@@ -1,11 +1,30 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AppSettings, Category } from './types';
-import { CORE_DOMAINS, MOCK_WATCHLIST } from './mockData';
+import { MOCK_WATCHLIST } from './mockData';
 import { readJsonStorage, STORAGE_KEYS, writeJsonStorage } from './storage';
+import {
+  DEFAULT_CORE_DOMAINS,
+  DEFAULT_FOLLOWED_TOPICS,
+  DEFAULT_MUTED_TOPICS,
+  sanitizeCoreDomains,
+  sanitizeFollowedTopics,
+  sanitizeMutedTopics,
+  uniqueStrings,
+} from './topicPreferences';
 
 interface AppContextType {
   settings: AppSettings;
   updateSettings: (newSettings: Partial<AppSettings>) => void;
+  setCoreDomains: (domains: Category[]) => void;
+  addCoreDomains: (domains: Category[]) => void;
+  removeCoreDomain: (domain: Category) => void;
+  setFollowedTopics: (topics: string[]) => void;
+  addFollowedTopics: (topics: string[]) => void;
+  removeFollowedTopic: (topic: string) => void;
+  toggleFollowedTopic: (topic: string) => void;
+  setMutedTopics: (topics: string[]) => void;
+  addMutedTopics: (topics: string[]) => void;
+  unmuteTopic: (topic: string) => void;
   savedSignals: string[];
   toggleSaveSignal: (signalId: string) => void;
   watchlist: string[];
@@ -21,7 +40,6 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const DEFAULT_PROTOTYPE_TOAST = 'Prototype only: this action is not wired yet.';
-const VALID_CATEGORIES = new Set<Category>(CORE_DOMAINS);
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every(item => typeof item === 'string');
@@ -43,9 +61,9 @@ const sanitizeSettings = (value: unknown): AppSettings => {
   const defaultSettings: AppSettings = {
     readingMode: 'Bilingual',
     translationStyle: 'Professional Analysis',
-    preferredTopics: ['AI', 'Energy'],
-    followedTopics: ['AI Data Center Power Demand', 'Nuclear Energy'],
-    mutedTopics: ['Meme Coins'],
+    preferredTopics: DEFAULT_CORE_DOMAINS,
+    followedTopics: DEFAULT_FOLLOWED_TOPICS,
+    mutedTopics: DEFAULT_MUTED_TOPICS,
     criticalAlerts: true,
     darkMode: true,
   };
@@ -55,8 +73,9 @@ const sanitizeSettings = (value: unknown): AppSettings => {
   }
 
   const parsed = value as Partial<AppSettings>;
-  const preferredTopics = sanitizeStringArray(parsed.preferredTopics, defaultSettings.preferredTopics)
-    .filter((topic): topic is Category => VALID_CATEGORIES.has(topic as Category));
+  const preferredTopics = sanitizeCoreDomains(
+    sanitizeStringArray(parsed.preferredTopics, defaultSettings.preferredTopics)
+  );
 
   return {
     readingMode:
@@ -73,8 +92,12 @@ const sanitizeSettings = (value: unknown): AppSettings => {
         ? parsed.translationStyle
         : defaultSettings.translationStyle,
     preferredTopics: preferredTopics.length > 0 ? preferredTopics : defaultSettings.preferredTopics,
-    followedTopics: sanitizeStringArray(parsed.followedTopics, defaultSettings.followedTopics),
-    mutedTopics: sanitizeStringArray(parsed.mutedTopics, defaultSettings.mutedTopics),
+    followedTopics: sanitizeFollowedTopics(
+      sanitizeStringArray(parsed.followedTopics, defaultSettings.followedTopics)
+    ),
+    mutedTopics: sanitizeMutedTopics(
+      sanitizeStringArray(parsed.mutedTopics, defaultSettings.mutedTopics)
+    ),
     criticalAlerts:
       typeof parsed.criticalAlerts === 'boolean'
         ? parsed.criticalAlerts
@@ -121,7 +144,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [notes]);
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings(prev => ({ ...prev, ...newSettings }));
+    setSettings(prev => ({
+      ...prev,
+      ...newSettings,
+      preferredTopics: newSettings.preferredTopics
+        ? sanitizeCoreDomains(newSettings.preferredTopics)
+        : prev.preferredTopics,
+      followedTopics: newSettings.followedTopics
+        ? sanitizeFollowedTopics(newSettings.followedTopics)
+        : prev.followedTopics,
+      mutedTopics: newSettings.mutedTopics
+        ? sanitizeMutedTopics(newSettings.mutedTopics)
+        : prev.mutedTopics,
+    }));
+  };
+
+  const setCoreDomains = (domains: Category[]) => {
+    updateSettings({
+      preferredTopics: sanitizeCoreDomains(domains).length > 0
+        ? sanitizeCoreDomains(domains)
+        : DEFAULT_CORE_DOMAINS,
+    });
+  };
+
+  const addCoreDomains = (domains: Category[]) => {
+    setCoreDomains(uniqueStrings([...settings.preferredTopics, ...domains]) as Category[]);
+  };
+
+  const removeCoreDomain = (domain: Category) => {
+    const nextDomains = settings.preferredTopics.filter(topic => topic !== domain);
+    setCoreDomains(nextDomains.length > 0 ? nextDomains : DEFAULT_CORE_DOMAINS);
+  };
+
+  const setFollowedTopics = (topics: string[]) => {
+    updateSettings({ followedTopics: sanitizeFollowedTopics(topics) });
+  };
+
+  const addFollowedTopics = (topics: string[]) => {
+    setFollowedTopics([...settings.followedTopics, ...topics]);
+  };
+
+  const removeFollowedTopic = (topic: string) => {
+    setFollowedTopics(settings.followedTopics.filter(currentTopic => currentTopic !== topic));
+  };
+
+  const toggleFollowedTopic = (topic: string) => {
+    if (settings.followedTopics.includes(topic)) {
+      removeFollowedTopic(topic);
+    } else {
+      addFollowedTopics([topic]);
+    }
+  };
+
+  const setMutedTopics = (topics: string[]) => {
+    updateSettings({ mutedTopics: sanitizeMutedTopics(topics) });
+  };
+
+  const addMutedTopics = (topics: string[]) => {
+    setMutedTopics([...settings.mutedTopics, ...topics]);
+  };
+
+  const unmuteTopic = (topic: string) => {
+    setMutedTopics(settings.mutedTopics.filter(currentTopic => currentTopic !== topic));
   };
 
   const toggleSaveSignal = (signalId: string) => {
@@ -156,6 +240,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider value={{
       settings,
       updateSettings,
+      setCoreDomains,
+      addCoreDomains,
+      removeCoreDomain,
+      setFollowedTopics,
+      addFollowedTopics,
+      removeFollowedTopic,
+      toggleFollowedTopic,
+      setMutedTopics,
+      addMutedTopics,
+      unmuteTopic,
       savedSignals,
       toggleSaveSignal,
       watchlist,

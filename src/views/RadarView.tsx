@@ -12,16 +12,11 @@ interface RadarViewProps {
 }
 
 export default function RadarView({ onTopicClick, onResultSelect }: RadarViewProps) {
-  const { settings, updateSettings } = useApp();
+  const { settings, toggleFollowedTopic } = useApp();
 
   const handleToggleFollow = (e: React.MouseEvent, topicName: string) => {
     e.stopPropagation();
-    const current = settings.followedTopics;
-    if (current.includes(topicName)) {
-      updateSettings({ followedTopics: current.filter(t => t !== topicName) });
-    } else {
-      updateSettings({ followedTopics: [...current, topicName] });
-    }
+    toggleFollowedTopic(topicName);
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Header } from '../components/Header';
 import { SignalCard } from '../components/SignalCard';
 import { MOCK_SIGNALS } from '../mockData';
@@ -6,6 +6,7 @@ import { Signal, Category } from '../types';
 import { useApp } from '../AppContext';
 import { Plus } from 'lucide-react';
 import { AddTopicModal } from '../components/AddTopicModal';
+import { getTodayFilterOptions, getVisibleTodaySignals } from '../topicPreferences';
 
 interface TodayViewProps {
   onSignalClick: (signal: Signal) => void;
@@ -17,16 +18,14 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
   const [activeFilter, setActiveFilter] = useState<Category | 'All'>('All');
   const [isAddTopicModalOpen, setIsAddTopicModalOpen] = useState(false);
   
-  const filters: (Category | 'All')[] = ['All', ...settings.preferredTopics];
+  const filters = getTodayFilterOptions(settings.preferredTopics);
+  const filteredSignals = getVisibleTodaySignals(MOCK_SIGNALS, settings, activeFilter);
 
-  const filteredSignals = MOCK_SIGNALS.filter(signal => {
-    // If "All" is active, show signals that match ANY of the user's preferred topics
-    if (activeFilter === 'All') {
-      return signal.categories.some(cat => settings.preferredTopics.includes(cat));
+  useEffect(() => {
+    if (activeFilter !== 'All' && !settings.preferredTopics.includes(activeFilter)) {
+      setActiveFilter('All');
     }
-    // If specific filter is active, show signals matching that filter
-    return signal.categories.includes(activeFilter as Category);
-  });
+  }, [activeFilter, settings.preferredTopics]);
 
   return (
     <div className="flex flex-col min-h-full">
@@ -74,7 +73,11 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
         </div>
       </main>
 
-      <AddTopicModal isOpen={isAddTopicModalOpen} onClose={() => setIsAddTopicModalOpen(false)} />
+      <AddTopicModal
+        isOpen={isAddTopicModalOpen}
+        onClose={() => setIsAddTopicModalOpen(false)}
+        title="Add Topic"
+      />
     </div>
   );
 }

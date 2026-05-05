@@ -3,14 +3,19 @@ import { Zap, Cpu, Bitcoin, TrendingUp, Bot, Globe, AlertCircle, Shield, Target 
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../AppContext';
 import { Category } from '../types';
+import {
+  DEFAULT_CORE_DOMAINS,
+  DEFAULT_FOLLOWED_TOPICS,
+  DEFAULT_MUTED_TOPICS,
+} from '../topicPreferences';
 
 interface OnboardingViewProps {
   onComplete: () => void;
 }
 
 export default function OnboardingView({ onComplete }: OnboardingViewProps) {
-  const { updateSettings } = useApp();
-  const [selectedDomains, setSelectedDomains] = useState<Category[]>(['AI', 'Stocks', 'Macro']);
+  const { setCoreDomains, setFollowedTopics, setMutedTopics } = useApp();
+  const [selectedDomains, setSelectedDomains] = useState<Category[]>(DEFAULT_CORE_DOMAINS);
   const [showWarning, setShowWarning] = useState(false);
 
   const domains = [
@@ -43,7 +48,9 @@ export default function OnboardingView({ onComplete }: OnboardingViewProps) {
       setTimeout(() => setShowWarning(false), 3000);
       return;
     }
-    updateSettings({ preferredTopics: selectedDomains });
+    setCoreDomains(selectedDomains);
+    setFollowedTopics(DEFAULT_FOLLOWED_TOPICS);
+    setMutedTopics(DEFAULT_MUTED_TOPICS);
     onComplete();
   };
 

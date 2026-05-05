@@ -4,11 +4,83 @@ export const CORE_DOMAINS: Category[] = [
   'AI', 'Crypto', 'Stocks', 'Robotics', 'Energy', 'US Policy', 'China Policy', 'Australia Policy', 'Macro', 'Geopolitics'
 ];
 
+export const FOLLOWED_TOPIC_OPTIONS = [
+  'AI Data Center Power Demand',
+  'Nuclear Energy',
+  'US Chip Export Controls',
+  'China AI Policy',
+  'Australia Critical Minerals',
+  'Bitcoin ETF',
+  'Stablecoin Regulation',
+  'Humanoid Robotics',
+  'AI Agents',
+  'Semiconductor Supply Chain',
+];
+
+export const MUTED_TOPIC_OPTIONS = [
+  'Meme Coins',
+  'Celebrity Drama',
+  'Low-quality Rumors',
+];
+
+export const TOPIC_MODAL_GROUPS = {
+  Policy: [
+    'US Policy',
+    'China Policy',
+    'Australia Policy',
+    'Macro',
+    'Geopolitics',
+    'US Chip Export Controls',
+    'China AI Policy',
+    'Australia Critical Minerals',
+    'Stablecoin Regulation',
+  ],
+  Technology: [
+    'AI',
+    'Humanoid Robotics',
+    'AI Agents',
+    'AI Data Center Power Demand',
+    'Semiconductor Supply Chain',
+  ],
+  Markets: [
+    'Crypto',
+    'Stocks',
+    'Macro',
+    'Geopolitics',
+    'Bitcoin ETF',
+    'Stablecoin Regulation',
+  ],
+  Energy: [
+    'Energy',
+    'Nuclear Energy',
+    'AI Data Center Power Demand',
+    'Australia Critical Minerals',
+  ],
+};
+
+export const SUGGESTED_TOPICS = [
+  'US Policy',
+  'China Policy',
+  'Australia Policy',
+  'Macro',
+  'Geopolitics',
+  'AI Data Center Power Demand',
+  'Nuclear Energy',
+  'US Chip Export Controls',
+  'China AI Policy',
+  'Australia Critical Minerals',
+  'Bitcoin ETF',
+  'Stablecoin Regulation',
+  'Humanoid Robotics',
+  'AI Agents',
+  'Semiconductor Supply Chain',
+];
+
 export const AVAILABLE_TOPICS = {
-  'Policy': ['US Chip Export Controls', 'China AI Policy', 'Australia Critical Minerals', 'US Policy', 'China Policy', 'Stablecoin Regulation'],
-  'Technology': ['Humanoid Robotics', 'AI Agents', 'AI Data Center Power Demand', 'Semiconductor Supply Chain', 'Nuclear Energy', 'Battery Tech'],
-  'Markets': ['Bitcoin ETF', 'Macro', 'Geopolitics', 'NVIDIA Earnings', 'Stocks', 'Crypto'],
-  'Recommended': ['AI Data Center Power Demand', 'Nuclear Energy', 'US Chip Export Controls', 'Semiconductor Supply Chain', 'Data Center Infrastructure', 'Grid Infrastructure']
+  Policy: TOPIC_MODAL_GROUPS.Policy,
+  Technology: [...TOPIC_MODAL_GROUPS.Technology, 'Battery Tech'],
+  Markets: [...TOPIC_MODAL_GROUPS.Markets, 'NVIDIA Earnings'],
+  Recommended: SUGGESTED_TOPICS,
 };
 
 export const MOCK_SIGNALS: Signal[] = [

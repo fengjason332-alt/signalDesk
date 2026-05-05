@@ -224,7 +224,12 @@ export default function SettingsView({ onPreviewState, onResultSelect, onResetOn
         </div>
       </main>
 
-      <AddTopicModal isOpen={isManageModalOpen} onClose={() => setIsManageModalOpen(false)} />
+      <AddTopicModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
+        title="Manage Topics"
+        includeMutedTopics
+      />
     </div>
   );
 }
