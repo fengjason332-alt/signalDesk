@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { AppSettings, Signal, Category, ReadingMode, TranslationStyle } from './types';
-import { MOCK_SIGNALS, MOCK_WATCHLIST } from './mockData';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppSettings, Category } from './types';
+import { CORE_DOMAINS, MOCK_WATCHLIST } from './mockData';
+import { readJsonStorage, STORAGE_KEYS, writeJsonStorage } from './storage';
 
 interface AppContextType {
   settings: AppSettings;
@@ -12,63 +13,111 @@ interface AppContextType {
   removeFromWatchlist: (itemId: string) => void;
   notes: Record<string, string>;
   saveNote: (id: string, text: string) => void;
+  prototypeToast: string | null;
+  showPrototypeToast: (message?: string) => void;
+  clearPrototypeToast: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const DEFAULT_PROTOTYPE_TOAST = 'Prototype only: this action is not wired yet.';
+const VALID_CATEGORIES = new Set<Category>(CORE_DOMAINS);
+
+const isStringArray = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.every(item => typeof item === 'string');
+
+const sanitizeStringArray = (value: unknown, fallback: string[]) =>
+  isStringArray(value) ? value : fallback;
+
+const sanitizeNotes = (value: unknown): Record<string, string> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).filter(([, noteValue]) => typeof noteValue === 'string')
+  );
+};
+
+const sanitizeSettings = (value: unknown): AppSettings => {
+  const defaultSettings: AppSettings = {
+    readingMode: 'Bilingual',
+    translationStyle: 'Professional Analysis',
+    preferredTopics: ['AI', 'Energy'],
+    followedTopics: ['AI Data Center Power Demand', 'Nuclear Energy'],
+    mutedTopics: ['Meme Coins'],
+    criticalAlerts: true,
+    darkMode: true,
+  };
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return defaultSettings;
+  }
+
+  const parsed = value as Partial<AppSettings>;
+  const preferredTopics = sanitizeStringArray(parsed.preferredTopics, defaultSettings.preferredTopics)
+    .filter((topic): topic is Category => VALID_CATEGORIES.has(topic as Category));
+
+  return {
+    readingMode:
+      parsed.readingMode === 'Chinese Only' ||
+      parsed.readingMode === 'Bilingual' ||
+      parsed.readingMode === 'Original'
+        ? parsed.readingMode
+        : defaultSettings.readingMode,
+    translationStyle:
+      parsed.translationStyle === 'Professional Analysis' ||
+      parsed.translationStyle === 'Simple Chinese' ||
+      parsed.translationStyle === 'Accurate Translation' ||
+      parsed.translationStyle === 'Student-Friendly Explanation'
+        ? parsed.translationStyle
+        : defaultSettings.translationStyle,
+    preferredTopics: preferredTopics.length > 0 ? preferredTopics : defaultSettings.preferredTopics,
+    followedTopics: sanitizeStringArray(parsed.followedTopics, defaultSettings.followedTopics),
+    mutedTopics: sanitizeStringArray(parsed.mutedTopics, defaultSettings.mutedTopics),
+    criticalAlerts:
+      typeof parsed.criticalAlerts === 'boolean'
+        ? parsed.criticalAlerts
+        : defaultSettings.criticalAlerts,
+    darkMode: typeof parsed.darkMode === 'boolean' ? parsed.darkMode : defaultSettings.darkMode,
+  };
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const defaultSettings: AppSettings = {
-      readingMode: 'Bilingual',
-      translationStyle: 'Professional Analysis',
-      preferredTopics: ['AI', 'Energy'],
-      followedTopics: ['AI Data Center Power Demand', 'Nuclear Energy'],
-      mutedTopics: ['Meme Coins'],
-      criticalAlerts: true,
-      darkMode: true,
-    };
-    const saved = localStorage.getItem('signaldesk_settings');
-    if (!saved) return defaultSettings;
-    
-    try {
-      const parsed = JSON.parse(saved);
-      // Merge saved settings with defaults to ensure new fields are present
-      return { ...defaultSettings, ...parsed };
-    } catch (e) {
-      console.error('Error parsing settings', e);
-      return defaultSettings;
-    }
-  });
+  const [settings, setSettings] = useState<AppSettings>(() =>
+    sanitizeSettings(readJsonStorage(STORAGE_KEYS.settings, null))
+  );
 
-  const [savedSignals, setSavedSignals] = useState<string[]>(() => {
-    const saved = localStorage.getItem('signaldesk_saved');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const [savedSignals, setSavedSignals] = useState<string[]>(() =>
+    sanitizeStringArray(readJsonStorage(STORAGE_KEYS.savedSignals, []), [])
+  );
 
-  const [watchlist, setWatchlist] = useState<string[]>(() => {
-    const saved = localStorage.getItem('signaldesk_watchlist');
-    return saved ? JSON.parse(saved) : MOCK_WATCHLIST.map(w => w.id);
-  });
+  const [watchlist, setWatchlist] = useState<string[]>(() =>
+    sanitizeStringArray(
+      readJsonStorage(STORAGE_KEYS.watchlist, MOCK_WATCHLIST.map(item => item.id)),
+      MOCK_WATCHLIST.map(item => item.id)
+    )
+  );
 
-  const [notes, setNotes] = useState<Record<string, string>>(() => {
-    const saved = localStorage.getItem('signaldesk_notes');
-    return saved ? JSON.parse(saved) : {};
-  });
+  const [notes, setNotes] = useState<Record<string, string>>(() =>
+    sanitizeNotes(readJsonStorage(STORAGE_KEYS.notes, {}))
+  );
+  const [prototypeToast, setPrototypeToast] = useState<string | null>(null);
 
   useEffect(() => {
-    localStorage.setItem('signaldesk_settings', JSON.stringify(settings));
+    writeJsonStorage(STORAGE_KEYS.settings, settings);
   }, [settings]);
 
   useEffect(() => {
-    localStorage.setItem('signaldesk_saved', JSON.stringify(savedSignals));
+    writeJsonStorage(STORAGE_KEYS.savedSignals, savedSignals);
   }, [savedSignals]);
 
   useEffect(() => {
-    localStorage.setItem('signaldesk_watchlist', JSON.stringify(watchlist));
+    writeJsonStorage(STORAGE_KEYS.watchlist, watchlist);
   }, [watchlist]);
 
   useEffect(() => {
-    localStorage.setItem('signaldesk_notes', JSON.stringify(notes));
+    writeJsonStorage(STORAGE_KEYS.notes, notes);
   }, [notes]);
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
@@ -95,6 +144,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setNotes(prev => ({ ...prev, [id]: text }));
   };
 
+  const showPrototypeToast = (message = DEFAULT_PROTOTYPE_TOAST) => {
+    setPrototypeToast(message);
+  };
+
+  const clearPrototypeToast = () => {
+    setPrototypeToast(null);
+  };
+
   return (
     <AppContext.Provider value={{
       settings,
@@ -105,7 +162,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addToWatchlist,
       removeFromWatchlist,
       notes,
-      saveNote
+      saveNote,
+      prototypeToast,
+      showPrototypeToast,
+      clearPrototypeToast
     }}>
       {children}
     </AppContext.Provider>

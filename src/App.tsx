@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   TodayView, 
   RadarView, 
@@ -15,7 +15,9 @@ import WatchlistItemDetailView from './views/WatchlistItemDetailView';
 import { BottomNav } from './components/BottomNav';
 import { Signal, WatchlistItem, Topic } from './types';
 import { AnimatePresence, motion } from 'motion/react';
-import { AppProvider } from './AppContext';
+import { AppProvider, useApp } from './AppContext';
+import { DetailPayload, toDetailPayloadFromLibraryItem, toDetailPayloadFromSignal } from './detailPayload';
+import { readBooleanStorage, removeStorageKey, STORAGE_KEYS, writeBooleanStorage } from './storage';
 
 export type ViewType = 
   | 'today' 
@@ -31,11 +33,34 @@ export type ViewType =
   | 'watchlist-detail';
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<ViewType>('onboarding');
+  return (
+    <AppProvider>
+      <AppShell />
+    </AppProvider>
+  );
+}
+
+function AppShell() {
+  const [currentView, setCurrentView] = useState<ViewType>(() =>
+    readBooleanStorage(STORAGE_KEYS.onboardingComplete, false) ? 'today' : 'onboarding'
+  );
   const [navigationStack, setNavigationStack] = useState<ViewType[]>([]);
-  const [selectedSignal, setSelectedSignal] = useState<Signal | null>(null);
+  const [selectedDetail, setSelectedDetail] = useState<DetailPayload | null>(null);
   const [selectedWatchItem, setSelectedWatchItem] = useState<WatchlistItem | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
+  const { prototypeToast, clearPrototypeToast } = useApp();
+
+  useEffect(() => {
+    if (!prototypeToast) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      clearPrototypeToast();
+    }, 2400);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [prototypeToast, clearPrototypeToast]);
 
   const navigateTo = (view: ViewType) => {
     setNavigationStack(prev => [...prev, currentView]);
@@ -52,9 +77,13 @@ export default function App() {
     }
   };
 
-  const navigateToSignal = (signal: Signal) => {
-    setSelectedSignal(signal);
+  const openDetail = (detail: DetailPayload) => {
+    setSelectedDetail(detail);
     navigateTo('detail');
+  };
+
+  const navigateToSignal = (signal: Signal) => {
+    openDetail(toDetailPayloadFromSignal(signal));
   };
 
   const navigateToTopic = (topic: Topic) => {
@@ -68,17 +97,27 @@ export default function App() {
   };
 
   const handleOnboardingComplete = () => {
+    writeBooleanStorage(STORAGE_KEYS.onboardingComplete, true);
     setCurrentView('loading');
     setTimeout(() => {
       setCurrentView('today');
     }, 2000);
   };
 
+  const handleResetOnboarding = () => {
+    removeStorageKey(STORAGE_KEYS.onboardingComplete);
+    setNavigationStack([]);
+    setSelectedDetail(null);
+    setSelectedTopic(null);
+    setSelectedWatchItem(null);
+    setCurrentView('onboarding');
+  };
+
   const handleSearchResultSelect = (type: 'signal' | 'topic' | 'library' | 'watchlist', item: any) => {
-    if (type === 'signal' || type === 'library') {
-      // Library items are mapped to signals in the view, 
-      // but for direct search results we might need to handle them
-      navigateToSignal(item);
+    if (type === 'signal') {
+      openDetail(toDetailPayloadFromSignal(item));
+    } else if (type === 'library') {
+      openDetail(toDetailPayloadFromLibraryItem(item));
     } else if (type === 'topic') {
       navigateToTopic(item);
     } else if (type === 'watchlist') {
@@ -99,11 +138,17 @@ export default function App() {
       case 'watchlist':
         return <WatchlistView onSelectItem={navigateToWatchItem} onResultSelect={handleSearchResultSelect} />;
       case 'library':
-        return <LibraryView onSignalClick={navigateToSignal} onResultSelect={handleSearchResultSelect} />;
+        return <LibraryView onOpenDetail={openDetail} onResultSelect={handleSearchResultSelect} />;
       case 'settings':
-        return <SettingsView onPreviewState={(state) => setCurrentView(state)} onResultSelect={handleSearchResultSelect} />;
+        return (
+          <SettingsView
+            onPreviewState={(state) => setCurrentView(state)}
+            onResultSelect={handleSearchResultSelect}
+            onResetOnboarding={handleResetOnboarding}
+          />
+        );
       case 'detail':
-        return <DetailView signal={selectedSignal} onBack={goBack} />;
+        return <DetailView detail={selectedDetail} onBack={goBack} />;
       case 'topic-synthesis':
         return <TopicSynthesisView topic={selectedTopic} onBack={goBack} onSignalClick={navigateToSignal} />;
       case 'watchlist-detail':
@@ -118,28 +163,39 @@ export default function App() {
   const showNav = !['onboarding', 'loading', 'detail', 'topic-synthesis', 'watchlist-detail'].includes(currentView);
 
   return (
-    <AppProvider>
-      <div className="flex flex-col min-h-screen max-w-md mx-auto relative shadow-2xl bg-background border-x border-outline/10">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentView}
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-            className="flex-1 pb-24"
-          >
-            {renderView()}
-          </motion.div>
-        </AnimatePresence>
+    <div className="flex flex-col min-h-screen max-w-md mx-auto relative shadow-2xl bg-background border-x border-outline/10">
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentView}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.2 }}
+          className="flex-1 pb-24"
+        >
+          {renderView()}
+        </motion.div>
+      </AnimatePresence>
 
-        {showNav && (
-          <BottomNav 
-            activeTab={currentView as any} 
-            onTabChange={(view) => setCurrentView(view as any)} 
-          />
+      <AnimatePresence>
+        {prototypeToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            className="fixed bottom-28 left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-primary/20 bg-surface/95 px-4 py-3 text-sm text-on-surface shadow-[0_12px_36px_rgba(0,0,0,0.35)] backdrop-blur-md"
+          >
+            {prototypeToast}
+          </motion.div>
         )}
-      </div>
-    </AppProvider>
+      </AnimatePresence>
+
+      {showNav && (
+        <BottomNav 
+          activeTab={currentView as any} 
+          onTabChange={(view) => setCurrentView(view as any)} 
+        />
+      )}
+    </div>
   );
 }

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Header } from '../components/Header';
-import { Plus, LayoutGrid, StretchHorizontal, MoreVertical, TrendingUp, TrendingDown, Bell, Eye, Share2, Trash2 } from 'lucide-react';
+import { Plus, LayoutGrid, StretchHorizontal, MoreVertical, TrendingUp, TrendingDown, Bell, Eye, Trash2 } from 'lucide-react';
 import { MOCK_WATCHLIST } from '../mockData';
 import { WatchlistItem } from '../types';
 import { useApp } from '../AppContext';
@@ -13,7 +13,7 @@ interface WatchlistViewProps {
 }
 
 export default function WatchlistView({ onSelectItem, onResultSelect }: WatchlistViewProps) {
-  const { watchlist, addToWatchlist, removeFromWatchlist } = useApp();
+  const { watchlist, addToWatchlist, removeFromWatchlist, showPrototypeToast } = useApp();
   const [isCompact, setIsCompact] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
@@ -98,12 +98,20 @@ export default function WatchlistView({ onSelectItem, onResultSelect }: Watchlis
                             </button>
                             {activeMenuId === item.id && (
                               <div className="absolute right-0 top-full mt-1 w-32 bg-surface-high border border-outline/20 rounded-xl shadow-2xl z-10 overflow-hidden">
-                                <button className="w-full px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors flex items-center gap-2">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(null);
+                                    showPrototypeToast();
+                                  }}
+                                  className="w-full px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors flex items-center gap-2"
+                                >
                                   <Bell size={12} /> Mute
                                 </button>
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    setActiveMenuId(null);
                                     removeFromWatchlist(item.id);
                                   }}
                                   className="w-full px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-error hover:bg-error/10 transition-colors flex items-center gap-2"

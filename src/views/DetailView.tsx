@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Bookmark, ChevronDown, Share2, Globe, FileText, Languages, CheckCircle2 } from 'lucide-react';
-import { Signal, ReadingMode, TranslationStyle } from '../types';
+import { ReadingMode, TranslationStyle } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../AppContext';
+import { DetailPayload } from '../detailPayload';
 
 interface DetailViewProps {
-  signal: Signal | null;
+  detail: DetailPayload | null;
   onBack: () => void;
 }
 
@@ -16,24 +17,25 @@ const TRANSLATION_STYLES: TranslationStyle[] = [
   'Student-Friendly Explanation'
 ];
 
-export default function DetailView({ signal, onBack }: DetailViewProps) {
-  const { settings, updateSettings, savedSignals, toggleSaveSignal, notes, saveNote } = useApp();
+export default function DetailView({ detail, onBack }: DetailViewProps) {
+  const { settings, updateSettings, savedSignals, toggleSaveSignal, notes, saveNote, showPrototypeToast } = useApp();
   const [localNote, setLocalNote] = useState('');
   const [isNoteSaved, setIsNoteSaved] = useState(false);
   const [showStyles, setShowStyles] = useState(false);
 
   useEffect(() => {
-    if (signal) {
-      setLocalNote(notes[signal.id] || '');
+    if (detail) {
+      setLocalNote(notes[detail.id] || '');
     }
-  }, [signal, notes]);
+  }, [detail, notes]);
 
-  if (!signal) return null;
+  if (!detail) return null;
 
-  const isSaved = savedSignals.includes(signal.id);
+  const isSaveable = detail.kind === 'signal';
+  const isSaved = isSaveable && savedSignals.includes(detail.id);
 
   const handleSaveNote = () => {
-    saveNote(signal.id, localNote);
+    saveNote(detail.id, localNote);
     setIsNoteSaved(true);
     setTimeout(() => setIsNoteSaved(false), 2000);
   };
@@ -50,12 +52,21 @@ export default function DetailView({ signal, onBack }: DetailViewProps) {
         <span className="font-display font-bold text-sm tracking-tight text-on-surface">SignalDetail</span>
         <div className="flex items-center gap-2">
           <button 
-            onClick={() => toggleSaveSignal(signal.id)}
+            onClick={() => {
+              if (isSaveable) {
+                toggleSaveSignal(detail.id);
+              } else {
+                showPrototypeToast('Prototype only: saving library documents is not wired yet.');
+              }
+            }}
             className={`p-2 transition-colors ${isSaved ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
           >
             <Bookmark size={20} fill={isSaved ? 'currentColor' : 'none'} />
           </button>
-          <button className="p-2 text-on-surface-variant hover:text-primary transition-colors">
+          <button
+            onClick={() => showPrototypeToast()}
+            className="p-2 text-on-surface-variant hover:text-primary transition-colors"
+          >
             <Share2 size={20} />
           </button>
         </div>
@@ -65,21 +76,28 @@ export default function DetailView({ signal, onBack }: DetailViewProps) {
         {/* Intro */}
         <section className="space-y-4">
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
-            {signal.categories.map(cat => (
+            {detail.categories.map(cat => (
               <span key={cat} className="text-[10px] uppercase font-bold tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded whitespace-nowrap">
                 {cat}
               </span>
             ))}
+            {detail.libraryMeta && (
+              <span className="text-[10px] uppercase font-bold tracking-widest text-[#ffae00] bg-[#ffae00]/10 px-2 py-0.5 rounded whitespace-nowrap">
+                {detail.libraryMeta.title}
+              </span>
+            )}
             <span className="text-[10px] text-on-surface-variant tracking-wide font-medium whitespace-nowrap">
-              {signal.source.toUpperCase()} · {signal.timestamp.toUpperCase()}
+              {detail.source.toUpperCase()} · {detail.timestamp.toUpperCase()}
             </span>
           </div>
           <h1 className="text-3xl font-bold text-on-surface leading-tight">
-            {signal.titleZh}
+            {detail.titleZh}
           </h1>
-          <p className="text-sm italic text-on-surface-variant opacity-70">
-            {signal.titleEn}
-          </p>
+          {detail.titleEn && (
+            <p className="text-sm italic text-on-surface-variant opacity-70">
+              {detail.titleEn}
+            </p>
+          )}
         </section>
 
         {/* Quick Summary Card */}
@@ -88,33 +106,35 @@ export default function DetailView({ signal, onBack }: DetailViewProps) {
             AI Summary / 核心洞察
           </h3>
           <p className="text-xl text-on-surface font-medium leading-relaxed">
-            {signal.summaryZh}
+            {detail.summaryZh}
           </p>
         </div>
 
         {/* Why it matters */}
-        <div className="bg-surface-low rounded-2xl border border-outline/10 p-6 space-y-4">
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
-            Why it matters / 为什么重要
-          </h3>
-          <ul className="space-y-4">
-            {signal.whyItMatters.map((item, i) => (
-              <li key={i} className="flex gap-4 text-sm text-on-surface-variant leading-relaxed">
-                <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0 shadow-[0_0_8px_#00e5ff]" />
-                {item}
-              </li>
-            ))}
-          </ul>
-        </div>
+        {detail.whyItMatters.length > 0 && (
+          <div className="bg-surface-low rounded-2xl border border-outline/10 p-6 space-y-4">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
+              Why it matters / 为什么重要
+            </h3>
+            <ul className="space-y-4">
+              {detail.whyItMatters.map((item, i) => (
+                <li key={i} className="flex gap-4 text-sm text-on-surface-variant leading-relaxed">
+                  <div className="w-1.5 h-1.5 rounded-full bg-primary mt-2 shrink-0 shadow-[0_0_8px_#00e5ff]" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {/* Glossary */}
-        {signal.glossary && (
+        {detail.glossary && (
           <div className="bg-surface-lowest rounded-2xl border border-outline/5 p-6 space-y-4">
             <h3 className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
               Glossary / 术语解释
             </h3>
             <div className="grid gap-4">
-              {signal.glossary.map((g, i) => (
+              {detail.glossary.map((g, i) => (
                 <div key={i} className="flex flex-col gap-1">
                   <span className="text-sm font-bold text-on-surface">{g.term}</span>
                   <span className="text-xs text-on-surface-variant leading-relaxed">{g.definition}</span>
@@ -184,7 +204,7 @@ export default function DetailView({ signal, onBack }: DetailViewProps) {
 
         {/* Content Feed */}
         <article className="space-y-12 pb-12">
-          {signal.content?.map((p, i) => (
+          {detail.content?.map((p, i) => (
             <div key={i} className="space-y-4">
               {(readingMode === 'Bilingual' || readingMode === 'Original') && (
                 <p className="text-sm text-on-surface-variant leading-relaxed font-serif tracking-wide italic opacity-80 pl-6 border-l-2 border-primary/20">
@@ -198,10 +218,14 @@ export default function DetailView({ signal, onBack }: DetailViewProps) {
               )}
             </div>
           ))}
-          {!signal.content && (
+          {!detail.content && (
             <div className="py-20 text-center text-on-surface-variant/40 italic flex flex-col items-center">
               <FileText size={48} strokeWidth={1} className="mb-4 opacity-20" />
-              <p>Detailed analysis for this signal is being synthesized...</p>
+              <p>
+                {detail.kind === 'library'
+                  ? 'Full document content is not available in this prototype yet.'
+                  : 'Detailed analysis for this signal is being synthesized...'}
+              </p>
             </div>
           )}
         </article>
@@ -223,7 +247,7 @@ export default function DetailView({ signal, onBack }: DetailViewProps) {
           />
           <button 
             onClick={handleSaveNote}
-            disabled={localNote === (notes[signal.id] || '')}
+            disabled={localNote === (notes[detail.id] || '')}
             className="w-full bg-primary/10 text-primary border border-primary/20 py-3 rounded-xl text-xs font-bold hover:bg-primary/20 active:scale-[0.98] disabled:opacity-30 disabled:active:scale-100 transition-all uppercase tracking-wider"
           >
             {isNoteSaved ? 'Note Saved' : 'Save Note'}

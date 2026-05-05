@@ -1,9 +1,10 @@
 import React from 'react';
-import { Header } from '../components/Header';
 import { ArrowLeft, Share2, TrendingUp, Users, MessageSquare, Zap } from 'lucide-react';
 import { Topic, Signal } from '../types';
 import { MOCK_SIGNALS } from '../mockData';
 import { SignalCard } from '../components/SignalCard';
+import { isSignalRelatedToTopic } from '../detailPayload';
+import { useApp } from '../AppContext';
 
 interface TopicSynthesisViewProps {
   topic: Topic | null;
@@ -12,11 +13,11 @@ interface TopicSynthesisViewProps {
 }
 
 export default function TopicSynthesisView({ topic, onBack, onSignalClick }: TopicSynthesisViewProps) {
+  const { showPrototypeToast } = useApp();
+
   if (!topic) return null;
 
-  const relatedSignals = MOCK_SIGNALS.filter(s => 
-    s.category === topic.category || s.tags.some(tag => topic.tags.includes(tag))
-  );
+  const relatedSignals = MOCK_SIGNALS.filter(signal => isSignalRelatedToTopic(signal, topic));
 
   return (
     <div className="min-h-screen bg-background">
@@ -25,7 +26,10 @@ export default function TopicSynthesisView({ topic, onBack, onSignalClick }: Top
           <ArrowLeft size={20} />
         </button>
         <span className="text-sm font-bold tracking-widest uppercase text-on-surface-variant">Synthesis</span>
-        <button className="p-2 -mr-2 text-on-surface hover:bg-surface rounded-full transition-colors">
+        <button
+          onClick={() => showPrototypeToast()}
+          className="p-2 -mr-2 text-on-surface hover:bg-surface rounded-full transition-colors"
+        >
           <Share2 size={20} />
         </button>
       </header>

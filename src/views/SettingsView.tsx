@@ -3,17 +3,18 @@ import { Header } from '../components/Header';
 import { motion } from 'motion/react';
 import { User, Bell, Languages, Layout, Shield, ChevronRight, Globe, Gauge, Moon, Zap, MousePointer2, Plus, VolumeX, Heart, Hash } from 'lucide-react';
 import { useApp } from '../AppContext';
-import { Category, ReadingMode, TranslationStyle } from '../types';
+import { ReadingMode } from '../types';
 import { ViewType } from '../App';
 import { AddTopicModal } from '../components/AddTopicModal';
 
 interface SettingsViewProps {
   onPreviewState?: (state: ViewType) => void;
   onResultSelect?: (type: 'signal' | 'topic' | 'library' | 'watchlist', item: any) => void;
+  onResetOnboarding?: () => void;
 }
 
-export default function SettingsView({ onPreviewState, onResultSelect }: SettingsViewProps) {
-  const { settings, updateSettings } = useApp();
+export default function SettingsView({ onPreviewState, onResultSelect, onResetOnboarding }: SettingsViewProps) {
+  const { settings, updateSettings, showPrototypeToast } = useApp();
   const [isManageModalOpen, setIsManageModalOpen] = React.useState(false);
 
   return (
@@ -52,13 +53,16 @@ export default function SettingsView({ onPreviewState, onResultSelect }: Setting
                   ))}
                 </div>
               </div>
-              <div className="p-4 flex items-center justify-between group cursor-pointer hover:bg-white/5 transition-colors">
+              <button
+                onClick={() => showPrototypeToast()}
+                className="w-full p-4 flex items-center justify-between group cursor-pointer hover:bg-white/5 transition-colors text-left"
+              >
                 <div className="space-y-0.5">
                   <span className="text-sm font-medium text-on-surface block">Translation Style</span>
                   <span className="text-[10px] text-primary font-bold">{settings.translationStyle}</span>
                 </div>
                 <ChevronRight size={16} className="text-on-surface-variant" />
-              </div>
+              </button>
             </div>
           </section>
 
@@ -193,12 +197,27 @@ export default function SettingsView({ onPreviewState, onResultSelect }: Setting
                 </div>
                 <ChevronRight size={16} className="text-on-surface-variant/40" />
               </button>
+              {onResetOnboarding && (
+                <button 
+                  onClick={onResetOnboarding}
+                  className="w-full p-4 flex items-center justify-between hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <User size={16} className="text-on-surface-variant" />
+                    <span className="text-sm font-medium text-on-surface">Reset Onboarding</span>
+                  </div>
+                  <ChevronRight size={16} className="text-on-surface-variant/40" />
+                </button>
+              )}
             </div>
           </section>
 
           <footer className="py-10 text-center space-y-4">
             <div className="text-[10px] text-on-surface-variant/30 uppercase tracking-[4px] font-bold">SignalDesk v0.4.2</div>
-            <button className="text-xs font-bold text-error border border-error/20 px-6 py-2 rounded-xl hover:bg-error/5 transition-colors">
+            <button
+              onClick={() => showPrototypeToast()}
+              className="text-xs font-bold text-error border border-error/20 px-6 py-2 rounded-xl hover:bg-error/5 transition-colors"
+            >
               Log Out of Intelligence Feed
             </button>
           </footer>

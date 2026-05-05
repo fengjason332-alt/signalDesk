@@ -3,6 +3,8 @@ import { ArrowLeft, MoreVertical, TrendingUp, TrendingDown, Bell, Globe, Activit
 import { WatchlistItem, Signal } from '../types';
 import { MOCK_SIGNALS } from '../mockData';
 import { SignalCard } from '../components/SignalCard';
+import { isSignalRelatedToWatchlistItem } from '../detailPayload';
+import { useApp } from '../AppContext';
 
 interface WatchlistItemDetailViewProps {
   item: WatchlistItem | null;
@@ -11,11 +13,11 @@ interface WatchlistItemDetailViewProps {
 }
 
 export default function WatchlistItemDetailView({ item, onBack, onSignalClick }: WatchlistItemDetailViewProps) {
+  const { showPrototypeToast } = useApp();
+
   if (!item) return null;
 
-  const relatedSignals = MOCK_SIGNALS.filter(s => 
-    s.tags.includes(item.name) || s.titleZh.includes(item.name)
-  );
+  const relatedSignals = MOCK_SIGNALS.filter(signal => isSignalRelatedToWatchlistItem(signal, item));
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -24,7 +26,10 @@ export default function WatchlistItemDetailView({ item, onBack, onSignalClick }:
           <ArrowLeft size={20} />
         </button>
         <span className="text-sm font-bold tracking-widest uppercase text-on-surface-variant">Entity Profile</span>
-        <button className="p-2 -mr-2 text-on-surface hover:bg-surface rounded-full transition-colors">
+        <button
+          onClick={() => showPrototypeToast()}
+          className="p-2 -mr-2 text-on-surface hover:bg-surface rounded-full transition-colors"
+        >
           <MoreVertical size={20} />
         </button>
       </header>
@@ -87,7 +92,10 @@ export default function WatchlistItemDetailView({ item, onBack, onSignalClick }:
         <section>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-sm font-bold uppercase tracking-widest text-on-surface">Recent Coverage</h2>
-            <button className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline">
+            <button
+              onClick={() => showPrototypeToast()}
+              className="text-[10px] font-bold uppercase tracking-widest text-primary hover:underline"
+            >
               View All
             </button>
           </div>

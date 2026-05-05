@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
 import { Header } from '../components/Header';
-import { Search, Bookmark, BookOpen, Trash2, Filter } from 'lucide-react';
+import { Search, Bookmark, BookOpen } from 'lucide-react';
 import { MOCK_LIBRARY, MOCK_SIGNALS } from '../mockData';
-import { Signal, LibraryItem } from '../types';
+import { DetailPayload } from '../detailPayload';
 import { useApp } from '../AppContext';
 import { motion, AnimatePresence } from 'motion/react';
+import { toDetailPayloadFromLibraryItem, toDetailPayloadFromSignal } from '../detailPayload';
 
 interface LibraryViewProps {
-  onSignalClick: (signal: Signal) => void;
+  onOpenDetail: (detail: DetailPayload) => void;
   onResultSelect?: (type: 'signal' | 'topic' | 'library' | 'watchlist', item: any) => void;
 }
 
-export default function LibraryView({ onSignalClick, onResultSelect }: LibraryViewProps) {
-  const { savedSignals, toggleSaveSignal } = useApp();
+export default function LibraryView({ onOpenDetail, onResultSelect }: LibraryViewProps) {
+  const { savedSignals, toggleSaveSignal, showPrototypeToast } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   
@@ -53,22 +54,9 @@ export default function LibraryView({ onSignalClick, onResultSelect }: LibraryVi
 
   const handleItemClick = (item: any) => {
     if (item.isSignal) {
-      onSignalClick(item.original);
+      onOpenDetail(toDetailPayloadFromSignal(item.original));
     } else {
-      // Create a mock signal from library item for detail view compatibility
-      onSignalClick({
-        id: item.id,
-        category: 'Macro',
-        titleZh: item.title,
-        titleEn: 'Research Document',
-        summaryZh: item.summaryZh,
-        whyItMatters: [item.whyItMatters],
-        importance: 9.0,
-        source: item.source,
-        timestamp: item.date,
-        tags: item.tags,
-        content: [{ en: 'This is a research document from the library.', zh: '这是一份来自图书馆的研究文档。' }]
-      } as Signal);
+      onOpenDetail(toDetailPayloadFromLibraryItem(item));
     }
   };
 
@@ -131,6 +119,8 @@ export default function LibraryView({ onSignalClick, onResultSelect }: LibraryVi
                         e.stopPropagation();
                         if (item.isSignal) {
                           toggleSaveSignal(item.id);
+                        } else {
+                          showPrototypeToast('Prototype only: saving library documents is not wired yet.');
                         }
                       }}
                       className="text-primary hover:text-primary/70 transition-colors"
