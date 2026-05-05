@@ -163,7 +163,10 @@ function AppShell() {
   const showNav = !['onboarding', 'loading', 'detail', 'topic-synthesis', 'watchlist-detail'].includes(currentView);
 
   return (
-    <div className="flex flex-col min-h-screen max-w-md mx-auto relative shadow-2xl bg-background border-x border-outline/10">
+    <div
+      className="flex flex-col min-h-screen min-h-[100dvh] max-w-md mx-auto relative shadow-2xl bg-background border-x border-outline/10"
+      style={{paddingBottom: 'env(safe-area-inset-bottom, 0px)'}}
+    >
       <AnimatePresence mode="wait">
         <motion.div
           key={currentView}
@@ -171,7 +174,8 @@ function AppShell() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.2 }}
-          className="flex-1 pb-24"
+          className="flex-1"
+          style={{paddingBottom: 'calc(6rem + env(safe-area-inset-bottom, 0px))'}}
         >
           {renderView()}
         </motion.div>
@@ -184,6 +188,7 @@ function AppShell() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
             className="fixed bottom-28 left-1/2 z-40 w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 rounded-2xl border border-primary/20 bg-surface/95 px-4 py-3 text-sm text-on-surface shadow-[0_12px_36px_rgba(0,0,0,0.35)] backdrop-blur-md"
+            style={{bottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))'}}
           >
             {prototypeToast}
           </motion.div>

@@ -17,7 +17,10 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   ];
 
   return (
-    <nav className="fixed bottom-0 w-full max-w-md bg-surface/80 backdrop-blur-md border-t border-outline/20 p-2 flex justify-around items-end pb-8">
+    <nav
+      className="fixed bottom-0 w-full max-w-md bg-surface/80 backdrop-blur-md border-t border-outline/20 p-2 flex justify-around items-end"
+      style={{paddingBottom: 'calc(0.5rem + var(--safe-area-inset-bottom, var(--safe-area-bottom)))'}}
+    >
       {tabs.map((tab) => {
         const isActive = activeTab === tab.id;
         return (

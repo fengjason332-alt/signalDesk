@@ -22,7 +22,10 @@ export function Header({ title, showAvatar = true, showSearch = true, onResultSe
 
   return (
     <>
-      <header className="flex items-center justify-between p-4 sticky top-0 bg-background/50 backdrop-blur-sm z-10">
+      <header
+        className="flex items-center justify-between p-4 sticky top-0 bg-background/50 backdrop-blur-sm z-10"
+        style={{paddingTop: 'calc(1rem + var(--safe-area-top))'}}
+      >
         <div className="flex items-center gap-3">
           {showAvatar && (
             <div className="w-8 h-8 rounded-full bg-surface-high border border-outline/20 flex items-center justify-center overflow-hidden">

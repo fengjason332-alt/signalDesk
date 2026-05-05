@@ -24,11 +24,32 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+    --safe-area-top: env(safe-area-inset-top, 0px);
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+    background-color: #111318;
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100%;
+    background-color: #111318;
+  }
+
   body {
     @apply bg-background text-on-surface font-sans antialiased;
+    min-height: 100vh;
+    min-height: 100dvh;
     background-image: radial-gradient(circle, #282a2e 1px, transparent 1px);
     background-size: 24px 24px;
     background-attachment: fixed;
+  }
+
+  #root {
+    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   /* Custom Scrollbar */
