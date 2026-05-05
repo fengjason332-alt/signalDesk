@@ -160,3 +160,14 @@ test('bottom navigation and app shell reserve iPhone safe-area space', async () 
   assert.match(appSource, /safe-area-inset-bottom/);
   assert.match(navSource, /safe-area-inset-bottom/);
 });
+
+test('detail-style standalone views keep interactive headers below the iPhone status bar', async () => {
+  const detailSource = await readRepoFile('src', 'views', 'DetailView.tsx');
+  const topicSource = await readRepoFile('src', 'views', 'TopicSynthesisView.tsx');
+  const watchlistSource = await readRepoFile('src', 'views', 'WatchlistItemDetailView.tsx');
+
+  assert.match(detailSource, /safe-area-inset-top/);
+  assert.match(detailSource, /calc\(4rem \+ env\(safe-area-inset-top, 0px\)\)/);
+  assert.match(topicSource, /safe-area-inset-top/);
+  assert.match(watchlistSource, /safe-area-inset-top/);
+});

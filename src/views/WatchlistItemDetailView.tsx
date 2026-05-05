@@ -21,7 +21,13 @@ export default function WatchlistItemDetailView({ item, onBack, onSignalClick }:
 
   return (
     <div className="min-h-screen bg-background pb-12">
-      <header className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b border-outline/10 px-4 h-16 flex items-center justify-between">
+      <header
+        className="sticky top-0 z-20 bg-background/80 backdrop-blur-md border-b border-outline/10 px-4 pb-4 flex items-center justify-between"
+        style={{
+          paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))',
+          minHeight: 'calc(4rem + env(safe-area-inset-top, 0px))',
+        }}
+      >
         <button onClick={onBack} className="p-2 -ml-2 text-on-surface hover:bg-surface rounded-full transition-colors">
           <ArrowLeft size={20} />
         </button>

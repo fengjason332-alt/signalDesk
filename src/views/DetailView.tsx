@@ -45,7 +45,13 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
   return (
     <div className="flex flex-col min-h-screen bg-background relative">
       {/* Detail Header */}
-      <header className="flex items-center justify-between p-4 sticky top-0 bg-background/80 backdrop-blur-md z-20 border-b border-outline/10">
+      <header
+        className="flex items-center justify-between px-4 pb-4 sticky top-0 bg-background/80 backdrop-blur-md z-20 border-b border-outline/10"
+        style={{
+          paddingTop: 'calc(1rem + env(safe-area-inset-top, 0px))',
+          minHeight: 'calc(4rem + env(safe-area-inset-top, 0px))',
+        }}
+      >
         <button onClick={onBack} className="p-2 -ml-2 text-on-surface-variant hover:text-primary transition-colors">
           <ArrowLeft size={20} />
         </button>
@@ -145,7 +151,10 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
         )}
 
         {/* Reading Controls */}
-        <div className="sticky top-16 bg-background/95 backdrop-blur-md z-10 py-6 -mx-4 px-4 flex flex-col gap-4 border-b border-outline/10">
+        <div
+          className="sticky bg-background/95 backdrop-blur-md z-10 py-6 -mx-4 px-4 flex flex-col gap-4 border-b border-outline/10"
+          style={{top: 'calc(4rem + env(safe-area-inset-top, 0px))'}}
+        >
           <div className="flex bg-surface-high rounded-full p-1 border border-outline/10">
             {(['Chinese Only', 'Bilingual', 'Original'] as ReadingMode[]).map(mode => (
               <button
