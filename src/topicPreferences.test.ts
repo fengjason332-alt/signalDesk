@@ -8,12 +8,12 @@ import {
   matchesMutedTopics,
   matchesSelectedTopics,
 } from './topicPreferences';
-import { AppSettings, Category } from './types';
+import { AppSettings } from './types';
 
 const buildSettings = (overrides: Partial<AppSettings> = {}): AppSettings => ({
   readingMode: 'Bilingual',
   translationStyle: 'Professional Analysis',
-  preferredTopics: ['AI', 'Energy'],
+  preferredTopics: ['ai', 'energy'] as any,
   followedTopics: [],
   mutedTopics: [],
   criticalAlerts: true,
@@ -22,13 +22,13 @@ const buildSettings = (overrides: Partial<AppSettings> = {}): AppSettings => ({
 });
 
 test('builds Today filter chips from selected core domains only', () => {
-  assert.deepEqual(getTodayFilterOptions(['AI', 'Energy']), ['All', 'AI', 'Energy']);
-  assert.deepEqual(getTodayFilterOptions(['US Policy', 'Macro']), ['All', 'US Policy', 'Macro']);
+  assert.deepEqual(getTodayFilterOptions(['ai', 'energy'] as any), ['All', 'ai', 'energy']);
+  assert.deepEqual(getTodayFilterOptions(['us_policy', 'macro'] as any), ['All', 'us_policy', 'macro']);
 });
 
 test('shows signals matching selected core domains on the All feed', () => {
   const settings = buildSettings({
-    preferredTopics: ['AI', 'Energy'],
+    preferredTopics: ['ai', 'energy'] as any,
   });
 
   const visibleSignals = getVisibleTodaySignals(MOCK_SIGNALS, settings, 'All').map(signal => signal.id);
@@ -38,7 +38,7 @@ test('shows signals matching selected core domains on the All feed', () => {
 
 test('includes followed topics in the All feed even when their category is not selected', () => {
   const settings = buildSettings({
-    preferredTopics: ['AI', 'Energy'],
+    preferredTopics: ['ai', 'energy'] as any,
     followedTopics: ['US Chip Export Controls'],
   });
 
@@ -49,18 +49,18 @@ test('includes followed topics in the All feed even when their category is not s
 
 test('category chips still filter by category', () => {
   const settings = buildSettings({
-    preferredTopics: ['AI', 'Energy', 'US Policy'],
+    preferredTopics: ['ai', 'energy', 'us_policy'] as any,
     followedTopics: ['US Chip Export Controls'],
   });
 
-  const visibleSignals = getVisibleTodaySignals(MOCK_SIGNALS, settings, 'US Policy').map(signal => signal.id);
+  const visibleSignals = getVisibleTodaySignals(MOCK_SIGNALS, settings, 'us_policy' as any).map(signal => signal.id);
 
   assert.deepEqual(visibleSignals, ['s1', 's2', 's5']);
 });
 
 test('muted topics hide matching signals', () => {
   const settings = buildSettings({
-    preferredTopics: ['Crypto', 'US Policy'],
+    preferredTopics: ['crypto', 'us_policy'] as any,
     mutedTopics: ['Stablecoin Regulation'],
   });
 
@@ -74,4 +74,9 @@ test('topic matching uses structured fields consistently', () => {
   assert.equal(matchesSelectedTopics(MOCK_SIGNALS[2], ['AI Data Center Power Demand']), true);
   assert.equal(matchesSelectedTopics(MOCK_SIGNALS[4], ['Semiconductor Supply Chain']), true);
   assert.equal(matchesSelectedTopics(MOCK_SIGNALS[0], ['Nuclear Energy']), false);
+});
+
+test('custom muted topics use conservative fallback matching', () => {
+  assert.equal(matchesMutedTopics(MOCK_SIGNALS[0], ['AI']), false);
+  assert.equal(matchesMutedTopics(MOCK_SIGNALS[4], ['TradeWar']), true);
 });

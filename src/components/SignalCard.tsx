@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Signal } from '../types';
+import { getCategoryLabel, Signal } from '../types';
 import { Bookmark, ThumbsUp, ThumbsDown, Zap } from 'lucide-react';
 import { useApp } from '../AppContext';
 
@@ -33,7 +33,7 @@ export function SignalCard({ signal, onClick }: SignalCardProps) {
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
           {signal.categories.map(cat => (
             <span key={cat} className="text-[10px] uppercase font-bold tracking-widest text-[#00e5ff] bg-primary/10 px-2 py-0.5 rounded whitespace-nowrap">
-              {cat}
+              {getCategoryLabel(cat)}
             </span>
           ))}
           <span className="text-[10px] text-on-surface-variant flex items-center gap-1 border border-outline/10 px-1.5 py-0.5 rounded whitespace-nowrap">

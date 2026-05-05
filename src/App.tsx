@@ -17,7 +17,6 @@ import { Signal, WatchlistItem, Topic } from './types';
 import { AnimatePresence, motion } from 'motion/react';
 import { AppProvider, useApp } from './AppContext';
 import { DetailPayload, toDetailPayloadFromLibraryItem, toDetailPayloadFromSignal } from './detailPayload';
-import { readBooleanStorage, removeStorageKey, STORAGE_KEYS, writeBooleanStorage } from './storage';
 
 export type ViewType = 
   | 'today' 
@@ -41,14 +40,20 @@ export default function App() {
 }
 
 function AppShell() {
-  const [currentView, setCurrentView] = useState<ViewType>(() =>
-    readBooleanStorage(STORAGE_KEYS.onboardingComplete, false) ? 'today' : 'onboarding'
+  const {
+    prototypeToast,
+    clearPrototypeToast,
+    isOnboardingComplete,
+    completeOnboarding,
+    resetOnboarding,
+  } = useApp();
+  const [currentView, setCurrentView] = useState<ViewType>(
+    isOnboardingComplete ? 'today' : 'onboarding',
   );
   const [navigationStack, setNavigationStack] = useState<ViewType[]>([]);
   const [selectedDetail, setSelectedDetail] = useState<DetailPayload | null>(null);
   const [selectedWatchItem, setSelectedWatchItem] = useState<WatchlistItem | null>(null);
   const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
-  const { prototypeToast, clearPrototypeToast } = useApp();
 
   useEffect(() => {
     if (!prototypeToast) {
@@ -97,7 +102,7 @@ function AppShell() {
   };
 
   const handleOnboardingComplete = () => {
-    writeBooleanStorage(STORAGE_KEYS.onboardingComplete, true);
+    completeOnboarding();
     setCurrentView('loading');
     setTimeout(() => {
       setCurrentView('today');
@@ -105,7 +110,7 @@ function AppShell() {
   };
 
   const handleResetOnboarding = () => {
-    removeStorageKey(STORAGE_KEYS.onboardingComplete);
+    resetOnboarding();
     setNavigationStack([]);
     setSelectedDetail(null);
     setSelectedTopic(null);

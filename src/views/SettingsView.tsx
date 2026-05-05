@@ -3,7 +3,7 @@ import { Header } from '../components/Header';
 import { motion } from 'motion/react';
 import { User, Bell, Languages, Layout, Shield, ChevronRight, Globe, Gauge, Moon, Zap, MousePointer2, Plus, VolumeX, Heart, Hash } from 'lucide-react';
 import { useApp } from '../AppContext';
-import { ReadingMode } from '../types';
+import { getCategoryLabel, ReadingMode } from '../types';
 import { ViewType } from '../App';
 import { AddTopicModal } from '../components/AddTopicModal';
 
@@ -82,7 +82,7 @@ export default function SettingsView({ onPreviewState, onResultSelect, onResetOn
                   <div className="flex flex-wrap gap-1.5">
                     {settings.preferredTopics.map(topic => (
                       <span key={topic} className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-bold border border-primary/20">
-                        {topic}
+                        {getCategoryLabel(topic)}
                       </span>
                     ))}
                   </div>

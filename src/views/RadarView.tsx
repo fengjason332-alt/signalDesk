@@ -1,7 +1,7 @@
 import React from 'react';
 import { Header } from '../components/Header';
 import { MOCK_TOPICS } from '../mockData';
-import { Topic } from '../types';
+import { getCategoryLabel, Topic } from '../types';
 import { Zap, TrendingUp, ChevronRight, Plus, Check } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useApp } from '../AppContext';
@@ -95,7 +95,7 @@ export default function RadarView({ onTopicClick, onResultSelect }: RadarViewPro
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="px-1.5 py-0.5 rounded bg-primary/5 text-primary text-[8px] font-bold tracking-widest uppercase">
-                        {topic.category}
+                        {getCategoryLabel(topic.category)}
                       </span>
                       <div className="flex items-center gap-1 text-[10px] font-bold text-success">
                         <TrendingUp size={10} />

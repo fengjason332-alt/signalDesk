@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, Share2, TrendingUp, Users, MessageSquare, Zap } from 'lucide-react';
-import { Topic, Signal } from '../types';
+import { getCategoryLabel, Topic, Signal } from '../types';
 import { MOCK_SIGNALS } from '../mockData';
 import { SignalCard } from '../components/SignalCard';
 import { isSignalRelatedToTopic } from '../detailPayload';
@@ -43,7 +43,7 @@ export default function TopicSynthesisView({ topic, onBack, onSignalClick }: Top
       <main className="px-6 py-8">
         <div className="flex items-center gap-2 mb-4">
           <span className="px-2 py-0.5 rounded bg-primary/10 text-primary text-[10px] font-bold tracking-widest uppercase">
-            {topic.category}
+            {getCategoryLabel(topic.category)}
           </span>
           <span className="flex items-center gap-1 text-[10px] font-bold text-success">
             <TrendingUp size={12} />

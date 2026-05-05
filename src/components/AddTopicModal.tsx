@@ -6,7 +6,7 @@ import {
   FOLLOWED_TOPIC_OPTIONS,
   MUTED_TOPIC_OPTIONS,
 } from '../mockData';
-import { Category } from '../types';
+import { Category, getCategoryLabel } from '../types';
 import {
   DEFAULT_CORE_DOMAINS,
   getSuggestedTopics,
@@ -57,7 +57,11 @@ export function AddTopicModal({
   }, [isOpen, settings.preferredTopics, settings.followedTopics, settings.mutedTopics]);
 
   const filterItems = (items: string[]) =>
-    items.filter(item => item.toLowerCase().includes(searchQuery.toLowerCase()));
+    items.filter(item => {
+      const label = topicKindForValue(item) === 'core' ? getCategoryLabel(item as Category) : item;
+      const query = searchQuery.toLowerCase();
+      return item.toLowerCase().includes(query) || label.toLowerCase().includes(query);
+    });
 
   const isCoreSelected = (domain: Category) => draftCoreDomains.includes(domain);
   const isFollowedSelected = (topic: string) => draftFollowedTopics.includes(topic);
@@ -129,6 +133,9 @@ export function AddTopicModal({
     return <Hash size={16} />;
   };
 
+  const getItemLabel = (item: string) =>
+    topicKindForValue(item) === 'core' ? getCategoryLabel(item as Category) : item;
+
   const getSectionItems = (items: string[]) => uniqueItems(items);
 
   const renderSection = (sectionTitle: string, items: string[]) => {
@@ -156,7 +163,7 @@ export function AddTopicModal({
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isSelected ? 'bg-primary text-on-primary' : 'bg-surface-high text-on-surface-variant'}`}>
                     {getItemIcon(item)}
                   </div>
-                  <span className={`font-bold ${isSelected ? 'text-primary' : 'text-on-surface'}`}>{item}</span>
+                  <span className={`font-bold ${isSelected ? 'text-primary' : 'text-on-surface'}`}>{getItemLabel(item)}</span>
                 </div>
                 {isSelected ? <Check size={18} className="text-primary" /> : <Plus size={18} className="text-on-surface-variant/40" />}
               </button>

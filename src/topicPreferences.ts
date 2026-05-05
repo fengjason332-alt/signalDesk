@@ -1,11 +1,11 @@
+import { AppSettings, CATEGORY_KEYS, CategoryKey, getCategoryLabel, Signal } from './types';
 import {
-  CORE_DOMAINS,
-  FOLLOWED_TOPIC_OPTIONS,
-  MUTED_TOPIC_OPTIONS,
-  SUGGESTED_TOPICS,
-  TOPIC_MODAL_GROUPS,
-} from './mockData';
-import { AppSettings, Category, Signal } from './types';
+  findCanonicalTopicByValue,
+  canonicalTopicMatchTokens,
+  getAllCanonicalTopicNames,
+  getSuggestedTopicNames,
+  getTopicNamesForGroup,
+} from './topicRegistry';
 
 export type TopicModalTab =
   | 'All'
@@ -26,12 +26,17 @@ export const TOPIC_MODAL_TABS: TopicModalTab[] = [
   'Followed Topics',
 ];
 
-export const DEFAULT_CORE_DOMAINS: Category[] = ['AI', 'Energy'];
+export const DEFAULT_CORE_DOMAINS: CategoryKey[] = ['ai', 'energy'];
 export const DEFAULT_FOLLOWED_TOPICS: string[] = [];
 export const DEFAULT_MUTED_TOPICS: string[] = [];
 
-export const CORE_DOMAIN_SET = new Set<Category>(CORE_DOMAINS);
-export const FOLLOWED_TOPIC_OPTION_SET = new Set(FOLLOWED_TOPIC_OPTIONS);
+export const MUTED_TOPIC_OPTIONS = [
+  'Meme Coins',
+  'Celebrity Drama',
+  'Low-quality Rumors',
+];
+
+export const CORE_DOMAIN_SET = new Set<CategoryKey>(CATEGORY_KEYS);
 export const MUTED_TOPIC_OPTION_SET = new Set(MUTED_TOPIC_OPTIONS);
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
@@ -64,38 +69,101 @@ const matchesText = (left: string, right: string) => {
   );
 };
 
+const normalizeSignalCategories = (signal: Signal) =>
+  uniqueStrings(Array.isArray(signal.categories) ? signal.categories : []);
+
 const signalTokens = (signal: Signal) =>
   uniqueStrings([
-    ...signal.categories,
-    ...signal.topics,
-    ...signal.entities,
-    ...signal.tags,
+    ...normalizeSignalCategories(signal),
+    ...normalizeSignalCategories(signal).map(getCategoryLabel),
+    ...(Array.isArray(signal.topics) ? signal.topics : []),
+    ...(Array.isArray(signal.entities) ? signal.entities : []),
+    ...(Array.isArray(signal.tags) ? signal.tags : []),
   ]);
 
+const matchesCanonicalTopic = (signal: Signal, selectedTopic: string) => {
+  const canonicalTopic = findCanonicalTopicByValue(selectedTopic);
+  if (!canonicalTopic) {
+    return false;
+  }
+
+  const topicTokens = signalTokens(signal);
+  return topicTokens.some(token =>
+    canonicalTopicMatchTokens(canonicalTopic).some(matchToken => matchesText(token, matchToken)),
+  );
+};
+
+const matchesCustomTopic = (
+  signal: Signal,
+  selectedTopic: string,
+  mode: 'followed' | 'muted',
+) => {
+  const normalizedSelectedTopic = normalizeText(selectedTopic);
+  if (!normalizedSelectedTopic || normalizedSelectedTopic.length < 3) {
+    return false;
+  }
+
+  const topicTokens = signalTokens(signal).map(normalizeText);
+  const exactMatch = topicTokens.some(token => token === normalizedSelectedTopic);
+  if (exactMatch) {
+    return true;
+  }
+
+  if (mode === 'muted') {
+    if (normalizedSelectedTopic.length < 6) {
+      return false;
+    }
+
+    return topicTokens.some(token => token.includes(normalizedSelectedTopic));
+  }
+
+  if (normalizedSelectedTopic.length < 4) {
+    return false;
+  }
+
+  return topicTokens.some(
+    token =>
+      token.includes(normalizedSelectedTopic) ||
+      normalizedSelectedTopic.includes(token),
+  );
+};
+
 export const sanitizeCoreDomains = (values: string[]) =>
-  uniqueStrings(values).filter((value): value is Category => CORE_DOMAIN_SET.has(value as Category));
+  uniqueStrings(values).filter((value): value is CategoryKey =>
+    CORE_DOMAIN_SET.has(value as CategoryKey),
+  );
 
 export const sanitizeFollowedTopics = (values: string[]) => uniqueStrings(values);
 
 export const sanitizeMutedTopics = (values: string[]) => uniqueStrings(values);
 
-export const getTodayFilterOptions = (coreDomains: Category[]) => [
+export const getTodayFilterOptions = (coreDomains: CategoryKey[]) => [
   'All',
   ...sanitizeCoreDomains(coreDomains),
-] as Array<'All' | Category>;
+] as Array<'All' | CategoryKey>;
 
 export const matchesSelectedTopics = (signal: Signal, selectedTopics: string[]) =>
-  signalTokens(signal).some(token =>
-    selectedTopics.some(selectedTopic => matchesText(token, selectedTopic))
-  );
+  selectedTopics.some(selectedTopic => {
+    if (matchesCanonicalTopic(signal, selectedTopic)) {
+      return true;
+    }
+
+    return matchesCustomTopic(signal, selectedTopic, 'followed');
+  });
 
 export const matchesMutedTopics = (signal: Signal, mutedTopics: string[]) =>
-  matchesSelectedTopics(signal, mutedTopics);
+  mutedTopics.some(selectedTopic => {
+    if (matchesCanonicalTopic(signal, selectedTopic)) {
+      return true;
+    }
+
+    return matchesCustomTopic(signal, selectedTopic, 'muted');
+  });
 
 export const getVisibleTodaySignals = (
   signals: Signal[],
   settings: AppSettings,
-  activeFilter: 'All' | Category
+  activeFilter: 'All' | CategoryKey,
 ) => {
   const selectedCoreDomains = sanitizeCoreDomains(settings.preferredTopics);
   const followedTopics = sanitizeFollowedTopics(settings.followedTopics);
@@ -119,7 +187,7 @@ export const getVisibleTodaySignals = (
 };
 
 export const topicKindForValue = (value: string): 'core' | 'followed' | 'muted' => {
-  if (CORE_DOMAIN_SET.has(value as Category)) {
+  if (CORE_DOMAIN_SET.has(value as CategoryKey)) {
     return 'core';
   }
 
@@ -130,24 +198,24 @@ export const topicKindForValue = (value: string): 'core' | 'followed' | 'muted' 
   return 'followed';
 };
 
-export const getSuggestedTopics = () => SUGGESTED_TOPICS;
+export const getSuggestedTopics = () => getSuggestedTopicNames();
 
 export const getTopicsForTab = (tab: TopicModalTab) => {
   switch (tab) {
     case 'Core Domains':
-      return CORE_DOMAINS;
+      return CATEGORY_KEYS;
     case 'Policy':
-      return TOPIC_MODAL_GROUPS.Policy;
+      return getTopicNamesForGroup('Policy');
     case 'Technology':
-      return TOPIC_MODAL_GROUPS.Technology;
+      return getTopicNamesForGroup('Technology');
     case 'Markets':
-      return TOPIC_MODAL_GROUPS.Markets;
+      return getTopicNamesForGroup('Markets');
     case 'Energy':
-      return TOPIC_MODAL_GROUPS.Energy;
+      return getTopicNamesForGroup('Energy');
     case 'Followed Topics':
-      return FOLLOWED_TOPIC_OPTIONS;
+      return getAllCanonicalTopicNames();
     case 'All':
     default:
-      return uniqueStrings([...CORE_DOMAINS, ...FOLLOWED_TOPIC_OPTIONS]);
+      return uniqueStrings([...CATEGORY_KEYS, ...getAllCanonicalTopicNames()]);
   }
 };

@@ -1,7 +1,21 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { AppSettings, Category } from './types';
-import { MOCK_WATCHLIST } from './mockData';
-import { readJsonStorage, STORAGE_KEYS, writeJsonStorage } from './storage';
+import {
+  AppSettings,
+  Category,
+  PersistedUserStateV2,
+  SavedItemTargetType,
+} from './types';
+import {
+  buildTopicPreferenceRecordsForUserInput,
+  deriveNotesMap,
+  deriveSavedSignalIds,
+  deriveSettingsFromPersistedState,
+  deriveWatchlistEntityIds,
+  hydratePersistedStateV2,
+  inferNoteTargetType,
+  isOnboardingComplete,
+  writePersistedStateV2,
+} from './storage';
 import {
   DEFAULT_CORE_DOMAINS,
   DEFAULT_FOLLOWED_TOPICS,
@@ -27,11 +41,16 @@ interface AppContextType {
   unmuteTopic: (topic: string) => void;
   savedSignals: string[];
   toggleSaveSignal: (signalId: string) => void;
+  isSavedItem: (targetType: SavedItemTargetType, targetId: string) => boolean;
+  toggleSavedItem: (targetType: SavedItemTargetType, targetId: string) => void;
   watchlist: string[];
   addToWatchlist: (itemIds: string[]) => void;
   removeFromWatchlist: (itemId: string) => void;
   notes: Record<string, string>;
   saveNote: (id: string, text: string) => void;
+  isOnboardingComplete: boolean;
+  completeOnboarding: () => void;
+  resetOnboarding: () => void;
   prototypeToast: string | null;
   showPrototypeToast: (message?: string) => void;
   clearPrototypeToast: () => void;
@@ -41,129 +60,114 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const DEFAULT_PROTOTYPE_TOAST = 'Prototype only: this action is not wired yet.';
 
-const isStringArray = (value: unknown): value is string[] =>
-  Array.isArray(value) && value.every(item => typeof item === 'string');
-
-const sanitizeStringArray = (value: unknown, fallback: string[]) =>
-  isStringArray(value) ? value : fallback;
-
-const sanitizeNotes = (value: unknown): Record<string, string> => {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(value).filter(([, noteValue]) => typeof noteValue === 'string')
-  );
-};
-
-const sanitizeSettings = (value: unknown): AppSettings => {
-  const defaultSettings: AppSettings = {
-    readingMode: 'Bilingual',
-    translationStyle: 'Professional Analysis',
-    preferredTopics: DEFAULT_CORE_DOMAINS,
-    followedTopics: DEFAULT_FOLLOWED_TOPICS,
-    mutedTopics: DEFAULT_MUTED_TOPICS,
-    criticalAlerts: true,
-    darkMode: true,
-  };
-
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return defaultSettings;
-  }
-
-  const parsed = value as Partial<AppSettings>;
-  const preferredTopics = sanitizeCoreDomains(
-    sanitizeStringArray(parsed.preferredTopics, defaultSettings.preferredTopics)
+const updateTopicPreferenceSet = (
+  state: PersistedUserStateV2,
+  preferenceType: 'followed' | 'muted',
+  topics: string[],
+) => {
+  const sanitizedTopics =
+    preferenceType === 'followed'
+      ? sanitizeFollowedTopics(topics)
+      : sanitizeMutedTopics(topics);
+  const preservedRecords = state.topic_preferences.filter(
+    record => record.preference_type !== preferenceType,
   );
 
-  return {
-    readingMode:
-      parsed.readingMode === 'Chinese Only' ||
-      parsed.readingMode === 'Bilingual' ||
-      parsed.readingMode === 'Original'
-        ? parsed.readingMode
-        : defaultSettings.readingMode,
-    translationStyle:
-      parsed.translationStyle === 'Professional Analysis' ||
-      parsed.translationStyle === 'Simple Chinese' ||
-      parsed.translationStyle === 'Accurate Translation' ||
-      parsed.translationStyle === 'Student-Friendly Explanation'
-        ? parsed.translationStyle
-        : defaultSettings.translationStyle,
-    preferredTopics: preferredTopics.length > 0 ? preferredTopics : defaultSettings.preferredTopics,
-    followedTopics: sanitizeFollowedTopics(
-      sanitizeStringArray(parsed.followedTopics, defaultSettings.followedTopics)
-    ),
-    mutedTopics: sanitizeMutedTopics(
-      sanitizeStringArray(parsed.mutedTopics, defaultSettings.mutedTopics)
-    ),
-    criticalAlerts:
-      typeof parsed.criticalAlerts === 'boolean'
-        ? parsed.criticalAlerts
-        : defaultSettings.criticalAlerts,
-    darkMode: typeof parsed.darkMode === 'boolean' ? parsed.darkMode : defaultSettings.darkMode,
-  };
+  return [
+    ...preservedRecords,
+    ...buildTopicPreferenceRecordsForUserInput(sanitizedTopics, preferenceType),
+  ];
 };
+
+const updateProfileState = (
+  state: PersistedUserStateV2,
+  updates: Partial<PersistedUserStateV2['profile']>,
+): PersistedUserStateV2['profile'] => ({
+  ...state.profile,
+  ...updates,
+  updated_at: new Date().toISOString(),
+});
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [settings, setSettings] = useState<AppSettings>(() =>
-    sanitizeSettings(readJsonStorage(STORAGE_KEYS.settings, null))
-  );
-
-  const [savedSignals, setSavedSignals] = useState<string[]>(() =>
-    sanitizeStringArray(readJsonStorage(STORAGE_KEYS.savedSignals, []), [])
-  );
-
-  const [watchlist, setWatchlist] = useState<string[]>(() =>
-    sanitizeStringArray(
-      readJsonStorage(STORAGE_KEYS.watchlist, MOCK_WATCHLIST.map(item => item.id)),
-      MOCK_WATCHLIST.map(item => item.id)
-    )
-  );
-
-  const [notes, setNotes] = useState<Record<string, string>>(() =>
-    sanitizeNotes(readJsonStorage(STORAGE_KEYS.notes, {}))
+  const [persistedState, setPersistedState] = useState<PersistedUserStateV2>(() =>
+    hydratePersistedStateV2(),
   );
   const [prototypeToast, setPrototypeToast] = useState<string | null>(null);
 
   useEffect(() => {
-    writeJsonStorage(STORAGE_KEYS.settings, settings);
-  }, [settings]);
+    writePersistedStateV2(persistedState);
+  }, [persistedState]);
 
-  useEffect(() => {
-    writeJsonStorage(STORAGE_KEYS.savedSignals, savedSignals);
-  }, [savedSignals]);
-
-  useEffect(() => {
-    writeJsonStorage(STORAGE_KEYS.watchlist, watchlist);
-  }, [watchlist]);
-
-  useEffect(() => {
-    writeJsonStorage(STORAGE_KEYS.notes, notes);
-  }, [notes]);
+  const settings = deriveSettingsFromPersistedState(persistedState);
+  const savedSignals = deriveSavedSignalIds(persistedState);
+  const watchlist = deriveWatchlistEntityIds(persistedState);
+  const notes = deriveNotesMap(persistedState);
+  const onboardingComplete = isOnboardingComplete(persistedState);
+  const isSavedItem = (targetType: SavedItemTargetType, targetId: string) =>
+    persistedState.saved_items.some(
+      item => item.target_type === targetType && item.target_id === targetId,
+    );
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
-    setSettings(prev => ({
-      ...prev,
-      ...newSettings,
-      preferredTopics: newSettings.preferredTopics
-        ? sanitizeCoreDomains(newSettings.preferredTopics)
-        : prev.preferredTopics,
-      followedTopics: newSettings.followedTopics
-        ? sanitizeFollowedTopics(newSettings.followedTopics)
-        : prev.followedTopics,
-      mutedTopics: newSettings.mutedTopics
-        ? sanitizeMutedTopics(newSettings.mutedTopics)
-        : prev.mutedTopics,
-    }));
+    setPersistedState(prev => {
+      let nextState = prev;
+
+      if (newSettings.preferredTopics) {
+        const nextDomains = sanitizeCoreDomains(newSettings.preferredTopics);
+        nextState = {
+          ...nextState,
+          profile: updateProfileState(nextState, {
+            core_domains: nextDomains.length > 0 ? nextDomains : DEFAULT_CORE_DOMAINS,
+          }),
+        };
+      }
+
+      if (newSettings.followedTopics) {
+        nextState = {
+          ...nextState,
+          topic_preferences: updateTopicPreferenceSet(
+            nextState,
+            'followed',
+            newSettings.followedTopics,
+          ),
+        };
+      }
+
+      if (newSettings.mutedTopics) {
+        nextState = {
+          ...nextState,
+          topic_preferences: updateTopicPreferenceSet(
+            nextState,
+            'muted',
+            newSettings.mutedTopics,
+          ),
+        };
+      }
+
+      return {
+        ...nextState,
+        profile: updateProfileState(nextState, {
+          reading_mode: newSettings.readingMode ?? nextState.profile.reading_mode,
+          translation_style:
+            newSettings.translationStyle ?? nextState.profile.translation_style,
+          critical_alerts:
+            typeof newSettings.criticalAlerts === 'boolean'
+              ? newSettings.criticalAlerts
+              : nextState.profile.critical_alerts,
+          dark_mode:
+            typeof newSettings.darkMode === 'boolean'
+              ? newSettings.darkMode
+              : nextState.profile.dark_mode,
+        }),
+      };
+    });
   };
 
   const setCoreDomains = (domains: Category[]) => {
+    const sanitizedDomains = sanitizeCoreDomains(domains);
     updateSettings({
-      preferredTopics: sanitizeCoreDomains(domains).length > 0
-        ? sanitizeCoreDomains(domains)
-        : DEFAULT_CORE_DOMAINS,
+      preferredTopics:
+        sanitizedDomains.length > 0 ? sanitizedDomains : DEFAULT_CORE_DOMAINS,
     });
   };
 
@@ -185,7 +189,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const removeFollowedTopic = (topic: string) => {
-    setFollowedTopics(settings.followedTopics.filter(currentTopic => currentTopic !== topic));
+    setFollowedTopics(
+      settings.followedTopics.filter(currentTopic => currentTopic !== topic),
+    );
   };
 
   const toggleFollowedTopic = (topic: string) => {
@@ -208,24 +214,132 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setMutedTopics(settings.mutedTopics.filter(currentTopic => currentTopic !== topic));
   };
 
+  const toggleSavedItem = (targetType: SavedItemTargetType, targetId: string) => {
+    setPersistedState(prev => {
+      const existingRecord = prev.saved_items.find(
+        item => item.target_type === targetType && item.target_id === targetId,
+      );
+
+      if (existingRecord) {
+        return {
+          ...prev,
+          saved_items: prev.saved_items.filter(
+            item => !(item.target_type === targetType && item.target_id === targetId),
+          ),
+        };
+      }
+
+      const timestamp = new Date().toISOString();
+      return {
+        ...prev,
+        saved_items: [
+          ...prev.saved_items,
+          {
+            target_type: targetType,
+            target_id: targetId,
+            created_at: timestamp,
+            updated_at: timestamp,
+          },
+        ],
+      };
+    });
+  };
+
   const toggleSaveSignal = (signalId: string) => {
-    setSavedSignals(prev => 
-      prev.includes(signalId) 
-        ? prev.filter(id => id !== signalId)
-        : [...prev, signalId]
-    );
+    toggleSavedItem('signal', signalId);
   };
 
   const addToWatchlist = (itemIds: string[]) => {
-    setWatchlist(prev => Array.from(new Set([...prev, ...itemIds])));
+    setPersistedState(prev => {
+      const existingIds = new Set(prev.watchlist_items.map(item => item.entity_id));
+      const nextIds = sanitizeFollowedTopics(itemIds).filter(itemId => !existingIds.has(itemId));
+      if (nextIds.length === 0) {
+        return prev;
+      }
+
+      const timestamp = new Date().toISOString();
+      const nextSortOrder = prev.watchlist_items.reduce(
+        (highest, item) => Math.max(highest, item.sort_order),
+        -1,
+      );
+
+      return {
+        ...prev,
+        watchlist_items: [
+          ...prev.watchlist_items,
+          ...nextIds.map((entityId, index) => ({
+            entity_id: entityId,
+            created_at: timestamp,
+            updated_at: timestamp,
+            sort_order: nextSortOrder + index + 1,
+          })),
+        ],
+      };
+    });
   };
 
   const removeFromWatchlist = (itemId: string) => {
-    setWatchlist(prev => prev.filter(id => id !== itemId));
+    setPersistedState(prev => ({
+      ...prev,
+      watchlist_items: prev.watchlist_items.filter(item => item.entity_id !== itemId),
+    }));
   };
 
   const saveNote = (id: string, text: string) => {
-    setNotes(prev => ({ ...prev, [id]: text }));
+    setPersistedState(prev => {
+      const targetType = inferNoteTargetType(id);
+      const existingRecord = prev.notes.find(
+        note => note.target_id === id && note.target_type === targetType,
+      );
+      const timestamp = new Date().toISOString();
+
+      if (existingRecord) {
+        return {
+          ...prev,
+          notes: prev.notes.map(note =>
+            note.target_id === id && note.target_type === targetType
+              ? {
+                  ...note,
+                  body: text,
+                  updated_at: timestamp,
+                }
+              : note,
+          ),
+        };
+      }
+
+      return {
+        ...prev,
+        notes: [
+          ...prev.notes,
+          {
+            target_type: targetType,
+            target_id: id,
+            body: text,
+            created_at: timestamp,
+            updated_at: timestamp,
+          },
+        ],
+      };
+    });
+  };
+
+  const completeOnboarding = () => {
+    setPersistedState(prev => ({
+      ...prev,
+      profile: updateProfileState(prev, {
+        onboarding_completed: true,
+      }),
+    }));
+  };
+
+  const resetOnboarding = () => {
+    setPersistedState(prev => ({
+      ...prev,
+      profile: updateProfileState(prev, {
+        onboarding_completed: false,
+      }),
+    }));
   };
 
   const showPrototypeToast = (message = DEFAULT_PROTOTYPE_TOAST) => {
@@ -237,30 +351,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   return (
-    <AppContext.Provider value={{
-      settings,
-      updateSettings,
-      setCoreDomains,
-      addCoreDomains,
-      removeCoreDomain,
-      setFollowedTopics,
-      addFollowedTopics,
-      removeFollowedTopic,
-      toggleFollowedTopic,
-      setMutedTopics,
-      addMutedTopics,
-      unmuteTopic,
-      savedSignals,
-      toggleSaveSignal,
-      watchlist,
-      addToWatchlist,
-      removeFromWatchlist,
-      notes,
-      saveNote,
-      prototypeToast,
-      showPrototypeToast,
-      clearPrototypeToast
-    }}>
+    <AppContext.Provider
+      value={{
+        settings,
+        updateSettings,
+        setCoreDomains,
+        addCoreDomains,
+        removeCoreDomain,
+        setFollowedTopics,
+        addFollowedTopics,
+        removeFollowedTopic,
+        toggleFollowedTopic,
+        setMutedTopics,
+        addMutedTopics,
+        unmuteTopic,
+        savedSignals,
+        toggleSaveSignal,
+        isSavedItem,
+        toggleSavedItem,
+        watchlist,
+        addToWatchlist,
+        removeFromWatchlist,
+        notes,
+        saveNote,
+        isOnboardingComplete: onboardingComplete,
+        completeOnboarding,
+        resetOnboarding,
+        prototypeToast,
+        showPrototypeToast,
+        clearPrototypeToast,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

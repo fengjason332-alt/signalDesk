@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Zap, Cpu, Bitcoin, TrendingUp, Bot, Globe, AlertCircle, Shield, Target } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../AppContext';
-import { Category } from '../types';
+import { Category, getCategoryLabel } from '../types';
 import {
   DEFAULT_CORE_DOMAINS,
   DEFAULT_FOLLOWED_TOPICS,
@@ -19,16 +19,16 @@ export default function OnboardingView({ onComplete }: OnboardingViewProps) {
   const [showWarning, setShowWarning] = useState(false);
 
   const domains = [
-    { name: 'AI' as Category, icon: Cpu },
-    { name: 'Crypto' as Category, icon: Bitcoin },
-    { name: 'Stocks' as Category, icon: TrendingUp },
-    { name: 'Robotics' as Category, icon: Bot },
-    { name: 'Energy' as Category, icon: Zap },
-    { name: 'US Policy' as Category, icon: Shield },
-    { name: 'China Policy' as Category, icon: Globe },
-    { name: 'Australia Policy' as Category, icon: Target },
-    { name: 'Macro' as Category, icon: TrendingUp },
-    { name: 'Geopolitics' as Category, icon: Globe },
+    { name: 'ai' as Category, icon: Cpu },
+    { name: 'crypto' as Category, icon: Bitcoin },
+    { name: 'stocks' as Category, icon: TrendingUp },
+    { name: 'robotics' as Category, icon: Bot },
+    { name: 'energy' as Category, icon: Zap },
+    { name: 'us_policy' as Category, icon: Shield },
+    { name: 'china_policy' as Category, icon: Globe },
+    { name: 'australia_policy' as Category, icon: Target },
+    { name: 'macro' as Category, icon: TrendingUp },
+    { name: 'geopolitics' as Category, icon: Globe },
   ];
 
   const toggleDomain = (name: Category) => {
@@ -99,7 +99,7 @@ export default function OnboardingView({ onComplete }: OnboardingViewProps) {
                   strokeWidth={isActive ? 2.5 : 1.5}
                 />
                 <span className={`text-xl font-bold ${isActive ? 'text-primary' : 'text-on-surface-variant group-hover:text-on-surface'}`}>
-                  {d.name}
+                  {getCategoryLabel(d.name)}
                 </span>
               </motion.button>
             );

@@ -13,7 +13,7 @@ interface LibraryViewProps {
 }
 
 export default function LibraryView({ onOpenDetail, onResultSelect }: LibraryViewProps) {
-  const { savedSignals, toggleSaveSignal, showPrototypeToast } = useApp();
+  const { savedSignals, isSavedItem, toggleSavedItem } = useApp();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   
@@ -118,14 +118,23 @@ export default function LibraryView({ onOpenDetail, onResultSelect }: LibraryVie
                       onClick={(e) => {
                         e.stopPropagation();
                         if (item.isSignal) {
-                          toggleSaveSignal(item.id);
+                          toggleSavedItem('signal', item.id);
                         } else {
-                          showPrototypeToast('Prototype only: saving library documents is not wired yet.');
+                          toggleSavedItem('library_item', item.id);
                         }
                       }}
                       className="text-primary hover:text-primary/70 transition-colors"
                     >
-                      <Bookmark size={18} fill="currentColor" />
+                      <Bookmark
+                        size={18}
+                        fill={
+                          item.isSignal
+                            ? 'currentColor'
+                            : isSavedItem('library_item', item.id)
+                              ? 'currentColor'
+                              : 'none'
+                        }
+                      />
                     </button>
                   </div>
 

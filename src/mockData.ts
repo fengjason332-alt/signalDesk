@@ -1,7 +1,7 @@
 import { Signal, Topic, WatchlistItem, LibraryItem, Category } from './types';
 
 export const CORE_DOMAINS: Category[] = [
-  'AI', 'Crypto', 'Stocks', 'Robotics', 'Energy', 'US Policy', 'China Policy', 'Australia Policy', 'Macro', 'Geopolitics'
+  'ai', 'crypto', 'stocks', 'robotics', 'energy', 'us_policy', 'china_policy', 'australia_policy', 'macro', 'geopolitics'
 ];
 
 export const FOLLOWED_TOPIC_OPTIONS = [
@@ -86,7 +86,7 @@ export const AVAILABLE_TOPICS = {
 export const MOCK_SIGNALS: Signal[] = [
   {
     id: 's1',
-    categories: ['AI', 'US Policy'],
+    categories: ['ai', 'us_policy'],
     topics: ['AI Agents', 'AI Regulation'],
     entities: ['OpenAI', 'Microsoft'],
     importance: 9.8,
@@ -109,7 +109,7 @@ export const MOCK_SIGNALS: Signal[] = [
   },
   {
     id: 's2',
-    categories: ['Crypto', 'US Policy'],
+    categories: ['crypto', 'us_policy'],
     topics: ['Stablecoin Regulation', 'Bitcoin ETF'],
     entities: ['SEC', 'BlackRock'],
     importance: 8.5,
@@ -127,7 +127,7 @@ export const MOCK_SIGNALS: Signal[] = [
   },
   {
     id: 's3',
-    categories: ['Energy', 'AI'],
+    categories: ['energy', 'ai'],
     topics: ['Nuclear Energy', 'AI Data Center Power Demand'],
     entities: ['Microsoft', 'Constellation Energy'],
     importance: 9.2,
@@ -145,7 +145,7 @@ export const MOCK_SIGNALS: Signal[] = [
   },
   {
     id: 's4',
-    categories: ['Robotics', 'Energy'],
+    categories: ['robotics', 'energy'],
     topics: ['Humanoid Robotics', 'Battery Tech'],
     entities: ['Tesla'],
     importance: 7.8,
@@ -163,7 +163,7 @@ export const MOCK_SIGNALS: Signal[] = [
   },
   {
     id: 's5',
-    categories: ['US Policy', 'China Policy'],
+    categories: ['us_policy', 'china_policy'],
     topics: ['US Chip Export Controls', 'Semiconductor Supply Chain'],
     entities: ['NVIDIA', 'TSMC'],
     importance: 9.5,
@@ -183,8 +183,8 @@ export const MOCK_SIGNALS: Signal[] = [
 
 export const MOCK_TOPICS: Topic[] = [
   {
-    id: 't1',
-    category: 'AI',
+    id: 'topic_ai_data_center_power',
+    category: 'ai',
     name: 'AI Data Center Power Demand',
     momentum: 94,
     explanationZh: '由于主要科技公司宣布新建千兆瓦级数据中心，对先进冷却系统和下一代核能的机构兴趣激增。',
@@ -192,8 +192,8 @@ export const MOCK_TOPICS: Topic[] = [
     signalCount: 142
   },
   {
-    id: 't2',
-    category: 'Energy',
+    id: 'topic_nuclear_energy',
+    category: 'energy',
     name: 'Nuclear Energy',
     momentum: 88,
     explanationZh: '随着科技巨头寻求全天候零碳能源，核能正经历从退役到复兴的战略转折。',
@@ -201,8 +201,8 @@ export const MOCK_TOPICS: Topic[] = [
     signalCount: 67
   },
   {
-    id: 't3',
-    category: 'US Policy',
+    id: 'topic_us_chip_export_controls',
+    category: 'us_policy',
     name: 'US Chip Export Controls',
     momentum: 82,
     explanationZh: '政策制定者正在审查针对先进计算和半导体制造能力的出口管制效用。',
@@ -210,8 +210,8 @@ export const MOCK_TOPICS: Topic[] = [
     signalCount: 45
   },
   {
-    id: 't4',
-    category: 'Crypto',
+    id: 'topic_bitcoin_etf',
+    category: 'crypto',
     name: 'Bitcoin ETF',
     momentum: 72,
     explanationZh: '机构投资者正通过现货ETF渠道稳定配置数字资产，降低了市场的波动性基准。',
@@ -222,7 +222,7 @@ export const MOCK_TOPICS: Topic[] = [
 
 export const MOCK_WATCHLIST: WatchlistItem[] = [
   {
-    id: 'w1',
+    id: 'entity_nvidia',
     name: 'NVIDIA',
     type: 'Company',
     status: 'Critical Supply Chain Update',
@@ -233,7 +233,7 @@ export const MOCK_WATCHLIST: WatchlistItem[] = [
     description: 'NVIDIA is the leading designer of graphics processing units (GPUs) that are essential for AI workloads.'
   },
   {
-    id: 'w2',
+    id: 'entity_openai',
     name: 'OpenAI',
     type: 'Organization',
     status: 'Stable',
@@ -241,7 +241,7 @@ export const MOCK_WATCHLIST: WatchlistItem[] = [
     totalMentions: 45
   },
   {
-    id: 'w3',
+    id: 'entity_bitcoin',
     name: 'Bitcoin',
     type: 'Crypto',
     status: 'High Volatility',
@@ -251,7 +251,7 @@ export const MOCK_WATCHLIST: WatchlistItem[] = [
     valueTrend: 'down'
   },
   {
-    id: 'w4',
+    id: 'entity_elon_musk',
     name: 'Elon Musk',
     type: 'Person',
     status: 'High Signal',

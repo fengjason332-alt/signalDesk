@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Bookmark, ChevronDown, Share2, Globe, FileText, Languages, CheckCircle2 } from 'lucide-react';
-import { ReadingMode, TranslationStyle } from '../types';
+import { getCategoryLabel, ReadingMode, TranslationStyle } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../AppContext';
 import { DetailPayload } from '../detailPayload';
@@ -18,7 +18,15 @@ const TRANSLATION_STYLES: TranslationStyle[] = [
 ];
 
 export default function DetailView({ detail, onBack }: DetailViewProps) {
-  const { settings, updateSettings, savedSignals, toggleSaveSignal, notes, saveNote, showPrototypeToast } = useApp();
+  const {
+    settings,
+    updateSettings,
+    isSavedItem,
+    toggleSavedItem,
+    notes,
+    saveNote,
+    showPrototypeToast,
+  } = useApp();
   const [localNote, setLocalNote] = useState('');
   const [isNoteSaved, setIsNoteSaved] = useState(false);
   const [showStyles, setShowStyles] = useState(false);
@@ -31,8 +39,8 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
 
   if (!detail) return null;
 
-  const isSaveable = detail.kind === 'signal';
-  const isSaved = isSaveable && savedSignals.includes(detail.id);
+  const saveTargetType = detail.kind === 'signal' ? 'signal' : 'library_item';
+  const isSaved = isSavedItem(saveTargetType, detail.id);
 
   const handleSaveNote = () => {
     saveNote(detail.id, localNote);
@@ -59,11 +67,7 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
         <div className="flex items-center gap-2">
           <button 
             onClick={() => {
-              if (isSaveable) {
-                toggleSaveSignal(detail.id);
-              } else {
-                showPrototypeToast('Prototype only: saving library documents is not wired yet.');
-              }
+              toggleSavedItem(saveTargetType, detail.id);
             }}
             className={`p-2 transition-colors ${isSaved ? 'text-primary' : 'text-on-surface-variant hover:text-primary'}`}
           >
@@ -84,7 +88,7 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
           <div className="flex items-center gap-3 overflow-x-auto no-scrollbar">
             {detail.categories.map(cat => (
               <span key={cat} className="text-[10px] uppercase font-bold tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded whitespace-nowrap">
-                {cat}
+                {getCategoryLabel(cat as any)}
               </span>
             ))}
             {detail.libraryMeta && (

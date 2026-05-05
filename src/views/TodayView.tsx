@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Header } from '../components/Header';
 import { SignalCard } from '../components/SignalCard';
 import { MOCK_SIGNALS } from '../mockData';
-import { Signal, Category } from '../types';
+import { getCategoryLabel, Signal, Category } from '../types';
 import { useApp } from '../AppContext';
 import { Plus } from 'lucide-react';
 import { AddTopicModal } from '../components/AddTopicModal';
@@ -48,7 +48,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
                   : 'bg-surface text-on-surface-variant border-outline/10 hover:border-outline/30'
               }`}
             >
-              {filter}
+              {filter === 'All' ? filter : getCategoryLabel(filter)}
             </button>
           ))}
           <button 
