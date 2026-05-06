@@ -76,11 +76,28 @@ create table if not exists public.user_topic_preferences (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   constraint user_topic_preferences_topic_shape_check check (
-    (topic_kind = 'canonical' and topic_id is not null and custom_topic_label is null)
+    (
+      topic_kind = 'canonical'
+      and topic_id is not null
+      and custom_topic_label is null
+      and custom_topic_label_normalized is null
+    )
     or
-    (topic_kind = 'custom' and topic_id is null and custom_topic_label is not null)
+    (
+      topic_kind = 'custom'
+      and topic_id is null
+      and custom_topic_label is not null
+      and nullif(btrim(custom_topic_label_normalized), '') is not null
+    )
   )
 );
+
+create unique index if not exists user_topic_preferences_user_preference_canonical_idx
+  on public.user_topic_preferences (user_id, preference_type, topic_id)
+  where topic_kind = 'canonical';
+create unique index if not exists user_topic_preferences_user_preference_custom_idx
+  on public.user_topic_preferences (user_id, preference_type, custom_topic_label_normalized)
+  where topic_kind = 'custom';
 
 create table if not exists public.user_saved_items (
   id uuid primary key default gen_random_uuid(),
@@ -171,34 +188,58 @@ alter table public.user_notes enable row level security;
 alter table public.user_feedback enable row level security;
 alter table public.canonical_topics enable row level security;
 
+drop policy if exists "user_profiles_select_own" on public.user_profiles;
 create policy "user_profiles_select_own" on public.user_profiles for select using (auth.uid() = user_id);
+drop policy if exists "user_profiles_insert_own" on public.user_profiles;
 create policy "user_profiles_insert_own" on public.user_profiles for insert with check (auth.uid() = user_id);
+drop policy if exists "user_profiles_update_own" on public.user_profiles;
 create policy "user_profiles_update_own" on public.user_profiles for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+drop policy if exists "user_topic_preferences_select_own" on public.user_topic_preferences;
 create policy "user_topic_preferences_select_own" on public.user_topic_preferences for select using (auth.uid() = user_id);
+drop policy if exists "user_topic_preferences_insert_own" on public.user_topic_preferences;
 create policy "user_topic_preferences_insert_own" on public.user_topic_preferences for insert with check (auth.uid() = user_id);
+drop policy if exists "user_topic_preferences_update_own" on public.user_topic_preferences;
 create policy "user_topic_preferences_update_own" on public.user_topic_preferences for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "user_topic_preferences_delete_own" on public.user_topic_preferences;
 create policy "user_topic_preferences_delete_own" on public.user_topic_preferences for delete using (auth.uid() = user_id);
 
+drop policy if exists "user_saved_items_select_own" on public.user_saved_items;
 create policy "user_saved_items_select_own" on public.user_saved_items for select using (auth.uid() = user_id);
+drop policy if exists "user_saved_items_insert_own" on public.user_saved_items;
 create policy "user_saved_items_insert_own" on public.user_saved_items for insert with check (auth.uid() = user_id);
+drop policy if exists "user_saved_items_update_own" on public.user_saved_items;
 create policy "user_saved_items_update_own" on public.user_saved_items for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "user_saved_items_delete_own" on public.user_saved_items;
 create policy "user_saved_items_delete_own" on public.user_saved_items for delete using (auth.uid() = user_id);
 
+drop policy if exists "user_watchlist_items_select_own" on public.user_watchlist_items;
 create policy "user_watchlist_items_select_own" on public.user_watchlist_items for select using (auth.uid() = user_id);
+drop policy if exists "user_watchlist_items_insert_own" on public.user_watchlist_items;
 create policy "user_watchlist_items_insert_own" on public.user_watchlist_items for insert with check (auth.uid() = user_id);
+drop policy if exists "user_watchlist_items_update_own" on public.user_watchlist_items;
 create policy "user_watchlist_items_update_own" on public.user_watchlist_items for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "user_watchlist_items_delete_own" on public.user_watchlist_items;
 create policy "user_watchlist_items_delete_own" on public.user_watchlist_items for delete using (auth.uid() = user_id);
 
+drop policy if exists "user_notes_select_own" on public.user_notes;
 create policy "user_notes_select_own" on public.user_notes for select using (auth.uid() = user_id);
+drop policy if exists "user_notes_insert_own" on public.user_notes;
 create policy "user_notes_insert_own" on public.user_notes for insert with check (auth.uid() = user_id);
+drop policy if exists "user_notes_update_own" on public.user_notes;
 create policy "user_notes_update_own" on public.user_notes for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "user_notes_delete_own" on public.user_notes;
 create policy "user_notes_delete_own" on public.user_notes for delete using (auth.uid() = user_id);
 
+drop policy if exists "user_feedback_select_own" on public.user_feedback;
 create policy "user_feedback_select_own" on public.user_feedback for select using (auth.uid() = user_id);
+drop policy if exists "user_feedback_insert_own" on public.user_feedback;
 create policy "user_feedback_insert_own" on public.user_feedback for insert with check (auth.uid() = user_id);
+drop policy if exists "user_feedback_update_own" on public.user_feedback;
 create policy "user_feedback_update_own" on public.user_feedback for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+drop policy if exists "user_feedback_delete_own" on public.user_feedback;
 create policy "user_feedback_delete_own" on public.user_feedback for delete using (auth.uid() = user_id);
 
+drop policy if exists "canonical_topics_select_authenticated" on public.canonical_topics;
 create policy "canonical_topics_select_authenticated" on public.canonical_topics
 for select to authenticated using (true);

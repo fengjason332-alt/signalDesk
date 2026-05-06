@@ -25,6 +25,22 @@ import {
   sanitizeMutedTopics,
   uniqueStrings,
 } from './topicPreferences';
+import { useAuth } from './lib/auth/AuthContext';
+import { useUserStateSync } from './lib/persistence/useUserStateSync';
+
+type SyncUiMode = 'not-configured' | 'loading' | 'signed-out' | 'signed-in';
+
+interface SyncUiState {
+  mode: SyncUiMode;
+  email: string | null;
+}
+
+interface SyncControls extends SyncUiState {
+  isConfigured: boolean;
+  hasLoadedSession: boolean;
+  signInWithOtp: (email: string) => Promise<void>;
+  signOut: () => Promise<void>;
+}
 
 interface AppContextType {
   settings: AppSettings;
@@ -51,6 +67,7 @@ interface AppContextType {
   isOnboardingComplete: boolean;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
+  sync: SyncControls;
   prototypeToast: string | null;
   showPrototypeToast: (message?: string) => void;
   clearPrototypeToast: () => void;
@@ -88,11 +105,56 @@ const updateProfileState = (
   updated_at: new Date().toISOString(),
 });
 
+export const deriveSyncUiState = ({
+  isConfigured,
+  hasLoadedSession,
+  email,
+}: {
+  isConfigured: boolean;
+  hasLoadedSession: boolean;
+  email: string | null;
+}): SyncUiState => {
+  if (!isConfigured) {
+    return {
+      mode: 'not-configured',
+      email: null,
+    };
+  }
+
+  if (!hasLoadedSession) {
+    return {
+      mode: 'loading',
+      email: null,
+    };
+  }
+
+  if (!email) {
+    return {
+      mode: 'signed-out',
+      email: null,
+    };
+  }
+
+  return {
+    mode: 'signed-in',
+    email,
+  };
+};
+
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const {
+    session,
+    isConfigured,
+    hasLoadedSession,
+    signInWithOtp,
+    signOut,
+  } = useAuth();
   const [persistedState, setPersistedState] = useState<PersistedUserStateV2>(() =>
     hydratePersistedStateV2(),
   );
   const [prototypeToast, setPrototypeToast] = useState<string | null>(null);
+
+  useUserStateSync({ persistedState, setPersistedState });
 
   useEffect(() => {
     writePersistedStateV2(persistedState);
@@ -103,6 +165,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const watchlist = deriveWatchlistEntityIds(persistedState);
   const notes = deriveNotesMap(persistedState);
   const onboardingComplete = isOnboardingComplete(persistedState);
+  const syncUiState = deriveSyncUiState({
+    isConfigured,
+    hasLoadedSession,
+    email: session?.user.email ?? null,
+  });
   const isSavedItem = (targetType: SavedItemTargetType, targetId: string) =>
     persistedState.saved_items.some(
       item => item.target_type === targetType && item.target_id === targetId,
@@ -377,6 +444,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isOnboardingComplete: onboardingComplete,
         completeOnboarding,
         resetOnboarding,
+        sync: {
+          ...syncUiState,
+          isConfigured,
+          hasLoadedSession,
+          signInWithOtp,
+          signOut,
+        },
         prototypeToast,
         showPrototypeToast,
         clearPrototypeToast,

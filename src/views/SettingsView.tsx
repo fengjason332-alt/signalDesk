@@ -14,8 +14,64 @@ interface SettingsViewProps {
 }
 
 export default function SettingsView({ onPreviewState, onResultSelect, onResetOnboarding }: SettingsViewProps) {
-  const { settings, updateSettings, showPrototypeToast } = useApp();
+  const { settings, updateSettings, showPrototypeToast, sync } = useApp();
   const [isManageModalOpen, setIsManageModalOpen] = React.useState(false);
+  const [syncEmail, setSyncEmail] = React.useState('');
+  const [syncPendingAction, setSyncPendingAction] = React.useState<'sign-in' | 'sign-out' | null>(null);
+  const [syncFeedback, setSyncFeedback] = React.useState<{
+    kind: 'status' | 'error';
+    message: string;
+  } | null>(null);
+
+  const handleSyncSignIn = async () => {
+    const normalizedEmail = syncEmail.trim();
+    if (!normalizedEmail) {
+      setSyncFeedback({
+        kind: 'error',
+        message: 'Enter an email address to receive a sign-in link.',
+      });
+      return;
+    }
+
+    setSyncPendingAction('sign-in');
+    setSyncFeedback(null);
+
+    try {
+      await sync.signInWithOtp(normalizedEmail);
+      setSyncFeedback({
+        kind: 'status',
+        message: 'Check your email for the sign-in link.',
+      });
+    } catch (error) {
+      setSyncFeedback({
+        kind: 'error',
+        message:
+          error instanceof Error ? error.message : 'Unable to send sign-in email.',
+      });
+    } finally {
+      setSyncPendingAction(null);
+    }
+  };
+
+  const handleSyncSignOut = async () => {
+    setSyncPendingAction('sign-out');
+    setSyncFeedback(null);
+
+    try {
+      await sync.signOut();
+      setSyncFeedback({
+        kind: 'status',
+        message: 'Signed out. SignalDesk will keep using local storage on this device.',
+      });
+    } catch (error) {
+      setSyncFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : 'Unable to sign out right now.',
+      });
+    } finally {
+      setSyncPendingAction(null);
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-full">
@@ -128,6 +184,107 @@ export default function SettingsView({ onPreviewState, onResultSelect, onResetOn
                 <Plus size={16} className="group-hover:rotate-90 transition-transform" />
                 Manage Topics & Interests
               </button>
+            </div>
+          </section>
+
+          {/* Sync */}
+          <section className="space-y-4">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              <Globe size={14} />
+              Sync
+            </h3>
+            <div className="bg-surface rounded-2xl border border-outline/20">
+              <div className="p-4 space-y-3">
+                {sync.mode === 'not-configured' && (
+                  <>
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-on-surface block">Sync not configured</span>
+                      <span className="text-[10px] text-on-surface-variant block">
+                        Supabase is unavailable, so SignalDesk stays local-only on this device.
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {sync.mode === 'loading' && (
+                  <div className="space-y-0.5">
+                    <span className="text-sm font-medium text-on-surface block">Checking sync status...</span>
+                    <span className="text-[10px] text-on-surface-variant block">
+                      Local data remains available while your session loads.
+                    </span>
+                  </div>
+                )}
+
+                {sync.mode === 'signed-out' && (
+                  <>
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-on-surface block">Sign in to sync</span>
+                      <span className="text-[10px] text-on-surface-variant block">
+                        SignalDesk stays local-first until you connect a sync account.
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <input
+                        type="email"
+                        value={syncEmail}
+                        onChange={event => {
+                          setSyncEmail(event.target.value);
+                          if (syncFeedback?.kind === 'error') {
+                            setSyncFeedback(null);
+                          }
+                        }}
+                        placeholder="you@example.com"
+                        autoComplete="email"
+                        disabled={syncPendingAction !== null || !sync.hasLoadedSession}
+                        className="w-full rounded-xl border border-outline/20 bg-surface-high px-3 py-2 text-sm text-on-surface placeholder:text-on-surface-variant/50 focus:border-primary/40 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+                      <button
+                        onClick={() => {
+                          void handleSyncSignIn();
+                        }}
+                        disabled={
+                          syncPendingAction !== null ||
+                          !sync.hasLoadedSession ||
+                          syncEmail.trim().length === 0
+                        }
+                        className="self-start rounded-xl border border-primary/20 bg-primary/10 px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {syncPendingAction === 'sign-in' ? 'Sending...' : 'Send Sign-In Link'}
+                      </button>
+                    </div>
+                  </>
+                )}
+
+                {sync.mode === 'signed-in' && (
+                  <>
+                    <div className="space-y-0.5">
+                      <span className="text-sm font-medium text-on-surface block">Sync connected</span>
+                      <span className="text-[10px] text-on-surface-variant block">
+                        Signed in as {sync.email}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        void handleSyncSignOut();
+                      }}
+                      disabled={syncPendingAction !== null}
+                      className="rounded-xl border border-outline/20 bg-surface-high px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-on-surface transition-colors hover:bg-white/5 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {syncPendingAction === 'sign-out' ? 'Signing Out...' : 'Sign Out'}
+                    </button>
+                  </>
+                )}
+
+                {syncFeedback && sync.mode !== 'not-configured' && (
+                  <p
+                    className={`text-[10px] ${
+                      syncFeedback.kind === 'error' ? 'text-error' : 'text-primary'
+                    }`}
+                  >
+                    {syncFeedback.message}
+                  </p>
+                )}
+              </div>
             </div>
           </section>
 

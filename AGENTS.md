@@ -10,14 +10,17 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 - Tailwind CSS v4
 - `motion` / `motion/react` for transitions
 - Local React state plus `AppContext`
-- `localStorage` for persisted client-side preferences
-- Frontend-only mock-data prototype
+- `localStorage` for immediate local-first persistence
+- Supabase Auth + Postgres for optional account-level user state sync
+- Mock-content product with frontend-rendered fixtures
 
 ## Current Development Phase
 - Phase 1: stabilization completed
 - Phase 1.5: topic personalization completed
-- Current app status: frontend-only, mock-data-backed, locally persisted user preferences
-- Next major work is PWA support and persistence, not backend feature expansion by default
+- Phase 2: PWA install support completed
+- Phase 3: local-first persistence with optional Supabase account sync for user state completed
+- Current app status: local-first, mock-content-backed product with optional Supabase account sync for user state
+- Next major work is Phase 4 data ingestion, not backend feature expansion by default
 
 ## Visual Design Rules
 - Preserve the current dark-first SignalDesk look
@@ -49,7 +52,9 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 ## Data And State Rules
 - The app currently uses mock data only
 - `src/mockData.ts` is the source of truth for prototype content fixtures
-- Persisted client state belongs in `localStorage` until a later persistence phase
+- Persisted user state is local-first:
+  - write locally first through `localStorage`
+  - sync to Supabase only when configuration and an authenticated account are available
 - Current persisted user state includes:
   - onboarding completion
   - settings
@@ -59,6 +64,9 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
   - saved signals
   - watchlist ids
   - notes
+  - lightweight feedback state
+- Supabase sync is account-level state sync only; it does not replace mock content fixtures in this phase
+- If Supabase env vars are missing or the user is signed out, SignalDesk must remain safe in local-only mode
 - Keep signal data normalized around:
   - `categories: string[]`
   - `topics: string[]`
@@ -70,8 +78,11 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 ## Do Not Do Without Explicit Approval
 - Do not add backend services
 - Do not add real APIs or external data ingestion
-- Do not add Supabase integration
-- Do not add authentication
+- Do not introduce live market terminal behavior
+- Do not introduce generic social feed behavior
+- Do not add backend content ingestion in this phase
+- Do not expand Supabase beyond optional user-state sync
+- Do not make authentication required for the core local-first experience
 - Do not redesign the visual system
 - Do not replace the current navigation model with a full router unless requested
 - Do not remove the mock-data workflow

@@ -281,6 +281,39 @@ const sanitizeNoteRecords = (value: unknown): NoteRecord[] => {
   });
 };
 
+const sanitizeFeedbackRecords = (value: unknown): PersistedUserStateV2['feedback'] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap(item => {
+    if (!item || typeof item !== 'object') {
+      return [];
+    }
+
+    const record = item as Partial<PersistedUserStateV2['feedback'][number]>;
+    if (
+      typeof record.target_id !== 'string' ||
+      typeof record.target_type !== 'string' ||
+      typeof record.feedback_type !== 'string' ||
+      typeof record.created_at !== 'string' ||
+      typeof record.updated_at !== 'string'
+    ) {
+      return [];
+    }
+
+    if (!['signal', 'library_item', 'topic', 'watchlist_item'].includes(record.target_type)) {
+      return [];
+    }
+
+    if (!['useful', 'not_useful'].includes(record.feedback_type)) {
+      return [];
+    }
+
+    return [record as PersistedUserStateV2['feedback'][number]];
+  });
+};
+
 const sanitizeTopicPreferenceRecords = (value: unknown): TopicPreferenceRecord[] => {
   if (!Array.isArray(value)) {
     return [];
@@ -358,7 +391,7 @@ const sanitizePersistedStateV2 = (value: unknown): PersistedUserStateV2 | null =
     saved_items: sanitizeSavedItems(parsed.saved_items),
     watchlist_items: sanitizeWatchlistItems(parsed.watchlist_items),
     notes: sanitizeNoteRecords(parsed.notes),
-    feedback: [],
+    feedback: sanitizeFeedbackRecords(parsed.feedback),
   };
 };
 

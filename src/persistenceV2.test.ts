@@ -212,6 +212,44 @@ test('legacy watchlist outside demo defaults is preserved as entity-based record
   assert.equal(state.watchlist_items[0].sort_order, 0);
 });
 
+test('persisted V2 feedback survives hydration', async () => {
+  const storage = withMemoryStorage();
+  const api = await loadStorageApi();
+
+  storage.setItem(
+    api.STORAGE_KEYS.persistedStateV2,
+    JSON.stringify({
+      schema_version: 2,
+      profile: api.createFreshPersistedStateV2!().profile,
+      topic_preferences: [],
+      saved_items: [],
+      watchlist_items: [],
+      notes: [],
+      feedback: [
+        {
+          target_type: 'signal',
+          target_id: 's1',
+          feedback_type: 'useful',
+          created_at: '2026-05-05T00:00:00.000Z',
+          updated_at: '2026-05-05T00:00:00.000Z',
+        },
+      ],
+    }),
+  );
+
+  const state = api.hydratePersistedStateV2!();
+
+  assert.deepEqual(state.feedback, [
+    {
+      target_type: 'signal',
+      target_id: 's1',
+      feedback_type: 'useful',
+      created_at: '2026-05-05T00:00:00.000Z',
+      updated_at: '2026-05-05T00:00:00.000Z',
+    },
+  ]);
+});
+
 test('compatibility adapters derive signal bookmarks and watchlist ids from V2 state', async () => {
   withMemoryStorage();
   const api = await loadStorageApi();
