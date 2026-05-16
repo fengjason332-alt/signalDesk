@@ -1,8 +1,12 @@
 # Phase 3 Changes Summary
 
+This is the canonical Phase 3 status and handoff summary for SignalDesk.
+
 ## What changed
 
-This document summarizes the Phase 3 Supabase persistence work that was implemented in this session.
+This document summarizes the Phase 3 Supabase persistence work that was implemented for SignalDesk's user-state sync layer.
+
+It should be updated instead of creating a duplicate `PHASE_3_STATUS.md` file.
 
 ## High-level outcome
 

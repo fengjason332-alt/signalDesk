@@ -55,6 +55,7 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 - Persisted user state is local-first:
   - write locally first through `localStorage`
   - sync to Supabase only when configuration and an authenticated account are available
+- Preserve the working Phase 3 user-state sync behavior unless the current task explicitly changes it
 - Current persisted user state includes:
   - onboarding completion
   - settings
@@ -66,6 +67,8 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
   - notes
   - lightweight feedback state
 - Supabase sync is account-level state sync only; it does not replace mock content fixtures in this phase
+- Do not move mock content into Supabase unless the current phase explicitly requires it
+- Future ingestion and AI enrichment must stay server-side; never expose those secrets to the client
 - If Supabase env vars are missing or the user is signed out, SignalDesk must remain safe in local-only mode
 - Keep signal data normalized around:
   - `categories: string[]`
