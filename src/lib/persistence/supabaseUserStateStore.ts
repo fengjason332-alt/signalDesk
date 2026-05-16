@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { PersistedUserStateV2 } from '../../types';
 import {
   fromSupabaseRows,
@@ -64,6 +65,8 @@ export interface SupabaseUserStateStore {
   saveRemoteUserState(userId: string, state: PersistedUserStateV2): Promise<void>;
 }
 
+type SupabaseRuntimeClient = Pick<SupabaseClient<any, any, any>, 'from'>;
+
 const topicPreferenceIdentity = (row: SupabaseTopicPreferenceRow) =>
   row.topic_kind === 'canonical'
     ? `${row.preference_type}:canonical:${row.topic_id}`
@@ -81,6 +84,25 @@ const ensureStableLoadedId = (value: unknown) => {
 
   return value;
 };
+
+const buildSupabaseError = (context: string, error: { message?: string; code?: string | null }) =>
+  new Error(
+    `[SignalDesk sync] ${context} failed${error.code ? ` (${error.code})` : ''}: ${
+      error.message ?? 'Unknown Supabase error'
+    }`,
+  );
+
+async function runSupabaseQuery<TData>(
+  operation: PromiseLike<{ data: TData; error: { message?: string; code?: string | null } | null }>,
+  context: string,
+) {
+  const { data, error } = await operation;
+  if (error) {
+    throw buildSupabaseError(context, error);
+  }
+
+  return data;
+}
 
 async function replaceUserCollection<
   TWriteRow extends SupabaseCollectionRow,
@@ -207,12 +229,209 @@ export function createSupabaseUserStateStore(
   };
 }
 
+export function createSupabaseClientUserStateStoreAdapter(
+  client: SupabaseRuntimeClient,
+): SupabaseUserStateStoreAdapter {
+  return {
+    async loadProfile(userId) {
+      const data = await runSupabaseQuery(
+        client.from('user_profiles').select('*').eq('user_id', userId).maybeSingle(),
+        'load user_profiles',
+      );
+
+      return (data ?? null) as SupabaseUserProfileRow | null;
+    },
+    async loadTopicPreferences(userId) {
+      const data = await runSupabaseQuery(
+        client.from('user_topic_preferences').select('*').eq('user_id', userId),
+        'load user_topic_preferences',
+      );
+
+      return (data ?? []) as LoadedSupabaseTopicPreferenceRow[];
+    },
+    async loadSavedItems(userId) {
+      const data = await runSupabaseQuery(
+        client.from('user_saved_items').select('*').eq('user_id', userId),
+        'load user_saved_items',
+      );
+
+      return (data ?? []) as LoadedSupabaseSavedItemRow[];
+    },
+    async loadWatchlistItems(userId) {
+      const data = await runSupabaseQuery(
+        client
+          .from('user_watchlist_items')
+          .select('*')
+          .eq('user_id', userId)
+          .order('sort_order', { ascending: true }),
+        'load user_watchlist_items',
+      );
+
+      return (data ?? []) as LoadedSupabaseWatchlistItemRow[];
+    },
+    async loadNotes(userId) {
+      const data = await runSupabaseQuery(
+        client.from('user_notes').select('*').eq('user_id', userId),
+        'load user_notes',
+      );
+
+      return (data ?? []) as LoadedSupabaseNoteRow[];
+    },
+    async loadFeedback(userId) {
+      const data = await runSupabaseQuery(
+        client.from('user_feedback').select('*').eq('user_id', userId),
+        'load user_feedback',
+      );
+
+      return (data ?? []) as LoadedSupabaseFeedbackRow[];
+    },
+    async upsertProfile(row) {
+      await runSupabaseQuery(
+        client.from('user_profiles').upsert(row, { onConflict: 'user_id' }),
+        'upsert user_profiles',
+      );
+    },
+    async upsertTopicPreferences(rows) {
+      const canonicalRows = rows.filter(
+        (row): row is SupabaseCanonicalTopicPreferenceRow => row.topic_kind === 'canonical',
+      );
+      const customRows = rows.filter(
+        (row): row is SupabaseCustomTopicPreferenceRow => row.topic_kind === 'custom',
+      );
+
+      if (canonicalRows.length > 0) {
+        await runSupabaseQuery(
+          client.from('user_topic_preferences').upsert(canonicalRows, {
+            onConflict: 'user_id,preference_type,topic_id',
+          }),
+          'upsert canonical user_topic_preferences',
+        );
+      }
+
+      if (customRows.length > 0) {
+        await runSupabaseQuery(
+          client.from('user_topic_preferences').upsert(customRows, {
+            onConflict: 'user_id,preference_type,custom_topic_label_normalized',
+          }),
+          'upsert custom user_topic_preferences',
+        );
+      }
+    },
+    async upsertSavedItems(rows) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_saved_items').upsert(rows, {
+          onConflict: 'user_id,target_type,target_id',
+        }),
+        'upsert user_saved_items',
+      );
+    },
+    async upsertWatchlistItems(rows) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_watchlist_items').upsert(rows, {
+          onConflict: 'user_id,entity_id',
+        }),
+        'upsert user_watchlist_items',
+      );
+    },
+    async upsertNotes(rows) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_notes').upsert(rows, {
+          onConflict: 'user_id,target_type,target_id',
+        }),
+        'upsert user_notes',
+      );
+    },
+    async upsertFeedback(rows) {
+      if (rows.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_feedback').upsert(rows, {
+          onConflict: 'user_id,target_type,target_id',
+        }),
+        'upsert user_feedback',
+      );
+    },
+    async deleteTopicPreferences(userId, ids) {
+      if (ids.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_topic_preferences').delete().eq('user_id', userId).in('id', ids),
+        'delete user_topic_preferences',
+      );
+    },
+    async deleteSavedItems(userId, ids) {
+      if (ids.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_saved_items').delete().eq('user_id', userId).in('id', ids),
+        'delete user_saved_items',
+      );
+    },
+    async deleteWatchlistItems(userId, ids) {
+      if (ids.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_watchlist_items').delete().eq('user_id', userId).in('id', ids),
+        'delete user_watchlist_items',
+      );
+    },
+    async deleteNotes(userId, ids) {
+      if (ids.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_notes').delete().eq('user_id', userId).in('id', ids),
+        'delete user_notes',
+      );
+    },
+    async deleteFeedback(userId, ids) {
+      if (ids.length === 0) {
+        return;
+      }
+
+      await runSupabaseQuery(
+        client.from('user_feedback').delete().eq('user_id', userId).in('id', ids),
+        'delete user_feedback',
+      );
+    },
+  };
+}
+
 let configuredStore = createSupabaseUserStateStore(null);
 
 export function configureSupabaseUserStateStore(
   adapter: SupabaseUserStateStoreAdapter | null,
 ) {
   configuredStore = createSupabaseUserStateStore(adapter);
+}
+
+export function configureRuntimeSupabaseUserStateStore(
+  client: SupabaseRuntimeClient | null,
+) {
+  configureSupabaseUserStateStore(
+    client ? createSupabaseClientUserStateStoreAdapter(client) : null,
+  );
 }
 
 export function loadRemoteUserState(userId: string) {

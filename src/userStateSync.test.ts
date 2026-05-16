@@ -84,6 +84,7 @@ function createSyncHarness(options?: {
   remoteStatesByUser?: Record<string, PersistedUserStateV2 | null>;
   pauseSaveCalls?: boolean;
   loadFailuresByUser?: Record<string, Error>;
+  saveFailuresByUser?: Record<string, Error>;
 }) {
   const scheduler = new FakeTimerScheduler();
   const localWrites: PersistedUserStateV2[] = [];
@@ -91,7 +92,9 @@ function createSyncHarness(options?: {
   const saveCalls: Array<{ userId: string; state: PersistedUserStateV2 }> = [];
   const remoteStatesByUser = new Map<string, PersistedUserStateV2>();
   const loadFailuresByUser = new Map<string, Error>();
+  const saveFailuresByUser = new Map<string, Error>();
   const pendingSaveDeferreds: Deferred<void>[] = [];
+  const reportedErrors: unknown[] = [];
   let currentState = cloneState(options?.localState ?? createFreshPersistedStateV2());
   let pauseSaveCalls = options?.pauseSaveCalls ?? false;
   let activeSaveCount = 0;
@@ -106,6 +109,10 @@ function createSyncHarness(options?: {
 
   for (const [userId, error] of Object.entries(options?.loadFailuresByUser ?? {})) {
     loadFailuresByUser.set(userId, error);
+  }
+
+  for (const [userId, error] of Object.entries(options?.saveFailuresByUser ?? {})) {
+    saveFailuresByUser.set(userId, error);
   }
 
   controller = createUserStateSyncController({
@@ -132,6 +139,11 @@ function createSyncHarness(options?: {
       maxConcurrentSaveCount = Math.max(maxConcurrentSaveCount, activeSaveCount);
 
       try {
+        const saveFailure = saveFailuresByUser.get(userId);
+        if (saveFailure) {
+          throw saveFailure;
+        }
+
         if (pauseSaveCalls) {
           const deferred = new Deferred<void>();
           pendingSaveDeferreds.push(deferred);
@@ -145,6 +157,9 @@ function createSyncHarness(options?: {
     },
     scheduleTimeout: (callback, delayMs) => scheduler.setTimeout(callback, delayMs),
     clearScheduledTimeout: timerId => scheduler.clearTimeout(timerId as number),
+    onError: error => {
+      reportedErrors.push(error);
+    },
   });
 
   return {
@@ -169,6 +184,15 @@ function createSyncHarness(options?: {
     },
     clearLoadFailure(userId: string) {
       loadFailuresByUser.delete(userId);
+    },
+    setSaveFailure(userId: string, error: Error) {
+      saveFailuresByUser.set(userId, error);
+    },
+    clearSaveFailure(userId: string) {
+      saveFailuresByUser.delete(userId);
+    },
+    get reportedErrors() {
+      return [...reportedErrors];
     },
     async releaseNextSave() {
       const deferred = pendingSaveDeferreds.shift();
@@ -397,6 +421,23 @@ test('controller keeps failed initial remote load in local-only mode and does no
   assert.equal(harness.loadCalls.length, 1);
   assert.equal(harness.saveCalls.length, 0);
   assert.equal(harness.getRemoteState(USER_A), null);
+});
+
+test('controller reports remote save failures through onError instead of swallowing them silently', async () => {
+  const harness = createSyncHarness({
+    saveFailuresByUser: {
+      [USER_A]: new Error('save failed'),
+    },
+  });
+
+  await harness.controller.syncAuthState({
+    hasLoadedSession: true,
+    isConfigured: true,
+    sessionUserId: USER_A,
+  });
+
+  assert.equal(harness.reportedErrors.length, 1);
+  assert.match(String(harness.reportedErrors[0]), /save failed/i);
 });
 
 test('controller keeps a deleted local row from reappearing after sign-out and same-user re-auth with an unsynced delete', async () => {

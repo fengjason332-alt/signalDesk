@@ -14,6 +14,8 @@ import {
 } from './lib/persistence/userStateMapper';
 import {
   configureSupabaseUserStateStore,
+  configureRuntimeSupabaseUserStateStore,
+  createSupabaseClientUserStateStoreAdapter,
   createSupabaseUserStateStore,
   loadRemoteUserState,
   saveRemoteUserState,
@@ -47,6 +49,199 @@ const savedItemIdentity = (row: SupabaseSavedItemRow) => `${row.target_type}:${r
 const watchlistIdentity = (row: SupabaseWatchlistItemRow) => row.entity_id;
 const noteIdentity = (row: SupabaseNoteRow) => `${row.target_type}:${row.target_id}`;
 const feedbackIdentity = (row: SupabaseFeedbackRow) => `${row.target_type}:${row.target_id}`;
+
+type RuntimeTableName =
+  | 'user_profiles'
+  | 'user_topic_preferences'
+  | 'user_saved_items'
+  | 'user_watchlist_items'
+  | 'user_notes'
+  | 'user_feedback';
+
+class FakeSupabaseRuntimeClient {
+  tables: Record<RuntimeTableName, Record<string, unknown>[]> = {
+    user_profiles: [],
+    user_topic_preferences: [],
+    user_saved_items: [],
+    user_watchlist_items: [],
+    user_notes: [],
+    user_feedback: [],
+  };
+
+  private nextId = 1;
+
+  from(table: RuntimeTableName) {
+    return new FakeSupabaseRuntimeTable(this, table);
+  }
+
+  query(table: RuntimeTableName, filters: Array<{ column: string; value: unknown }>) {
+    return this.tables[table]
+      .filter(row =>
+        filters.every(filter => row[filter.column] === filter.value),
+      )
+      .map(row => ({ ...row }));
+  }
+
+  upsert(
+    table: RuntimeTableName,
+    values: Record<string, unknown>[],
+    onConflict: string | undefined,
+  ) {
+    const keyColumns =
+      onConflict?.split(',').map(column => column.trim()).filter(Boolean) ??
+      (table === 'user_profiles' ? ['user_id'] : ['id']);
+
+    for (const value of values) {
+      const rows = this.tables[table];
+      const matchIndex = rows.findIndex(row =>
+        keyColumns.every(column => row[column] === value[column]),
+      );
+
+      if (matchIndex >= 0) {
+        const existing = rows[matchIndex];
+        rows[matchIndex] = {
+          ...existing,
+          ...value,
+          id: existing.id ?? value.id,
+        };
+        continue;
+      }
+
+      rows.push({
+        ...value,
+        ...(table === 'user_profiles'
+          ? {}
+          : { id: value.id ?? `${table}-${this.nextId++}` }),
+      });
+    }
+  }
+
+  delete(
+    table: RuntimeTableName,
+    filters: Array<{ column: string; value: unknown }>,
+    ids: string[],
+  ) {
+    const idSet = new Set(ids);
+    this.tables[table] = this.tables[table].filter(row => {
+      const matchesFilters = filters.every(filter => row[filter.column] === filter.value);
+      return !(matchesFilters && typeof row.id === 'string' && idSet.has(row.id));
+    });
+  }
+}
+
+class FakeSupabaseRuntimeTable {
+  constructor(
+    private client: FakeSupabaseRuntimeClient,
+    private table: RuntimeTableName,
+  ) {}
+
+  select(_columns: string) {
+    return new FakeSupabaseRuntimeSelectBuilder(this.client, this.table);
+  }
+
+  upsert(values: Record<string, unknown>[] | Record<string, unknown>, options?: { onConflict?: string }) {
+    const rows = Array.isArray(values) ? values : [values];
+    this.client.upsert(this.table, rows, options?.onConflict);
+    return Promise.resolve({ data: null, error: null });
+  }
+
+  delete() {
+    return new FakeSupabaseRuntimeDeleteBuilder(this.client, this.table);
+  }
+}
+
+class FakeSupabaseRuntimeSelectBuilder {
+  private filters: Array<{ column: string; value: unknown }> = [];
+  private sortColumn: string | null = null;
+  private sortAscending = true;
+
+  constructor(
+    private client: FakeSupabaseRuntimeClient,
+    private table: RuntimeTableName,
+  ) {}
+
+  eq(column: string, value: unknown) {
+    this.filters.push({ column, value });
+    return this;
+  }
+
+  order(column: string, options?: { ascending?: boolean }) {
+    this.sortColumn = column;
+    this.sortAscending = options?.ascending !== false;
+    return this;
+  }
+
+  maybeSingle() {
+    const rows = this.executeRows();
+    return Promise.resolve({
+      data: rows[0] ?? null,
+      error: null,
+    });
+  }
+
+  then<TResult1 = { data: Record<string, unknown>[]; error: null }, TResult2 = never>(
+    onfulfilled?:
+      | ((value: { data: Record<string, unknown>[]; error: null }) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ) {
+    return Promise.resolve({
+      data: this.executeRows(),
+      error: null,
+    }).then(onfulfilled, onrejected);
+  }
+
+  private executeRows() {
+    const rows = this.client.query(this.table, this.filters);
+    if (!this.sortColumn) {
+      return rows;
+    }
+
+    return [...rows].sort((left, right) => {
+      const leftValue = left[this.sortColumn!];
+      const rightValue = right[this.sortColumn!];
+      const comparison =
+        typeof leftValue === 'number' && typeof rightValue === 'number'
+          ? leftValue - rightValue
+          : String(leftValue).localeCompare(String(rightValue));
+
+      return this.sortAscending ? comparison : -comparison;
+    });
+  }
+}
+
+class FakeSupabaseRuntimeDeleteBuilder {
+  private filters: Array<{ column: string; value: unknown }> = [];
+  private ids: string[] = [];
+
+  constructor(
+    private client: FakeSupabaseRuntimeClient,
+    private table: RuntimeTableName,
+  ) {}
+
+  eq(column: string, value: unknown) {
+    this.filters.push({ column, value });
+    return this;
+  }
+
+  in(column: string, values: string[]) {
+    if (column === 'id') {
+      this.ids = [...values];
+    }
+
+    return this;
+  }
+
+  then<TResult1 = { data: null; error: null }, TResult2 = never>(
+    onfulfilled?:
+      | ((value: { data: null; error: null }) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ) {
+    this.client.delete(this.table, this.filters, this.ids);
+    return Promise.resolve({ data: null, error: null }).then(onfulfilled, onrejected);
+  }
+}
 
 class MemorySupabaseUserStateStoreAdapter implements SupabaseUserStateStoreAdapter {
   profile: SupabaseUserProfileRow | null = null;
@@ -850,5 +1045,37 @@ test('saveRemoteUserState rejects malformed loaded rows that are missing stable 
   await assert.rejects(
     store.saveRemoteUserState(USER_ID, state),
     /missing stable id/i,
+  );
+});
+
+test('runtime store configuration wires the Supabase client adapter so profile and saved item writes reach the global store', async () => {
+  const client = new FakeSupabaseRuntimeClient();
+  configureRuntimeSupabaseUserStateStore(
+    client as unknown as Parameters<typeof createSupabaseClientUserStateStoreAdapter>[0],
+  );
+
+  const state = createFreshPersistedStateV2();
+  state.profile.onboarding_completed = true;
+  state.saved_items = [
+    {
+      target_type: 'signal',
+      target_id: 's-runtime',
+      created_at: BASE_TIME,
+      updated_at: BASE_TIME,
+    },
+  ];
+
+  await saveRemoteUserState(USER_ID, state);
+  const remoteState = await loadRemoteUserState(USER_ID);
+
+  assert.equal(client.tables.user_profiles.length, 1);
+  assert.equal(client.tables.user_saved_items.length, 1);
+  assert.equal(
+    client.tables.user_profiles[0]?.user_id,
+    USER_ID,
+  );
+  assert.deepEqual(
+    remoteState?.saved_items.map(item => item.target_id),
+    ['s-runtime'],
   );
 });

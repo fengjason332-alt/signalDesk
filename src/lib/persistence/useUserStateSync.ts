@@ -11,6 +11,14 @@ import {
 
 export const SYNC_DEBOUNCE_MS = 750;
 
+const logSyncErrorInDev = (error: unknown) => {
+  if (!import.meta.env?.DEV) {
+    return;
+  }
+
+  console.error('[SignalDesk sync] Remote user-state sync failed.', error);
+};
+
 interface UserStateSyncAuthSnapshot {
   hasLoadedSession: boolean;
   isConfigured: boolean;
@@ -271,6 +279,7 @@ export function useUserStateSync({
       replacePersistedState: nextState => {
         setPersistedState(nextState);
       },
+      onError: logSyncErrorInDev,
     });
   }
 
