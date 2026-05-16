@@ -67,6 +67,58 @@ export type TranslationStatus = (typeof TRANSLATION_STATUSES)[number];
 
 export type ContentMetadata = Record<string, string | number | boolean | null>;
 
+export interface SourceRegistryEntry {
+  id: string;
+  name: string;
+  url: string;
+  source_type: 'rss';
+  language: ContentLanguage;
+  reliability_tier: SourceReliabilityTier;
+  category_key: CategoryKey;
+  active: boolean;
+  notes: string;
+}
+
+export interface ParsedRssFeedItem {
+  guid: string | null;
+  title: string;
+  link: string;
+  pubDate: string | null;
+  description: string | null;
+  contentEncoded: string | null;
+  author: string | null;
+}
+
+export interface FetchedSourceFeed {
+  source: SourceRegistryEntry;
+  fetchedAt: string;
+  rawXml: string;
+  items: ParsedRssFeedItem[];
+}
+
+export interface NormalizedFeedItem {
+  source_id: string;
+  external_id: string | null;
+  canonical_url: string;
+  title: string;
+  dek: string | null;
+  author: string | null;
+  published_at: string;
+  discovered_at: string;
+  language: ContentLanguage;
+  category_keys: CategoryKey[];
+  raw_html: string | null;
+  raw_text: string | null;
+  normalized_text: string | null;
+  metadata: ContentMetadata;
+}
+
+export interface RawItemHashes {
+  title_hash: string;
+  canonical_url_hash: string;
+  content_hash: string;
+}
+
 export interface ContentSourceRecord {
   id: string;
   name: string;
