@@ -262,3 +262,131 @@ export interface SignalTranslationBlockRecord {
   created_at: string;
   updated_at: string;
 }
+
+export interface TopicEntityMappingInput {
+  title: string;
+  dek?: string | null;
+  text?: string | null;
+  categoryKeys?: readonly CategoryKey[];
+}
+
+export interface DeterministicTopicMatch {
+  topic_id: string;
+  topic_name: string;
+  category_key: CategoryKey;
+  // Integer-like deterministic confidence aligned with future persistence schemas.
+  confidence_score: number;
+  evidence_snippets: string[];
+}
+
+export interface DeterministicEntityMatch {
+  entity_id: string;
+  canonical_name: string;
+  entity_type: ContentEntityType;
+  // Integer-like deterministic confidence aligned with future persistence schemas.
+  confidence_score: number;
+  evidence_snippets: string[];
+  matched_aliases: string[];
+}
+
+export interface TopicEntityMappingResult {
+  primary_category: CategoryKey | null;
+  categories: CategoryKey[];
+  topics: DeterministicTopicMatch[];
+  entities: DeterministicEntityMatch[];
+}
+
+export interface DeterministicScoringSeed {
+  seed_version: 'phase4_det_v1';
+  source_reliability_score: number;
+  recency_score: number;
+  entity_importance_score: number;
+  topic_relevance_score: number;
+  source_count_score: number;
+  duplicate_confidence_score: number;
+  overall_seed_score: number;
+}
+
+export const CANDIDATE_SIGNAL_STATUSES = ['draft', 'candidate'] as const;
+export type CandidateSignalStatus = (typeof CANDIDATE_SIGNAL_STATUSES)[number];
+export const CANDIDATE_SIGNAL_LIFECYCLE_STAGES = ['candidate_preview'] as const;
+export type CandidateSignalLifecycleStage =
+  (typeof CANDIDATE_SIGNAL_LIFECYCLE_STAGES)[number];
+
+export interface CandidateSignalEntityMatch extends DeterministicEntityMatch {
+  mention_count: number;
+  relevance_score: number;
+}
+
+export interface CandidateSignalTopicMatch extends DeterministicTopicMatch {
+  match_count: number;
+  relevance_score: number;
+}
+
+export interface CandidateSignalSourceProvenance {
+  // Preview-only raw item id from the dry-run pipeline before any persisted
+  // raw_source_items UUID boundary exists in Supabase.
+  preview_raw_source_item_id: string;
+  source_id: string;
+  source_name: string;
+  ingestion_run_id: string | null;
+  published_at: string;
+  reliability_tier: SourceReliabilityTier;
+}
+
+export interface CandidateSignalRecord {
+  candidate_id: string;
+  title_seed: string;
+  primary_category: CategoryKey;
+  categories: CategoryKey[];
+  entities: string[];
+  topics: string[];
+  entity_matches: CandidateSignalEntityMatch[];
+  topic_matches: CandidateSignalTopicMatch[];
+  source_item_ids: string[];
+  source_count: number;
+  source_ids: string[];
+  source_names: string[];
+  source_provenance: CandidateSignalSourceProvenance[];
+  primary_preview_raw_source_item_id: string | null;
+  primary_source_name: string | null;
+  published_at: string;
+  // Preview-only candidate status for clustering output, not the same as
+  // intelligence_signals.generation_status in persisted signal rows.
+  status: CandidateSignalStatus;
+  lifecycle_stage: CandidateSignalLifecycleStage;
+  scoring_seed: DeterministicScoringSeed;
+}
+
+export interface Phase4DryRunRequest {
+  dryRun?: boolean;
+  sourceIds?: string[];
+  discoveredAt?: string;
+  now?: string;
+  maxItemsPerSource?: number;
+}
+
+export interface Phase4DryRunPreview {
+  dry_run: true;
+  writes_disabled: true;
+  selected_source_ids: string[];
+  fetched_item_count: number;
+  normalized_item_count: number;
+  raw_item_count: number;
+  dedupe_relationships: Array<{
+    left_id: string;
+    right_id: string;
+    confidence: RawItemDedupeConfidence;
+  }>;
+  candidate_signals: CandidateSignalRecord[];
+  source_previews: Array<{
+    source_id: string;
+    source_name: string;
+    fetched_count: number;
+    normalized_count: number;
+  }>;
+  write_steps: Array<{
+    step: string;
+    enabled: false;
+  }>;
+}
