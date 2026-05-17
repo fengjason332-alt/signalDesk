@@ -65,6 +65,16 @@ export type SignalTranslationBlockKind =
 export const TRANSLATION_STATUSES = ['pending', 'completed', 'failed'] as const;
 export type TranslationStatus = (typeof TRANSLATION_STATUSES)[number];
 
+export const RAW_ITEM_DEDUPE_CONFIDENCES = [
+  'exact',
+  'high',
+  'medium',
+  'low',
+  'none',
+] as const;
+export type RawItemDedupeConfidence =
+  (typeof RAW_ITEM_DEDUPE_CONFIDENCES)[number];
+
 export type ContentMetadata = Record<string, string | number | boolean | null>;
 
 export interface SourceRegistryEntry {

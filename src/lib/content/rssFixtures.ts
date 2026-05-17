@@ -36,3 +36,103 @@ export const SAMPLE_AI_RSS_FEED_XML = `<?xml version="1.0" encoding="UTF-8"?>
     </item>
   </channel>
 </rss>`;
+
+export const TRACKING_VARIANT_ITEMS = [
+  {
+    guid: 'tracking-001',
+    title: 'OpenAI expands power agreements for new data centers',
+    link: 'https://Example.com/ai/openai-power/?utm_source=rss&utm_medium=email&id=42',
+    pubDate: 'Sat, 17 May 2026 00:00:00 GMT',
+    description:
+      '<p>OpenAI and Microsoft are securing additional energy capacity.</p>',
+    contentEncoded:
+      '<div><p>OpenAI and Microsoft are securing additional energy capacity.</p></div>',
+    author: 'SignalDesk Test Feed',
+  },
+  {
+    guid: 'tracking-002',
+    title: 'OpenAI expands power agreements for new data centers',
+    link: 'https://example.com/ai/openai-power?id=42&gclid=abc123',
+    pubDate: 'Sat, 17 May 2026 00:00:00 GMT',
+    description:
+      '<p>OpenAI and Microsoft are securing additional energy capacity.</p>',
+    contentEncoded:
+      '<article><p>OpenAI and Microsoft are securing additional energy capacity.</p></article>',
+    author: 'SignalDesk Test Feed',
+  },
+] as const;
+
+export const TYPOGRAPHIC_TITLE_VARIANT_ITEMS = [
+  {
+    guid: 'punctuation-001',
+    title: 'OpenAI expands power agreements for new data centers',
+    link: 'https://example.com/ai/openai-power-grid-funding-a',
+    pubDate: 'Sat, 17 May 2026 02:00:00 GMT',
+    description:
+      '<p>Infrastructure operators are securing dedicated power deals for AI expansion.</p>',
+    contentEncoded:
+      '<p>Infrastructure operators are securing dedicated power deals for AI expansion.</p>',
+    author: 'SignalDesk Test Feed',
+  },
+  {
+    guid: 'punctuation-002',
+    title: '“OpenAI” expands power agreements — for new data centers',
+    link: 'https://example.com/ai/openai-power-grid-funding-b',
+    pubDate: 'Sat, 17 May 2026 02:00:00 GMT',
+    description:
+      '<p>Infrastructure operators are securing dedicated power deals for AI expansion.</p>',
+    contentEncoded:
+      '<div><p>Infrastructure operators are securing dedicated power deals for AI expansion.</p></div>',
+    author: 'SignalDesk Test Feed',
+  },
+] as const;
+
+export const SAME_CONTENT_DIFFERENT_IDS_ITEMS = [
+  {
+    guid: 'excerpt-001',
+    title: 'Microsoft expands data-center financing options',
+    link: 'https://example.com/ai/microsoft-financing-a',
+    pubDate: 'Sat, 17 May 2026 03:00:00 GMT',
+    description:
+      '<p>OpenAI and Microsoft are securing additional energy capacity.</p>',
+    contentEncoded:
+      '<div><p>OpenAI and Microsoft are securing additional energy capacity.</p></div>',
+    author: 'SignalDesk Test Feed',
+  },
+  {
+    guid: 'excerpt-999',
+    title: 'New financing path emerges for AI data-center buildout',
+    link: 'https://example.com/ai/microsoft-financing-b',
+    pubDate: 'Sat, 17 May 2026 03:30:00 GMT',
+    description:
+      '<p>OpenAI and Microsoft are securing additional energy capacity.</p>',
+    contentEncoded:
+      '<section><p>OpenAI and Microsoft are securing additional energy capacity.</p></section>',
+    author: 'SignalDesk Test Feed',
+  },
+] as const;
+
+export const SIMILAR_NOT_DUPLICATE_ITEMS = [
+  {
+    guid: 'different-001',
+    title: 'OpenAI expands power agreements for new data centers',
+    link: 'https://example.com/ai/openai-power-news',
+    pubDate: 'Sat, 17 May 2026 04:00:00 GMT',
+    description:
+      '<p>OpenAI and Microsoft are securing additional energy capacity.</p>',
+    contentEncoded:
+      '<div><p>OpenAI and Microsoft are securing additional energy capacity.</p></div>',
+    author: 'SignalDesk Test Feed',
+  },
+  {
+    guid: 'different-002',
+    title: 'OpenAI expands enterprise agreements for new data-center customers',
+    link: 'https://example.com/ai/openai-enterprise-customers',
+    pubDate: 'Sat, 17 May 2026 06:00:00 GMT',
+    description:
+      '<p>OpenAI launches enterprise contract bundles for new cloud customers.</p>',
+    contentEncoded:
+      '<div><p>OpenAI launches enterprise contract bundles for new cloud customers.</p></div>',
+    author: 'SignalDesk Test Feed',
+  },
+] as const;

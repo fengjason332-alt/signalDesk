@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import type {
   FetchedSourceFeed,
   NormalizedFeedItem,
@@ -8,6 +6,14 @@ import type {
   RawSourceItemRecord,
   SourceRegistryEntry,
 } from './types';
+import {
+  canonicalizeUrl,
+  createContentFingerprint,
+  createTitleFingerprint,
+  createUrlFingerprint,
+  normalizeContentText,
+  normalizeTitle,
+} from './normalization';
 
 interface FetchResponseLike {
   ok: boolean;
@@ -19,6 +25,7 @@ type FetchLike = (url: string) => Promise<FetchResponseLike>;
 
 const decodeEntities = (value: string) =>
   value
+    .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -27,9 +34,6 @@ const decodeEntities = (value: string) =>
 
 const stripCdata = (value: string) =>
   value.replace(/^<!\[CDATA\[/, '').replace(/\]\]>$/, '');
-
-const stripHtml = (value: string) =>
-  decodeEntities(value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim());
 
 const extractTagValue = (input: string, tagName: string) => {
   const pattern = new RegExp(`<${tagName}[^>]*>([\\s\\S]*?)</${tagName}>`, 'i');
@@ -63,21 +67,6 @@ const normalizePublishedAt = (value: string | null) => {
 
   return new Date(parsed).toISOString();
 };
-
-const normalizeCanonicalUrl = (value: string) => {
-  try {
-    const url = new URL(value);
-    url.search = '';
-    url.hash = '';
-    const normalized = url.toString();
-    return normalized.endsWith('/') ? normalized.slice(0, -1) : normalized;
-  } catch {
-    return value.trim();
-  }
-};
-
-const sha256 = (value: string) =>
-  createHash('sha256').update(value).digest('hex');
 
 export async function fetchSourceFeed(
   source: SourceRegistryEntry,
@@ -116,26 +105,23 @@ export function normalizeFeedItem(
   discoveredAt = new Date().toISOString(),
 ): NormalizedFeedItem {
   const rawHtml = item.contentEncoded ?? item.description;
-  const rawText = item.contentEncoded
-    ? stripHtml(item.contentEncoded)
-    : item.description
-      ? stripHtml(item.description)
-      : null;
+  const rawText = rawHtml ? normalizeContentText(rawHtml) : '';
+  const dekText = item.description ? normalizeContentText(item.description) : '';
 
   return {
     source_id: source.id,
     external_id: item.guid ?? item.link ?? null,
-    canonical_url: normalizeCanonicalUrl(item.link),
-    title: item.title.trim(),
-    dek: item.description ? stripHtml(item.description) : null,
+    canonical_url: canonicalizeUrl(item.link),
+    title: normalizeTitle(item.title),
+    dek: dekText || null,
     author: item.author,
     published_at: normalizePublishedAt(item.pubDate),
     discovered_at: discoveredAt,
     language: source.language,
     category_keys: [source.category_key],
     raw_html: rawHtml,
-    raw_text: rawText,
-    normalized_text: rawText,
+    raw_text: rawText || null,
+    normalized_text: rawText || null,
     metadata: {
       feed_item_guid: item.guid,
       source_name: source.name,
@@ -145,9 +131,9 @@ export function normalizeFeedItem(
 
 export function computeRawItemHashes(item: NormalizedFeedItem): RawItemHashes {
   return {
-    title_hash: sha256(item.title.toLowerCase()),
-    canonical_url_hash: sha256(item.canonical_url),
-    content_hash: sha256((item.normalized_text ?? item.raw_text ?? '').toLowerCase()),
+    title_hash: createTitleFingerprint(item.title),
+    canonical_url_hash: createUrlFingerprint(item.canonical_url),
+    content_hash: createContentFingerprint(item.normalized_text ?? item.raw_text ?? ''),
   };
 }
 
