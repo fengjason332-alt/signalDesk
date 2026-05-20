@@ -250,6 +250,11 @@ Server-only future env:
   - AI-generated summaries
   - AI-generated translations
 - this repo state still does not wire Today or any UI surface to real persisted content
+- Task 7 readiness assets now live in:
+  - `docs/PHASE_4_MANUAL_QA.md`
+  - `supabase/manual/phase4_content_sources_smoke_seed.sql`
+  - `supabase/manual/phase4_content_readiness_checks.sql`
+  - `src/lib/content/phase4SmokeTestRequest.ts`
 
 ## Manual QA Prerequisites For Write Mode
 
@@ -264,4 +269,19 @@ Server-only future env:
   - `PHASE4_WRITE_AUTH_TOKEN=<server-side secret>`
   - `PHASE4_ENABLE_LIVE_FETCH=true` only when intentionally testing live network fetches
 - call the Phase 4 Edge Function with `POST`, `dryRun: false`, and a matching `x-phase4-write-token` header
+- set `liveFetch: true` in the request body only when intentionally exercising live RSS fetches
 - verify candidate-only signal rows plus link-table provenance; do not expect translation blocks or AI summaries yet
+
+## Task 7 Readiness Notes
+
+- migration application remains manual; this repo still does not auto-apply Supabase SQL
+- `content_sources` smoke seeding is manual and intentionally limited to a small subset
+- the smoke-test request helper defaults to:
+  - `dryRun: true`
+  - `liveFetch: false`
+  - `maxItemsPerSource: 3`
+- write mode now fails with clearer server-side guardrail payloads when:
+  - writes are disabled
+  - `PHASE4_WRITE_AUTH_TOKEN` is not configured
+  - the request omits `x-phase4-write-token`
+  - the request token does not match

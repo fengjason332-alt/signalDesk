@@ -58,11 +58,15 @@ Phase 4 foundation:
 
 ## Current Next Recommended Task
 
-Phase 4 Task 7:
+Phase 4 Task 8:
 - keep the pipeline server-side only
-- add the first non-AI signal enrichment/persistence step after deterministic candidate rows
+- build the first AI-disabled signal enrichment step after deterministic candidate rows
 - keep Today on mock content until the persisted signal layer is stable enough for controlled integration
 - do not add AI summaries, translations, or translation-block writes until that dedicated phase begins
+- use the Task 7 manual readiness assets before any non-production write smoke test:
+  - `docs/PHASE_4_MANUAL_QA.md`
+  - `supabase/manual/phase4_content_sources_smoke_seed.sql`
+  - `supabase/manual/phase4_content_readiness_checks.sql`
 
 ## Phase 4 Task 5 Status
 
@@ -88,6 +92,24 @@ Phase 4 Task 7:
 - this still does not write AI-generated summaries or translations
 - this still does not switch the Today feed or any frontend surface away from mock content
 
+## Phase 4 Task 7 Status
+
+- manual migration/readiness guidance now lives in:
+  - `docs/PHASE_4_MANUAL_QA.md`
+  - `supabase/manual/phase4_content_sources_smoke_seed.sql`
+  - `supabase/manual/phase4_content_readiness_checks.sql`
+- smoke-test payload construction now has a safe helper in:
+  - `src/lib/content/phase4SmokeTestRequest.ts`
+- the Edge handler now returns clearer server-side guardrail payloads for:
+  - writes disabled
+  - missing server write token configuration
+  - missing request write token
+  - mismatched request write token
+- dry-run remains the default
+- live fetch remains opt-in and should only be enabled intentionally
+- this still does not call AI
+- this still does not change the UI or switch the Today feed
+
 ## Manual QA Prerequisites For Non-Production Write Testing
 
 - apply the draft migration `supabase/migrations/202605170001_phase4_content_foundation.sql` in a non-production Supabase project only
@@ -100,6 +122,7 @@ Phase 4 Task 7:
   - `PHASE4_WRITE_AUTH_TOKEN=<server-side secret>`
   - `PHASE4_ENABLE_LIVE_FETCH=true` only when live fetch is intentionally being exercised
 - invoke the Edge Function with `POST`, an explicit body containing `dryRun: false`, and a matching `x-phase4-write-token` header
+- use `liveFetch: true` only for intentional live-source smoke tests; the safe default request builder leaves it off
 - verify results in:
   - `content_ingestion_runs`
   - `raw_source_items`

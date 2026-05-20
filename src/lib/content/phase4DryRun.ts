@@ -64,6 +64,18 @@ const COUNTRY_CODE_BY_ENTITY_NAME: Record<string, string> = {
   Australia: 'AU',
 };
 
+interface Phase4WriteGuardrailPayload {
+  error: string;
+  code:
+    | 'phase4_write_mode_disabled'
+    | 'phase4_write_token_not_configured'
+    | 'phase4_write_token_missing'
+    | 'phase4_write_token_mismatch';
+  write_mode_requested: true;
+  writes_enabled: boolean;
+  write_token_configured: boolean;
+}
+
 interface PendingRunState {
   source: SourceRegistryEntry;
   runRef:
@@ -82,6 +94,8 @@ interface PendingRunState {
 }
 
 const isExplicitWriteRequest = (payload: Phase4DryRunRequest) => payload.dryRun === false;
+const isExplicitLiveFetchRequest = (payload: Phase4DryRunRequest) =>
+  payload.liveFetch === true;
 
 const getNow = (payload: Phase4DryRunRequest, now: (() => string) | undefined, fallback: string) =>
   payload.now ?? now?.() ?? fallback;
@@ -110,6 +124,24 @@ const getWriteResponseStatus = (result: Phase4IngestionResult) => {
 
   return 200;
 };
+
+const jsonResponse = (body: unknown, status: number) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      'content-type': 'application/json',
+    },
+  });
+
+const buildWriteGuardrailPayload = (
+  options: Phase4IngestionOptions,
+  payload: Pick<Phase4WriteGuardrailPayload, 'error' | 'code'>,
+): Phase4WriteGuardrailPayload => ({
+  ...payload,
+  write_mode_requested: true,
+  writes_enabled: Boolean(options.allowWrites && options.contentStore),
+  write_token_configured: Boolean(options.writeAuthToken),
+});
 
 const appendErrorMessage = (current: string | null, next: string) => {
   if (!current) {
@@ -344,10 +376,18 @@ export async function runPhase4Ingestion(
   payload: Phase4DryRunRequest,
   options: Phase4IngestionOptions = {},
 ): Promise<Phase4IngestionResult> {
-  if (!options.fetchImpl && !options.allowLiveFetch) {
-    throw new Error(
-      'Phase 4 dry-run live fetch is disabled by default. Provide a fetch implementation or explicitly enable live fetch.',
-    );
+  if (!options.fetchImpl) {
+    if (!isExplicitLiveFetchRequest(payload)) {
+      throw new Error(
+        'Phase 4 live fetch is disabled by default. Re-run with liveFetch: true only for intentional smoke tests.',
+      );
+    }
+
+    if (!options.allowLiveFetch) {
+      throw new Error(
+        'Phase 4 live fetch is not enabled on this server. Set PHASE4_ENABLE_LIVE_FETCH=true for intentional live fetch smoke tests.',
+      );
+    }
   }
 
   const sourceRegistry = options.sourceRegistry ?? getActiveEnglishRssSources();
@@ -604,16 +644,11 @@ export async function runPhase4DryRun(
 export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {}) {
   return async (request: Request) => {
     if (request.method !== 'POST') {
-      return new Response(
-        JSON.stringify({
-          error: 'Method not allowed. Use POST for the phase4 dry-run preview.',
-        }),
+      return jsonResponse(
         {
-          status: 405,
-          headers: {
-            'content-type': 'application/json',
-          },
+          error: 'Method not allowed. Use POST for the phase4 dry-run preview.',
         },
+        405,
       );
     }
 
@@ -621,32 +656,56 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
     try {
       body = (await request.json()) as Phase4DryRunRequest;
     } catch {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid JSON body for the phase4 dry-run preview.',
-        }),
+      return jsonResponse(
         {
-          status: 400,
-          headers: {
-            'content-type': 'application/json',
-          },
+          error: 'Invalid JSON body for the phase4 dry-run preview.',
         },
+        400,
       );
     }
 
-    if (body.dryRun === false && options.writeAuthToken) {
-      const requestToken = request.headers.get('x-phase4-write-token');
-      if (requestToken !== options.writeAuthToken) {
-        return new Response(
-          JSON.stringify({
-            error: 'Write mode requires a valid Phase 4 write token.',
+    if (body.dryRun === false) {
+      if (!options.allowWrites || !options.contentStore) {
+        return jsonResponse(
+          buildWriteGuardrailPayload(options, {
+            error:
+              'Phase 4 write mode is disabled on this server. Keep dryRun: true unless PHASE4_ENABLE_CONTENT_WRITES is intentionally enabled with a server-side content store.',
+            code: 'phase4_write_mode_disabled',
           }),
-          {
-            status: 403,
-            headers: {
-              'content-type': 'application/json',
-            },
-          },
+          403,
+        );
+      }
+
+      if (!options.writeAuthToken) {
+        return jsonResponse(
+          buildWriteGuardrailPayload(options, {
+            error:
+              'Phase 4 write mode requires PHASE4_WRITE_AUTH_TOKEN to be configured on the server before dryRun: false requests are allowed.',
+            code: 'phase4_write_token_not_configured',
+          }),
+          503,
+        );
+      }
+
+      const requestToken = request.headers.get('x-phase4-write-token');
+      if (!requestToken) {
+        return jsonResponse(
+          buildWriteGuardrailPayload(options, {
+            error:
+              'Phase 4 write mode requires the x-phase4-write-token header as the write token when dryRun is false.',
+            code: 'phase4_write_token_missing',
+          }),
+          403,
+        );
+      }
+
+      if (requestToken !== options.writeAuthToken) {
+        return jsonResponse(
+          buildWriteGuardrailPayload(options, {
+            error: 'Provided Phase 4 write token does not match server configuration.',
+            code: 'phase4_write_token_mismatch',
+          }),
+          403,
         );
       }
     }
@@ -654,23 +713,13 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
     try {
       const preview = await runPhase4Ingestion(body, options);
 
-      return new Response(JSON.stringify(preview), {
-        status: getWriteResponseStatus(preview),
-        headers: {
-          'content-type': 'application/json',
-        },
-      });
+      return jsonResponse(preview, getWriteResponseStatus(preview));
     } catch (error) {
-      return new Response(
-        JSON.stringify({
-          error: toErrorMessage(error),
-        }),
+      return jsonResponse(
         {
-          status: 503,
-          headers: {
-            'content-type': 'application/json',
-          },
+          error: toErrorMessage(error),
         },
+        503,
       );
     }
   };
@@ -679,16 +728,11 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
 export function createPhase4DryRunHandler(options: Phase4IngestionOptions = {}) {
   return async (request: Request) => {
     if (request.method !== 'POST') {
-      return new Response(
-        JSON.stringify({
-          error: 'Method not allowed. Use POST for the phase4 dry-run preview.',
-        }),
+      return jsonResponse(
         {
-          status: 405,
-          headers: {
-            'content-type': 'application/json',
-          },
+          error: 'Method not allowed. Use POST for the phase4 dry-run preview.',
         },
+        405,
       );
     }
 
@@ -696,16 +740,11 @@ export function createPhase4DryRunHandler(options: Phase4IngestionOptions = {}) 
     try {
       body = (await request.json()) as Phase4DryRunRequest;
     } catch {
-      return new Response(
-        JSON.stringify({
-          error: 'Invalid JSON body for the phase4 dry-run preview.',
-        }),
+      return jsonResponse(
         {
-          status: 400,
-          headers: {
-            'content-type': 'application/json',
-          },
+          error: 'Invalid JSON body for the phase4 dry-run preview.',
         },
+        400,
       );
     }
 
@@ -716,23 +755,13 @@ export function createPhase4DryRunHandler(options: Phase4IngestionOptions = {}) 
         contentStore: null,
       });
 
-      return new Response(JSON.stringify(preview), {
-        status: 200,
-        headers: {
-          'content-type': 'application/json',
-        },
-      });
+      return jsonResponse(preview, 200);
     } catch (error) {
-      return new Response(
-        JSON.stringify({
-          error: toErrorMessage(error),
-        }),
+      return jsonResponse(
         {
-          status: 503,
-          headers: {
-            'content-type': 'application/json',
-          },
+          error: toErrorMessage(error),
         },
+        503,
       );
     }
   };

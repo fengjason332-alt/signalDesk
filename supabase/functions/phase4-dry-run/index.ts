@@ -33,7 +33,7 @@ export function createConfiguredPhase4Handler() {
   const canCreateStore = Boolean(supabaseUrl && serviceRoleKey);
 
   const contentStore =
-    allowWrites && canCreateStore && writeAuthToken
+    canCreateStore
       ? createSupabaseContentStore(createClient(supabaseUrl!, serviceRoleKey!))
       : null;
 

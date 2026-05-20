@@ -360,6 +360,7 @@ export interface CandidateSignalRecord {
 
 export interface Phase4DryRunRequest {
   dryRun?: boolean;
+  liveFetch?: boolean;
   sourceIds?: string[];
   discoveredAt?: string;
   now?: string;

@@ -252,7 +252,77 @@ test('phase4 ingestion handler requires a valid write token before enabling writ
 
   assert.equal(response.status, 403);
   const payload = await response.json();
+  assert.equal(payload.code, 'phase4_write_token_missing');
+  assert.equal(payload.write_mode_requested, true);
+  assert.equal(payload.writes_enabled, true);
+  assert.equal(payload.write_token_configured, true);
   assert.match(payload.error, /write token/i);
+});
+
+test('phase4 ingestion handler rejects write mode clearly when writes are disabled', async () => {
+  const handler = createPhase4IngestionHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => SAMPLE_AI_RSS_FEED_XML,
+    }),
+    allowWrites: false,
+    contentStore: new EdgeMockContentStore(),
+    now: () => '2026-05-17T12:00:00.000Z',
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-ingestion', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        dryRun: false,
+        sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+        discoveredAt: '2026-05-17T12:00:00.000Z',
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 403);
+  const payload = await response.json();
+  assert.equal(payload.code, 'phase4_write_mode_disabled');
+  assert.equal(payload.write_mode_requested, true);
+  assert.equal(payload.writes_enabled, false);
+  assert.equal(payload.write_token_configured, false);
+  assert.match(payload.error, /disabled/i);
+});
+
+test('phase4 ingestion handler keeps dry-run working without write secrets', async () => {
+  const handler = createPhase4IngestionHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => SAMPLE_AI_RSS_FEED_XML,
+    }),
+    now: () => '2026-05-17T12:00:00.000Z',
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-ingestion', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+        discoveredAt: '2026-05-17T12:00:00.000Z',
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.dry_run, true);
+  assert.equal(payload.writes_disabled, true);
 });
 
 test('phase4 ingestion handler surfaces partial write failures with a non-200 status', async () => {
