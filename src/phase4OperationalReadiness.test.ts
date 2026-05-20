@@ -6,9 +6,9 @@ import { resolve } from 'node:path';
 import { buildPhase4SmokeTestRequest } from './lib/content/phase4SmokeTestRequest';
 
 const manualQaDocPath = resolve(process.cwd(), 'docs/PHASE_4_MANUAL_QA.md');
-const edgeFunctionDenoConfigPath = resolve(
+const edgeFunctionPath = resolve(
   process.cwd(),
-  'supabase/functions/deno.json',
+  'supabase/functions/phase4-dry-run/index.ts',
 );
 const readinessSqlPath = resolve(
   process.cwd(),
@@ -21,15 +21,18 @@ const contentSourcesSeedPath = resolve(
 
 test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(manualQaDocPath), true);
-  assert.equal(existsSync(edgeFunctionDenoConfigPath), true);
+  assert.equal(existsSync(edgeFunctionPath), true);
   assert.equal(existsSync(readinessSqlPath), true);
   assert.equal(existsSync(contentSourcesSeedPath), true);
 });
 
-test('phase 4 edge function deno config maps supabase-js for Deno bundling', () => {
-  const config = readFileSync(edgeFunctionDenoConfigPath, 'utf8');
+test('phase 4 edge function uses a direct Deno-compatible npm supabase import', () => {
+  const edgeFunction = readFileSync(edgeFunctionPath, 'utf8');
 
-  assert.match(config, /"@supabase\/supabase-js"\s*:\s*"npm:@supabase\/supabase-js"/i);
+  assert.match(
+    edgeFunction,
+    /import\s+\{\s*createClient\s*\}\s+from\s+['"]npm:@supabase\/supabase-js@2['"]/i,
+  );
 });
 
 test('phase 4 readiness SQL checks required tables, indexes, canonical topics, and policy expectations', () => {

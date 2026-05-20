@@ -1,4 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
+// @ts-ignore Supabase Edge Functions resolves Deno npm specifiers during bundling.
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 import {
   createPhase4DryRunHandler,

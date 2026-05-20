@@ -21,7 +21,7 @@ import type {
 import {
   createPhase4IngestionHandler,
   createPhase4DryRunHandler,
-} from '../supabase/functions/phase4-dry-run/index';
+} from './lib/content/phase4DryRun';
 
 class EdgeMockContentStore implements Phase4ContentStore {
   public failSignalWrites = false;
