@@ -101,3 +101,105 @@ test('mapRealContentSignalRowToSignal applies safe fallbacks for sparse Supabase
   assert.equal(signal.importance, 8.7);
   assert.deepEqual(signal.tags, ['AI Data Center Power Demand', 'OpenAI', 'Microsoft']);
 });
+
+test('mapRealContentSignalRowToSignal prefers headline_zh, then headline_en, then linked raw source title', () => {
+  const zhPreferred = mapRealContentSignalRowToSignal({
+    id: 'signal-real-zh',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'English fallback headline',
+    headline_zh: '中文标题',
+    summary_en: null,
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: 'OpenAI',
+    published_at: '2026-05-20T08:00:00.000Z',
+    overall_score: 70,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [],
+  });
+
+  const rawTitleFallback = mapRealContentSignalRowToSignal({
+    id: 'signal-real-raw-title',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: null,
+    headline_zh: null,
+    summary_en: null,
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: '',
+    published_at: null,
+    created_at: '2026-05-20T09:00:00.000Z',
+    overall_score: 40,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [
+      {
+        is_primary: true,
+        raw_source_item: {
+          source_id: 'rss_openai_blog_ai',
+          title: 'Raw source fallback title',
+          dek: 'A linked dek fallback.',
+          canonical_url: 'https://openai.com/news/example',
+          published_at: null,
+          created_at: '2026-05-20T10:00:00.000Z',
+          normalized_text: null,
+          metadata: null,
+        },
+      },
+    ],
+  });
+
+  assert.equal(zhPreferred.titleZh, '中文标题');
+  assert.equal(zhPreferred.titleEn, 'English fallback headline');
+  assert.equal(rawTitleFallback.titleZh, 'Raw source fallback title');
+  assert.equal(rawTitleFallback.titleEn, 'Raw source fallback title');
+});
+
+test('mapRealContentSignalRowToSignal does not require a signal title column and falls back through raw source summary/source/date fields', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-fallbacks',
+    primary_category: 'macro',
+    categories: ['macro'],
+    headline_en: null,
+    headline_zh: null,
+    summary_en: null,
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: '',
+    published_at: null,
+    created_at: '2026-05-21T02:00:00.000Z',
+    overall_score: 63,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [
+      {
+        is_primary: true,
+        raw_source_item: {
+          source_id: 'rss_white_house_briefing',
+          title: 'Raw item title fallback',
+          dek: '',
+          canonical_url: 'https://example.com/policy-update',
+          published_at: '',
+          created_at: '2026-05-20T10:00:00.000Z',
+          normalized_text:
+            'The White House outlined a new export control posture for advanced chips and related policy coordination with allies.',
+          metadata: null,
+        },
+      },
+    ],
+  });
+
+  assert.equal(signal.titleZh, 'Raw item title fallback');
+  assert.equal(
+    signal.summaryZh,
+    'The White House outlined a new export control posture for advanced chips and related policy coordination with allies.',
+  );
+  assert.equal(signal.source, 'rss_white_house_briefing');
+  assert.equal(signal.timestamp, '2026-05-21');
+});

@@ -26,6 +26,10 @@ const contentSourcesSeedPath = resolve(
   process.cwd(),
   'supabase/manual/phase4_content_sources_smoke_seed.sql',
 );
+const previewReadPoliciesPath = resolve(
+  process.cwd(),
+  'supabase/manual/phase4_preview_read_policies.sql',
+);
 
 test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(manualQaDocPath), true);
@@ -34,6 +38,7 @@ test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(sharedContentStorePath), true);
   assert.equal(existsSync(readinessSqlPath), true);
   assert.equal(existsSync(contentSourcesSeedPath), true);
+  assert.equal(existsSync(previewReadPoliciesPath), true);
 });
 
 test('phase 4 edge function uses a direct Deno-compatible npm supabase import', () => {
@@ -80,6 +85,29 @@ test('phase 4 smoke-test content_sources seed SQL stays idempotent and covers th
   assert.match(sql, /rss_yahoo_finance_markets/i);
   assert.match(sql, /rss_coindesk_crypto/i);
   assert.match(sql, /rss_white_house_briefing/i);
+});
+
+test('phase 4 preview read-policy SQL is manual, select-only, and scoped to preview-safe signal rows', () => {
+  const sql = readFileSync(previewReadPoliciesPath, 'utf8');
+
+  assert.match(sql, /manual-only phase 4 preview read policies/i);
+  assert.match(sql, /intelligence_signals_select_preview_public/i);
+  assert.match(sql, /signal_source_items_select_preview_public/i);
+  assert.match(sql, /raw_source_items_select_preview_public/i);
+  assert.match(sql, /signal_entities_select_preview_public/i);
+  assert.match(sql, /signal_topics_select_preview_public/i);
+  assert.match(sql, /content_entities_select_preview_public/i);
+  assert.match(sql, /canonical_topics_select_preview_public/i);
+  assert.match(sql, /to anon, authenticated/gi);
+  assert.match(sql, /for select/gi);
+  assert.match(sql, /candidate_preview', 'candidate', 'draft'/i);
+  assert.match(sql, /generation_status is null/i);
+  assert.match(sql, /generation_status::text <> 'failed'/i);
+  assert.doesNotMatch(sql, /for insert/i);
+  assert.doesNotMatch(sql, /for update/i);
+  assert.doesNotMatch(sql, /for delete/i);
+  assert.doesNotMatch(sql, /user_profiles/i);
+  assert.doesNotMatch(sql, /user_topic_preferences/i);
 });
 
 test('buildPhase4SmokeTestRequest defaults to the safest smoke-test settings', () => {

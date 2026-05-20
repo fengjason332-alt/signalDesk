@@ -41,10 +41,13 @@ export interface RealContentFeedEntityRow {
 export interface RealContentFeedSourceItemRow {
   is_primary?: boolean | null;
   raw_source_item?: {
+    source_id?: string | null;
     title?: string | null;
     dek?: string | null;
     canonical_url?: string | null;
     published_at?: string | null;
+    created_at?: string | null;
+    normalized_text?: string | null;
     metadata?: Record<string, unknown> | null;
   } | null;
 }
@@ -61,6 +64,7 @@ export interface RealContentSignalRow {
   why_it_matters_zh: string[] | null;
   primary_source_name: string | null;
   published_at: string | null;
+  created_at?: string | null;
   source_item_count?: number | null;
   overall_score: number | null;
   tags?: string[] | null;
@@ -76,7 +80,7 @@ interface RealContentFeedQueryResult {
 
 interface RealContentFeedQueryBuilder {
   in: (column: string, values: readonly string[]) => RealContentFeedQueryBuilder;
-  neq: (column: string, value: string) => RealContentFeedQueryBuilder;
+  or: (filter: string) => RealContentFeedQueryBuilder;
   order: (
     column: string,
     options: { ascending: boolean },
@@ -168,6 +172,24 @@ const getSourceNameFromMetadata = (
   return typeof sourceName === 'string' ? sourceName.trim() : '';
 };
 
+const buildNormalizedTextSummary = (value: string | null | undefined) => {
+  const normalizedValue = normalizeText(value);
+  if (!normalizedValue) {
+    return '';
+  }
+
+  const firstSentence = normalizedValue.match(/^(.{1,220}?[.!?])(?:\s|$)/)?.[1];
+  if (firstSentence) {
+    return firstSentence.trim();
+  }
+
+  if (normalizedValue.length <= 220) {
+    return normalizedValue;
+  }
+
+  return `${normalizedValue.slice(0, 217).trimEnd()}...`;
+};
+
 const getHostFromUrl = (url: string | null | undefined) => {
   const normalizedUrl = normalizeText(url);
   if (!normalizedUrl) {
@@ -210,6 +232,11 @@ const coerceSource = (
     return primarySourceName;
   }
 
+  const sourceId = normalizeText(primarySourceItem?.raw_source_item?.source_id);
+  if (sourceId) {
+    return sourceId;
+  }
+
   const metadataSourceName = getSourceNameFromMetadata(
     primarySourceItem?.raw_source_item?.metadata,
   );
@@ -241,7 +268,9 @@ const coerceTimestamp = (
 ) =>
   formatPreviewTimestamp(
     normalizeText(row.published_at) ||
-      normalizeText(primarySourceItem?.raw_source_item?.published_at),
+      normalizeText(primarySourceItem?.raw_source_item?.published_at) ||
+      normalizeText(row.created_at) ||
+      normalizeText(primarySourceItem?.raw_source_item?.created_at),
   );
 
 const coerceTitle = (
@@ -258,10 +287,12 @@ const coerceSummary = (
   preferredSummary: string | null | undefined,
   fallbackSummary: string | null | undefined,
   linkedDek: string | null | undefined,
+  linkedNormalizedText: string | null | undefined,
 ) =>
   normalizeText(preferredSummary) ||
   normalizeText(fallbackSummary) ||
   normalizeText(linkedDek) ||
+  buildNormalizedTextSummary(linkedNormalizedText) ||
   DEFAULT_SIGNAL_SUMMARY;
 
 const buildPreviewWhyItMatters = (
@@ -343,6 +374,7 @@ export function mapRealContentSignalRowToSignal(row: RealContentSignalRow): Sign
       row.summary_zh,
       row.summary_en,
       primarySourceItem?.raw_source_item?.dek,
+      primarySourceItem?.raw_source_item?.normalized_text,
     ),
     whyItMatters: buildPreviewWhyItMatters(row, topics, entities),
     importance: clampImportance(row.overall_score),
@@ -368,6 +400,7 @@ export async function loadRealContentFeedPreview(client: RealContentFeedLoaderCl
         why_it_matters_zh,
         primary_source_name,
         published_at,
+        created_at,
         source_item_count,
         overall_score,
         tags,
@@ -389,17 +422,20 @@ export async function loadRealContentFeedPreview(client: RealContentFeedLoaderCl
         signal_source_items (
           is_primary,
           raw_source_item:raw_source_items (
+            source_id,
             title,
             dek,
             canonical_url,
             published_at,
+            created_at,
+            normalized_text,
             metadata
           )
         )
       `,
     )
-    .in('lifecycle_stage', ['candidate', 'draft'])
-    .neq('generation_status', 'failed')
+    .in('lifecycle_stage', ['candidate_preview', 'candidate', 'draft'])
+    .or('generation_status.is.null,generation_status.neq.failed')
     .order('published_at', { ascending: false })
     .limit(REAL_CONTENT_FEED_LIMIT);
 

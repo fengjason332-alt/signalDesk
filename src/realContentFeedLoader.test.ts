@@ -10,7 +10,7 @@ import { MOCK_SIGNALS } from './mockData';
 
 class FakeRealContentFeedLoaderClient implements RealContentFeedLoaderClient {
   public readonly filters: Array<{
-    type: 'in' | 'neq' | 'order';
+    type: 'in' | 'or' | 'order';
     column: string;
     value: string | readonly string[] | { ascending: boolean };
   }> = [];
@@ -28,8 +28,8 @@ class FakeRealContentFeedLoaderClient implements RealContentFeedLoaderClient {
           self.filters.push({ type: 'in', column, value: values });
           return this;
         },
-        neq(column: string, value: string) {
-          self.filters.push({ type: 'neq', column, value });
+        or(filter: string) {
+          self.filters.push({ type: 'or', column: 'or', value: filter });
           return this;
         },
         order(column: string, value: { ascending: boolean }) {
@@ -82,12 +82,12 @@ test('loadRealContentFeedPreview scopes reads to preview-safe lifecycle rows', a
     {
       type: 'in',
       column: 'lifecycle_stage',
-      value: ['candidate', 'draft'],
+      value: ['candidate_preview', 'candidate', 'draft'],
     },
     {
-      type: 'neq',
-      column: 'generation_status',
-      value: 'failed',
+      type: 'or',
+      column: 'or',
+      value: 'generation_status.is.null,generation_status.neq.failed',
     },
     {
       type: 'order',

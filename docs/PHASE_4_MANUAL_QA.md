@@ -49,6 +49,8 @@ Use a non-production Supabase project only.
    - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 4. Run the readiness checks manually:
    - `supabase/manual/phase4_content_readiness_checks.sql`
+5. Run the preview read-only policy SQL manually before frontend preview tests:
+   - `supabase/manual/phase4_preview_read_policies.sql`
 
 The smoke subset is intentionally small:
 
@@ -68,7 +70,11 @@ After the manual SQL steps:
 - the smoke-test `content_sources` ids above should exist
 - the required draft indexes should exist
 - `canonical_topics` should still show its authenticated read policy from Phase 3
-- the Phase 4 content tables should remain server-only tables with no client-facing RLS policy rollout in this task
+- the Phase 4 content tables should remain server-only for writes
+- the frontend preview path now relies on a separate manual read-only policy rollout:
+  - `supabase/manual/phase4_preview_read_policies.sql`
+- for Task 9 preview reads, the frontend now also needs the manual read-only policy file applied:
+  - `supabase/manual/phase4_preview_read_policies.sql`
 
 ## Edge Function Deployment
 
@@ -242,14 +248,15 @@ Task 9 does not switch the app by default. To preview real content locally:
 1. Ensure the app already has working client-side Supabase env:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_USE_REAL_CONTENT_FEED=true`
 2. Confirm real content rows exist in Supabase:
    - `intelligence_signals`
    - `signal_source_items`
    - `raw_source_items`
    - `signal_entities`
    - `signal_topics`
-3. Enable preview mode locally:
-   - `VITE_USE_REAL_CONTENT_FEED=true`
+3. Confirm the manual read-only preview policy SQL has already been run:
+   - `supabase/manual/phase4_preview_read_policies.sql`
 4. Start the app normally.
 5. Open Today and verify:
    - the existing visual style is unchanged
