@@ -366,27 +366,59 @@ export interface Phase4DryRunRequest {
   maxItemsPerSource?: number;
 }
 
-export interface Phase4DryRunPreview {
-  dry_run: true;
-  writes_disabled: true;
+export interface Phase4IngestionRunSummary {
+  run_id: string;
+  source_id: string;
+  status: IngestionRunStatus;
+  started_at: string;
+  completed_at: string | null;
+  items_fetched: number;
+  items_inserted: number;
+  items_skipped_as_duplicates: number;
+  items_failed: number;
+  error_message: string | null;
+}
+
+export interface Phase4SourcePreview {
+  source_id: string;
+  source_name: string;
+  fetched_count: number;
+  normalized_count: number;
+  inserted_count: number;
+  skipped_count: number;
+  failed_count: number;
+  run_id: string | null;
+  run_status: IngestionRunStatus | null;
+  error_message: string | null;
+}
+
+export interface Phase4WriteStep {
+  step: string;
+  enabled: boolean;
+}
+
+export interface Phase4IngestionResult {
+  dry_run: boolean;
+  writes_disabled: boolean;
   selected_source_ids: string[];
   fetched_item_count: number;
   normalized_item_count: number;
   raw_item_count: number;
+  inserted_item_count: number;
+  skipped_duplicate_count: number;
+  failed_item_count: number;
   dedupe_relationships: Array<{
     left_id: string;
     right_id: string;
     confidence: RawItemDedupeConfidence;
   }>;
   candidate_signals: CandidateSignalRecord[];
-  source_previews: Array<{
-    source_id: string;
-    source_name: string;
-    fetched_count: number;
-    normalized_count: number;
-  }>;
-  write_steps: Array<{
-    step: string;
-    enabled: false;
-  }>;
+  source_previews: Phase4SourcePreview[];
+  ingestion_runs: Phase4IngestionRunSummary[];
+  write_steps: Phase4WriteStep[];
 }
+
+export type Phase4DryRunPreview = Phase4IngestionResult & {
+  dry_run: true;
+  writes_disabled: true;
+};

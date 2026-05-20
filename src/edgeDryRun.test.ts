@@ -132,3 +132,38 @@ test('phase4 dry-run honors maxItemsPerSource consistently across preview counte
   assert.equal(payload.source_previews[0]?.fetched_count, 1);
   assert.equal(payload.source_previews[0]?.normalized_count, 1);
 });
+
+test('phase4 dry-run handler remains preview-only even if the request body asks for write mode', async () => {
+  const handler = createPhase4DryRunHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => SAMPLE_AI_RSS_FEED_XML,
+    }),
+    allowWrites: true,
+    now: () => '2026-05-17T12:00:00.000Z',
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-dry-run', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        dryRun: false,
+        sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+        discoveredAt: '2026-05-17T12:00:00.000Z',
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+
+  assert.equal(payload.dry_run, true);
+  assert.equal(payload.writes_disabled, true);
+  assert.equal(payload.ingestion_runs.length, 0);
+  assert.equal(payload.inserted_item_count, 0);
+});

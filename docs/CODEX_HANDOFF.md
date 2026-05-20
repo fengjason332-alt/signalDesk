@@ -65,3 +65,12 @@ Phase 4 Task 1:
 - do not call paid APIs yet
 - do not call AI providers yet
 - do not switch the Today feed off mock content yet
+
+## Phase 4 Task 5 Status
+
+- the server-side RSS path now supports explicit write mode into `content_ingestion_runs`, `raw_source_items`, `content_entities`, and `raw_source_item_entities`
+- dry-run remains the default; writes require `dryRun: false` plus an explicitly enabled server-side content store
+- the Edge Function path stays safe by default; real server-side fetch/write execution should only be enabled in a non-production environment with explicit server env flags and a service-role-backed content store
+- this still does not write `intelligence_signals` or translation blocks
+- this still does not switch the Today feed or any frontend surface away from mock content
+- manual write testing later requires the draft Phase 4 migration to be applied in a non-production environment and matching `content_sources` rows to exist for the selected registry source ids
