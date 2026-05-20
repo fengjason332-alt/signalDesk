@@ -52,6 +52,13 @@ export const INGESTION_RUN_STATUSES = [
 ] as const;
 export type IngestionRunStatus = (typeof INGESTION_RUN_STATUSES)[number];
 
+export const PHASE4_BATCH_STATUSES = [
+  'succeeded',
+  'partial_success',
+  'failed',
+] as const;
+export type Phase4BatchStatus = (typeof PHASE4_BATCH_STATUSES)[number];
+
 export const CONTENT_LANGUAGES = ['en', 'zh', 'mixed', 'unknown'] as const;
 export type ContentLanguage = (typeof CONTENT_LANGUAGES)[number];
 
@@ -406,6 +413,7 @@ export interface Phase4IngestionRunSummary {
 export interface Phase4SourcePreview {
   source_id: string;
   source_name: string;
+  status: IngestionRunStatus;
   fetched_count: number;
   normalized_count: number;
   inserted_count: number;
@@ -421,9 +429,24 @@ export interface Phase4WriteStep {
   enabled: boolean;
 }
 
+export interface Phase4IngestionSummary {
+  overall_status: Phase4BatchStatus;
+  source_count: number;
+  candidate_signal_count: number;
+  raw_item_count: number;
+  raw_inserted_count: number;
+  raw_skipped_count: number;
+  raw_failed_count: number;
+  signal_inserted_count: number;
+  signal_skipped_count: number;
+  signal_failed_count: number;
+  write_mode_enabled: boolean;
+}
+
 export interface Phase4IngestionResult {
   dry_run: boolean;
   writes_disabled: boolean;
+  overall_status: Phase4BatchStatus;
   selected_source_ids: string[];
   fetched_item_count: number;
   normalized_item_count: number;
@@ -440,6 +463,7 @@ export interface Phase4IngestionResult {
   source_previews: Phase4SourcePreview[];
   ingestion_runs: Phase4IngestionRunSummary[];
   write_steps: Phase4WriteStep[];
+  summary: Phase4IngestionSummary;
 }
 
 export type Phase4DryRunPreview = Phase4IngestionResult & {

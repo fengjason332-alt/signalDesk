@@ -26,7 +26,21 @@ interface TopicRule {
 }
 
 const CATEGORY_KEYWORDS: Record<CategoryKey, string[]> = {
-  ai: ['artificial intelligence', 'ai', 'model', 'models', 'inference', 'compute'],
+  ai: [
+    'artificial intelligence',
+    'ai',
+    'model',
+    'models',
+    'inference',
+    'compute',
+    'reasoning',
+    'agent',
+    'agents',
+    'chatgpt',
+    'openai',
+    'gpt',
+    'education',
+  ],
   crypto: ['bitcoin', 'ethereum', 'crypto', 'digital asset', 'stablecoin', 'token'],
   stocks: ['stock', 'stocks', 'equity', 'earnings', 'chip', 'chips', 'semiconductor'],
   robotics: ['robot', 'robots', 'robotics', 'humanoid'],
@@ -256,6 +270,27 @@ const TOPIC_RULES: TopicRule[] = [
     category_key: 'robotics',
     aliases: ['humanoid robotics', 'humanoid robots', 'humanoid robot'],
     sort_order: 70,
+  },
+  {
+    topic_id: 'topic_ai_agents',
+    category_key: 'ai',
+    aliases: [
+      'ai agents',
+      'ai agent',
+      'reasoning model',
+      'reasoning models',
+      'openai academy',
+      'chatgpt',
+      'gpt-4',
+      'gpt-4.1',
+      'o3',
+      'o4-mini',
+    ],
+    required_groups: [
+      ['openai', 'chatgpt', 'gpt', 'openai academy', 'o3', 'o4-mini'],
+      ['model', 'models', 'reasoning', 'agent', 'agents', 'education', 'educator', 'teacher', 'teachers'],
+    ],
+    sort_order: 75,
   },
   {
     topic_id: 'topic_china_ai_policy',

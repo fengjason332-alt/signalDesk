@@ -116,6 +116,7 @@ class MockPhase4ContentStore implements Phase4ContentStore {
       return {
         id: this.signalIdByCandidateKey.get(signal.candidate_key)!,
         candidate_key: signal.candidate_key,
+        created: false,
       };
     }
 
@@ -126,6 +127,7 @@ class MockPhase4ContentStore implements Phase4ContentStore {
     return {
       id,
       candidate_key: signal.candidate_key,
+      created: true,
     };
   }
 
@@ -203,11 +205,42 @@ const OPENAI_OFFICIAL_RSS_FEED_XML = `<?xml version="1.0" encoding="UTF-8"?>
   </channel>
 </rss>`;
 
+const OPENAI_ACADEMY_RSS_FEED_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>OpenAI Academy Feed</title>
+    <item>
+      <guid>openai-academy-001</guid>
+      <title>OpenAI Academy launches reasoning model curriculum for educators</title>
+      <link>https://example.com/openai/academy-reasoning-curriculum</link>
+      <pubDate>Sat, 17 May 2026 03:00:00 GMT</pubDate>
+      <description><![CDATA[<p>OpenAI Academy is expanding teacher and student access to reasoning model lessons and guided ChatGPT usage.</p>]]></description>
+      <content:encoded><![CDATA[<div><p>OpenAI Academy is expanding teacher and student access to reasoning model lessons and guided ChatGPT usage.</p></div>]]></content:encoded>
+      <author>OpenAI</author>
+    </item>
+  </channel>
+</rss>`;
+
 const createSourceAwareFetchImpl = (sources: Record<string, string>) => async (url: string) => ({
   ok: true,
   status: 200,
   text: async () => sources[url] ?? SAMPLE_AI_RSS_FEED_XML,
 });
+
+const createPartiallyFailingFetchImpl = (
+  responses: Record<string, string>,
+  failingUrls: string[],
+) => async (url: string) => {
+  if (failingUrls.includes(url)) {
+    throw new Error(`fetch failed for ${url}`);
+  }
+
+  return {
+    ok: true,
+    status: 200,
+    text: async () => responses[url] ?? SAMPLE_AI_RSS_FEED_XML,
+  };
+};
 
 test('runPhase4Ingestion keeps dry-run as the default and never writes without explicit enablement', async () => {
   const store = new MockPhase4ContentStore();
@@ -376,6 +409,122 @@ test('runPhase4Ingestion persists deterministic candidate signals with signal-la
   );
   assert.equal(
     store.linkedSignalTopics.some(link => link.topic_id === 'topic_ai_data_center_power'),
+    true,
+  );
+});
+
+test('runPhase4Ingestion returns partial_success for multi-source batches when one source fails and another succeeds', async () => {
+  const store = new MockPhase4ContentStore();
+  const failingSource: SourceRegistryEntry = {
+    ...OPENAI_OFFICIAL_SOURCE,
+    id: 'rss_openai_fixture_failing',
+    name: 'OpenAI Fixture Failing',
+    url: 'https://example.com/feeds/openai-failing.xml',
+  };
+
+  const result = await runPhase4Ingestion(
+    {
+      dryRun: false,
+      sourceIds: [SAMPLE_AI_RSS_SOURCE.id, failingSource.id],
+      discoveredAt: '2026-05-17T12:00:00.000Z',
+      maxItemsPerSource: 1,
+    },
+    {
+      sourceRegistry: [SAMPLE_AI_RSS_SOURCE, failingSource],
+      fetchImpl: createPartiallyFailingFetchImpl(
+        {
+          [SAMPLE_AI_RSS_SOURCE.url]: SAMPLE_AI_RSS_FEED_XML,
+        },
+        [failingSource.url],
+      ),
+      now: () => '2026-05-17T12:00:00.000Z',
+      contentStore: store,
+      allowWrites: true,
+    },
+  );
+
+  assert.equal(result.overall_status, 'partial_success');
+  assert.equal(result.summary.overall_status, 'partial_success');
+  assert.equal(result.summary.source_count, 2);
+  assert.equal(result.summary.signal_inserted_count >= 1, true);
+  assert.equal(result.source_previews.length, 2);
+  assert.equal(result.source_previews.some(source => source.status === 'succeeded'), true);
+  assert.equal(result.source_previews.some(source => source.status === 'failed'), true);
+  assert.equal(
+    result.source_previews.find(source => source.source_id === failingSource.id)?.error_message?.includes('fetch failed'),
+    true,
+  );
+  assert.equal(result.ingestion_runs.length, 2);
+});
+
+test('runPhase4Ingestion keeps dry-run previews usable for multi-source partial failures', async () => {
+  const failingSource: SourceRegistryEntry = {
+    ...OPENAI_OFFICIAL_SOURCE,
+    id: 'rss_openai_fixture_dryrun_failure',
+    name: 'OpenAI Fixture Dryrun Failure',
+    url: 'https://example.com/feeds/openai-dryrun-failing.xml',
+  };
+
+  const result = await runPhase4Ingestion(
+    {
+      sourceIds: [SAMPLE_AI_RSS_SOURCE.id, failingSource.id],
+      discoveredAt: '2026-05-17T12:00:00.000Z',
+      maxItemsPerSource: 1,
+    },
+    {
+      sourceRegistry: [SAMPLE_AI_RSS_SOURCE, failingSource],
+      fetchImpl: createPartiallyFailingFetchImpl(
+        {
+          [SAMPLE_AI_RSS_SOURCE.url]: SAMPLE_AI_RSS_FEED_XML,
+        },
+        [failingSource.url],
+      ),
+      now: () => '2026-05-17T12:00:00.000Z',
+    },
+  );
+
+  assert.equal(result.dry_run, true);
+  assert.equal(result.overall_status, 'partial_success');
+  assert.equal(result.source_previews.length, 2);
+  assert.equal(result.source_previews.some(source => source.status === 'succeeded'), true);
+  assert.equal(result.source_previews.some(source => source.status === 'failed'), true);
+  assert.equal(result.candidate_signals.length >= 1, true);
+});
+
+test('runPhase4Ingestion persists signal_topics when OpenAI reasoning content maps to a canonical AI topic', async () => {
+  const store = new MockPhase4ContentStore();
+  const academySource: SourceRegistryEntry = {
+    ...OPENAI_OFFICIAL_SOURCE,
+    id: 'rss_openai_academy_fixture',
+    name: 'OpenAI Academy Fixture',
+    url: 'https://example.com/feeds/openai-academy.xml',
+  };
+
+  const result = await runPhase4Ingestion(
+    {
+      dryRun: false,
+      sourceIds: [academySource.id],
+      discoveredAt: '2026-05-17T12:00:00.000Z',
+      maxItemsPerSource: 1,
+    },
+    {
+      sourceRegistry: [academySource],
+      fetchImpl: createSourceAwareFetchImpl({
+        [academySource.url]: OPENAI_ACADEMY_RSS_FEED_XML,
+      }),
+      now: () => '2026-05-17T12:00:00.000Z',
+      contentStore: store,
+      allowWrites: true,
+    },
+  );
+
+  assert.equal(result.candidate_signals.length, 1);
+  assert.equal(
+    result.candidate_signals[0]?.topic_matches.some(match => match.topic_id === 'topic_ai_agents'),
+    true,
+  );
+  assert.equal(
+    store.linkedSignalTopics.some(link => link.topic_id === 'topic_ai_agents'),
     true,
   );
 });

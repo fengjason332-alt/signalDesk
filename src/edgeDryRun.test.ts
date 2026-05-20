@@ -54,7 +54,7 @@ class EdgeMockContentStore implements Phase4ContentStore {
       throw new Error(`signal upsert failed for ${signal.candidate_key}`);
     }
 
-    return { id: 'signal-edge-1', candidate_key: signal.candidate_key };
+    return { id: 'signal-edge-1', candidate_key: signal.candidate_key, created: true };
   }
   async upsertSignalSourceItemLink(_link: Phase4SignalSourceItemLinkUpsert) {}
   async upsertSignalEntityLink(_link: Phase4SignalEntityLinkUpsert) {}
@@ -360,4 +360,58 @@ test('phase4 ingestion handler surfaces partial write failures with a non-200 st
   assert.equal(response.status, 207);
   const payload = await response.json();
   assert.equal(payload.ingestion_runs[0]?.status, 'partial');
+});
+
+test('phase4 ingestion handler returns a partial-success payload for multi-source batches with one failing source', async () => {
+  const handler = createPhase4IngestionHandler({
+    sourceRegistry: [
+      SAMPLE_AI_RSS_SOURCE,
+      {
+        ...SAMPLE_AI_RSS_SOURCE,
+        id: 'rss_openai_edge_failure',
+        name: 'OpenAI Edge Failure Fixture',
+        url: 'https://example.com/feeds/openai-edge-failure.xml',
+      },
+    ],
+    fetchImpl: async url => {
+      if (url.includes('edge-failure')) {
+        throw new Error(`fetch failed for ${url}`);
+      }
+
+      return {
+        ok: true,
+        status: 200,
+        text: async () => SAMPLE_AI_RSS_FEED_XML,
+      };
+    },
+    allowWrites: true,
+    writeAuthToken: 'secret-phase4-token',
+    contentStore: new EdgeMockContentStore(),
+    now: () => '2026-05-17T12:00:00.000Z',
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-ingestion', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-phase4-write-token': 'secret-phase4-token',
+      },
+      body: JSON.stringify({
+        dryRun: false,
+        sourceIds: [SAMPLE_AI_RSS_SOURCE.id, 'rss_openai_edge_failure'],
+        discoveredAt: '2026-05-17T12:00:00.000Z',
+        maxItemsPerSource: 1,
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 207);
+
+  const payload = await response.json();
+  assert.equal(payload.overall_status, 'partial_success');
+  assert.equal(payload.summary.overall_status, 'partial_success');
+  assert.equal(payload.summary.source_count, 2);
+  assert.equal(payload.source_previews.some((source: { status: string }) => source.status === 'failed'), true);
+  assert.equal(payload.source_previews.some((source: { status: string }) => source.status === 'succeeded'), true);
 });

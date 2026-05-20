@@ -448,6 +448,11 @@ test('createSupabaseContentStore upserts deterministic candidate signals and sig
     topic_id: 'topic_ai_data_center_power',
     relevance_score: 90,
   };
+  const secondTopicLink: Phase4SignalTopicLinkUpsert = {
+    signal_id: first.id,
+    topic_id: 'topic_ai_agents',
+    relevance_score: 82,
+  };
 
   await store.upsertSignalSourceItemLink(sourceItemLink);
   await store.upsertSignalSourceItemLink(sourceItemLink);
@@ -455,8 +460,12 @@ test('createSupabaseContentStore upserts deterministic candidate signals and sig
   await store.upsertSignalEntityLink(entityLink);
   await store.upsertSignalTopicLink(topicLink);
   await store.upsertSignalTopicLink(topicLink);
+  await store.upsertSignalTopicLink(secondTopicLink);
+  await store.upsertSignalTopicLink(secondTopicLink);
 
   assert.equal(first.id, second.id);
+  assert.equal(first.created, true);
+  assert.equal(second.created, false);
   assert.equal(client.tables.intelligence_signals.length, 1);
   assert.equal(client.tables.intelligence_signals[0]?.candidate_key, signal.candidate_key);
   assert.equal(client.tables.intelligence_signals[0]?.source_item_count, 3);
@@ -465,8 +474,11 @@ test('createSupabaseContentStore upserts deterministic candidate signals and sig
   assert.equal(client.tables.signal_source_items[0]?.is_primary, true);
   assert.equal(client.tables.signal_entities.length, 1);
   assert.equal(client.tables.signal_entities[0]?.mention_count, 2);
-  assert.equal(client.tables.signal_topics.length, 1);
-  assert.equal(client.tables.signal_topics[0]?.topic_id, 'topic_ai_data_center_power');
+  assert.equal(client.tables.signal_topics.length, 2);
+  assert.deepEqual(
+    client.tables.signal_topics.map(row => row.topic_id).sort(),
+    ['topic_ai_agents', 'topic_ai_data_center_power'],
+  );
 });
 
 test('createSupabaseContentStore preserves richer signal fields on rerun instead of clobbering future enrichment', async () => {

@@ -17,6 +17,7 @@ import { CONTENT_ENTITY_CATALOG, mapTopicsAndEntities } from './topicEntityMappi
 import type {
   CandidateSignalRecord,
   DeterministicEntityMatch,
+  Phase4BatchStatus,
   IngestionRunStatus,
   Phase4DryRunPreview,
   Phase4DryRunRequest,
@@ -114,11 +115,11 @@ const getWriteResponseStatus = (result: Phase4IngestionResult) => {
     return 200;
   }
 
-  if (result.ingestion_runs.some(run => run.status === 'failed')) {
+  if (result.overall_status === 'failed') {
     return 500;
   }
 
-  if (result.ingestion_runs.some(run => run.status === 'partial')) {
+  if (result.overall_status === 'partial_success') {
     return 207;
   }
 
@@ -345,6 +346,10 @@ async function persistCandidateSignal(
       relevance_score: topicMatch.relevance_score,
     });
   }
+
+  return {
+    created: persistedSignal.created,
+  };
 }
 
 const resolveRunStatus = (counts: {
@@ -362,6 +367,24 @@ const resolveRunStatus = (counts: {
   }
 
   return 'failed';
+};
+
+const resolveBatchStatus = (
+  sourceStatuses: IngestionRunStatus[],
+): Phase4BatchStatus => {
+  if (sourceStatuses.length === 0) {
+    return 'succeeded';
+  }
+
+  if (sourceStatuses.every(status => status === 'succeeded')) {
+    return 'succeeded';
+  }
+
+  if (sourceStatuses.every(status => status === 'failed')) {
+    return 'failed';
+  }
+
+  return 'partial_success';
 };
 
 export function resolveDryRunSources(
@@ -424,6 +447,9 @@ export async function runPhase4Ingestion(
   let insertedItemCount = 0;
   let skippedDuplicateCount = 0;
   let failedItemCount = 0;
+  let insertedSignalCount = 0;
+  let skippedSignalCount = 0;
+  let failedSignalCount = 0;
 
   for (const source of selectedSources) {
     const pendingRun: PendingRunState = {
@@ -494,10 +520,6 @@ export async function runPhase4Ingestion(
         }
       }
     } catch (error) {
-      if (dryRun) {
-        throw error;
-      }
-
       const message = toErrorMessage(error);
       pendingRun.errorMessage = appendErrorMessage(pendingRun.errorMessage, message);
       if (pendingRun.fetchedCount === 0) {
@@ -536,15 +558,21 @@ export async function runPhase4Ingestion(
   if (!dryRun) {
     for (const candidateSignal of candidateSignals) {
       try {
-        await persistCandidateSignal(
+        const persistedSignal = await persistCandidateSignal(
           candidateSignal,
           contentStore!,
           persistedRawItemIdByPreviewId,
           now,
         );
+        if (persistedSignal.created) {
+          insertedSignalCount += 1;
+        } else {
+          skippedSignalCount += 1;
+        }
       } catch (error) {
         const message = toErrorMessage(error);
         failedItemCount += 1;
+        failedSignalCount += 1;
 
         for (const sourceId of candidateSignal.source_ids) {
           const pendingRun = pendingRunBySourceId.get(sourceId);
@@ -559,6 +587,7 @@ export async function runPhase4Ingestion(
     }
   }
 
+  const sourceStatuses: IngestionRunStatus[] = [];
   for (const pendingRun of pendingRuns) {
     const status = resolveRunStatus({
       fetched: pendingRun.fetchedCount,
@@ -594,9 +623,11 @@ export async function runPhase4Ingestion(
       });
     }
 
+    sourceStatuses.push(status);
     sourcePreviews.push({
       source_id: pendingRun.source.id,
       source_name: pendingRun.source.name,
+      status,
       fetched_count: pendingRun.fetchedCount,
       normalized_count: pendingRun.normalizedCount,
       inserted_count: pendingRun.insertedCount,
@@ -608,9 +639,12 @@ export async function runPhase4Ingestion(
     });
   }
 
+  const overallStatus = resolveBatchStatus(sourceStatuses);
+
   return {
     dry_run: dryRun,
     writes_disabled: dryRun,
+    overall_status: overallStatus,
     selected_source_ids: selectedSources.map(source => source.id),
     fetched_item_count: fetchedItemCount,
     normalized_item_count: normalizedItemCount,
@@ -623,6 +657,19 @@ export async function runPhase4Ingestion(
     source_previews: sourcePreviews,
     ingestion_runs: ingestionRuns,
     write_steps: buildWriteSteps(dryRun),
+    summary: {
+      overall_status: overallStatus,
+      source_count: selectedSources.length,
+      candidate_signal_count: candidateSignals.length,
+      raw_item_count: previewRawItems.length,
+      raw_inserted_count: insertedItemCount,
+      raw_skipped_count: skippedDuplicateCount,
+      raw_failed_count: failedItemCount,
+      signal_inserted_count: insertedSignalCount,
+      signal_skipped_count: skippedSignalCount,
+      signal_failed_count: failedSignalCount,
+      write_mode_enabled: !dryRun,
+    },
   };
 }
 

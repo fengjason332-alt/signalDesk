@@ -58,15 +58,16 @@ Phase 4 foundation:
 
 ## Current Next Recommended Task
 
-Phase 4 Task 8:
+Phase 4 Task 9:
 - keep the pipeline server-side only
-- build the first AI-disabled signal enrichment step after deterministic candidate rows
 - keep Today on mock content until the persisted signal layer is stable enough for controlled integration
-- do not add AI summaries, translations, or translation-block writes until that dedicated phase begins
-- use the Task 7 manual readiness assets before any non-production write smoke test:
+- use the Task 7/8 manual readiness assets before any non-production write smoke test:
   - `docs/PHASE_4_MANUAL_QA.md`
   - `supabase/manual/phase4_content_sources_smoke_seed.sql`
   - `supabase/manual/phase4_content_readiness_checks.sql`
+- next likely work branches:
+  - controlled multi-source smoke-test follow-through and stronger write observability
+  - or the first summary / translation persistence step, still without frontend Today integration until the signal layer is stable
 
 ## Phase 4 Task 5 Status
 
@@ -109,6 +110,37 @@ Phase 4 Task 8:
 - live fetch remains opt-in and should only be enabled intentionally
 - this still does not call AI
 - this still does not change the UI or switch the Today feed
+
+## Phase 4 Task 8 Status
+
+- multi-source ingestion now behaves more safely when one selected source fails:
+  - successful sources continue
+  - failed sources report their own `error_message`
+  - top-level batch status now distinguishes:
+    - `succeeded`
+    - `partial_success`
+    - `failed`
+- dry-run remains the default
+- write mode remains guarded by:
+  - `dryRun: false`
+  - server-side write enablement
+  - a configured `PHASE4_WRITE_AUTH_TOKEN`
+  - a matching `x-phase4-write-token` request header
+- deterministic topic mapping now covers a broader set of obvious AI / crypto / policy patterns, including:
+  - OpenAI reasoning / education style AI content
+  - bitcoin ETF / stablecoin policy content
+  - Australia critical minerals policy content
+- deterministic candidate-signal writes now expose clearer observability fields:
+  - top-level `overall_status`
+  - top-level `summary`
+  - per-source `status`
+  - signal inserted/skipped counts
+- `signal_topics` should now become non-zero when content clearly maps to canonical topics
+- this still does not:
+  - call AI
+  - write translation blocks
+  - write AI summaries
+  - switch the Today feed away from mock content
 
 ## Manual QA Prerequisites For Non-Production Write Testing
 

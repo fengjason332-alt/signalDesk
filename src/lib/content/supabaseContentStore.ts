@@ -161,7 +161,7 @@ export interface Phase4ContentStore {
   upsertRawItemEntityLink(link: Phase4RawItemEntityLinkUpsert): Promise<void>;
   upsertCandidateSignal(
     signal: Phase4CandidateSignalWriteInput,
-  ): Promise<{ id: string; candidate_key: string }>;
+  ): Promise<{ id: string; candidate_key: string; created: boolean }>;
   upsertSignalSourceItemLink(link: Phase4SignalSourceItemLinkUpsert): Promise<void>;
   upsertSignalEntityLink(link: Phase4SignalEntityLinkUpsert): Promise<void>;
   upsertSignalTopicLink(link: Phase4SignalTopicLinkUpsert): Promise<void>;
@@ -462,7 +462,10 @@ export function createSupabaseContentStore(
         'upsert intelligence_signals',
       );
 
-      return row as { id: string; candidate_key: string };
+      return {
+        ...(row as { id: string; candidate_key: string }),
+        created: existing === null,
+      };
     },
 
     async upsertSignalSourceItemLink(link) {

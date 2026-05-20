@@ -225,10 +225,11 @@ Server-only future env:
 5. Task 4: dry-run pipeline and deterministic scoring seed
 6. Task 5: raw content persistence into `content_ingestion_runs`, `raw_source_items`, `content_entities`, and `raw_source_item_entities`
 7. Task 6: deterministic candidate signal persistence into `intelligence_signals`, `signal_source_items`, `signal_entities`, and `signal_topics`
-8. Task 7: AI-disabled signal enrichment hardening and first safe path toward richer persisted signal content
-9. Task 8: summary and translation generation
-10. Task 9: Today feed integration with mock fallback
-11. Task 10: reliability hardening, retries, and ops cleanup
+8. Task 7: controlled Supabase smoke-test readiness and manual rollout assets
+9. Task 8: multi-source ingestion hardening, topic mapping improvement, and operational observability
+10. Task 9: summary and translation generation
+11. Task 10: Today feed integration with mock fallback
+12. Task 11: reliability hardening, retries, and ops cleanup
 
 ## Current Repo Status
 
@@ -243,6 +244,8 @@ Server-only future env:
   - `signal_source_items`
   - `signal_entities`
   - `signal_topics`
+- multi-source ingestion now preserves partial success across sources instead of collapsing the whole batch when one source-level fetch/write path fails
+- deterministic topic mapping now covers broader obvious AI / crypto / policy patterns so `signal_topics` can populate for more real RSS items
 - persisted candidate signals are intentionally lifecycle-limited to `candidate` / `draft` style rows, with deterministic seed fields stored for scoring reproducibility
 - dry-run remains the default behavior
 - this repo state still does not write:
@@ -285,3 +288,8 @@ Server-only future env:
   - `PHASE4_WRITE_AUTH_TOKEN` is not configured
   - the request omits `x-phase4-write-token`
   - the request token does not match
+- batch responses now expose:
+  - `overall_status`
+  - top-level `summary`
+  - per-source `status`
+  - signal inserted/skipped counts
