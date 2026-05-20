@@ -6,6 +6,10 @@ import { resolve } from 'node:path';
 import { buildPhase4SmokeTestRequest } from './lib/content/phase4SmokeTestRequest';
 
 const manualQaDocPath = resolve(process.cwd(), 'docs/PHASE_4_MANUAL_QA.md');
+const edgeFunctionDenoConfigPath = resolve(
+  process.cwd(),
+  'supabase/functions/deno.json',
+);
 const readinessSqlPath = resolve(
   process.cwd(),
   'supabase/manual/phase4_content_readiness_checks.sql',
@@ -17,8 +21,15 @@ const contentSourcesSeedPath = resolve(
 
 test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(manualQaDocPath), true);
+  assert.equal(existsSync(edgeFunctionDenoConfigPath), true);
   assert.equal(existsSync(readinessSqlPath), true);
   assert.equal(existsSync(contentSourcesSeedPath), true);
+});
+
+test('phase 4 edge function deno config maps supabase-js for Deno bundling', () => {
+  const config = readFileSync(edgeFunctionDenoConfigPath, 'utf8');
+
+  assert.match(config, /"@supabase\/supabase-js"\s*:\s*"npm:@supabase\/supabase-js"/i);
 });
 
 test('phase 4 readiness SQL checks required tables, indexes, canonical topics, and policy expectations', () => {
