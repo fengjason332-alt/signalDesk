@@ -10,6 +10,14 @@ const edgeFunctionPath = resolve(
   process.cwd(),
   'supabase/functions/phase4-dry-run/index.ts',
 );
+const sharedPhase4HandlerPath = resolve(
+  process.cwd(),
+  'supabase/functions/_shared/phase4DryRun.ts',
+);
+const sharedContentStorePath = resolve(
+  process.cwd(),
+  'supabase/functions/_shared/supabaseContentStore.ts',
+);
 const readinessSqlPath = resolve(
   process.cwd(),
   'supabase/manual/phase4_content_readiness_checks.sql',
@@ -22,6 +30,8 @@ const contentSourcesSeedPath = resolve(
 test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(manualQaDocPath), true);
   assert.equal(existsSync(edgeFunctionPath), true);
+  assert.equal(existsSync(sharedPhase4HandlerPath), true);
+  assert.equal(existsSync(sharedContentStorePath), true);
   assert.equal(existsSync(readinessSqlPath), true);
   assert.equal(existsSync(contentSourcesSeedPath), true);
 });
@@ -33,6 +43,9 @@ test('phase 4 edge function uses a direct Deno-compatible npm supabase import', 
     edgeFunction,
     /import\s+\{\s*createClient\s*\}\s+from\s+['"]npm:@supabase\/supabase-js@2['"]/i,
   );
+  assert.doesNotMatch(edgeFunction, /src\/lib\/content/i);
+  assert.match(edgeFunction, /from\s+['"]\.\.\/_shared\/phase4DryRun\.ts['"]/i);
+  assert.match(edgeFunction, /from\s+['"]\.\.\/_shared\/supabaseContentStore\.ts['"]/i);
 });
 
 test('phase 4 readiness SQL checks required tables, indexes, canonical topics, and policy expectations', () => {

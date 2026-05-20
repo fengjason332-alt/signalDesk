@@ -4,13 +4,13 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import {
   createPhase4DryRunHandler,
   createPhase4IngestionHandler,
-} from '../../../src/lib/content/phase4DryRun';
-import { createSupabaseContentStore } from '../../../src/lib/content/supabaseContentStore';
+} from '../_shared/phase4DryRun.ts';
+import { createSupabaseContentStore } from '../_shared/supabaseContentStore.ts';
 
 export {
   createPhase4DryRunHandler,
   createPhase4IngestionHandler,
-} from '../../../src/lib/content/phase4DryRun';
+} from '../_shared/phase4DryRun.ts';
 
 const denoGlobal = globalThis as typeof globalThis & {
   Deno?: {
