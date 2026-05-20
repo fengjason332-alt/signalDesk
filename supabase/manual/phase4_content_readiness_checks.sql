@@ -4,27 +4,31 @@
 -- - Phase 4 content tables exist, but do not yet ship client-facing RLS/policy rollout
 -- - the smoke-test content_sources subset has been inserted manually
 
+with expected_tables(expected_table_name) as (
+  select *
+  from unnest(
+    array[
+      'content_sources',
+      'content_ingestion_runs',
+      'raw_source_items',
+      'content_entities',
+      'raw_source_item_entities',
+      'intelligence_signals',
+      'signal_source_items',
+      'signal_entities',
+      'signal_topics',
+      'signal_translation_blocks'
+    ]::text[]
+  )
+)
 select
-  table_name,
-  case when table_name is null then false else true end as table_exists
-from unnest(
-  array[
-    'content_sources',
-    'content_ingestion_runs',
-    'raw_source_items',
-    'content_entities',
-    'raw_source_item_entities',
-    'intelligence_signals',
-    'signal_source_items',
-    'signal_entities',
-    'signal_topics',
-    'signal_translation_blocks'
-  ]::text[]
-) as expected(table_name)
-left join information_schema.tables tables
-  on tables.table_schema = 'public'
- and tables.table_name = expected.table_name
-order by expected.table_name;
+  expected_tables.expected_table_name as table_name,
+  (schema_tables.table_name is not null) as table_exists
+from expected_tables
+left join information_schema.tables as schema_tables
+  on schema_tables.table_schema = 'public'
+ and schema_tables.table_name = expected_tables.expected_table_name
+order by expected_tables.expected_table_name;
 
 select
   id,

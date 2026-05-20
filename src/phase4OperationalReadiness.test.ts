@@ -24,6 +24,9 @@ test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
 test('phase 4 readiness SQL checks required tables, indexes, canonical topics, and policy expectations', () => {
   const sql = readFileSync(readinessSqlPath, 'utf8');
 
+  assert.match(sql, /with expected_tables\(expected_table_name\) as/i);
+  assert.match(sql, /expected_tables\.expected_table_name as table_name/i);
+  assert.match(sql, /\(schema_tables\.table_name is not null\) as table_exists/i);
   assert.match(sql, /content_sources/i);
   assert.match(sql, /content_ingestion_runs/i);
   assert.match(sql, /raw_source_items/i);
