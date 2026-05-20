@@ -283,6 +283,31 @@ Server-only future env:
 - known limitation:
   - there are still no AI-generated summaries or translations in the preview path
 
+## Task 10 Notes
+
+- Task 10 hardens the preview adapter and detail payload only; it does not change the default product surface
+- Today remains mock by default and only switches to preview mode with:
+  - `VITE_USE_REAL_CONTENT_FEED=true`
+- Radar remains mock/demo content
+- preview reads still require client-safe env only:
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+  - `VITE_USE_REAL_CONTENT_FEED=true`
+- preview reads also still require the manual SQL rollout:
+  - `supabase/manual/phase4_preview_read_policies.sql`
+- preview mapping now preserves richer provenance for detail rendering when the joined rows provide it:
+  - raw source item ids
+  - source ids
+  - source names
+  - canonical URLs
+  - published timestamps
+- preview remains candidate-only and excludes rows explicitly marked with `generation_status = failed`
+- the preview path remains read-only and deterministic:
+  - no AI summaries
+  - no translation blocks
+  - no client writes
+  - no default Today rollout change
+
 ## Manual QA Prerequisites For Write Mode
 
 - use a non-production Supabase project only

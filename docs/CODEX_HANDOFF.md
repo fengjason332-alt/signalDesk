@@ -61,6 +61,7 @@ Phase 4 foundation:
 Phase 4 Task 10:
 - keep the pipeline server-side only for writes and enrichment
 - keep Today on mock content by default, even though a read-only preview path now exists behind `VITE_USE_REAL_CONTENT_FEED=true`
+- keep Radar on mock/demo content
 - use the Task 7/8/9 manual readiness assets before any non-production read-preview or write smoke test:
   - `docs/PHASE_4_MANUAL_QA.md`
   - `supabase/manual/phase4_content_sources_smoke_seed.sql`
@@ -173,6 +174,30 @@ Phase 4 Task 10:
   - use translations
   - use AI-generated summaries
   - switch the default Today experience away from mock content
+
+## Phase 4 Task 10 Status
+
+- preview hardening now improves read-only real-content detail safety only:
+  - richer provenance mapping from `primary_source_name`, `signal_source_items`, and joined `raw_source_items`
+  - preserved source item ids, source ids, source names, source URLs, and published timestamps when available
+  - safer fallbacks for sparse headline, summary, topic, entity, source-link, and generation-status fields
+- preview eligibility remains limited to:
+  - `candidate_preview`
+  - `candidate`
+  - `draft`
+- rows with `generation_status = failed` are excluded from preview mapping
+- preview-only console diagnostics now report:
+  - rows fetched
+  - mapped card count
+  - filtered count when defensive client-side filtering removes rows
+  - whether fallback occurred
+- Today still defaults to the mock feed unless `VITE_USE_REAL_CONTENT_FEED=true`
+- Radar still remains mock/demo only
+- preview read failure still falls back to the mock Today feed without crashing
+- this still does not:
+  - call AI
+  - write Phase 4 content from the client
+  - switch Today or Radar to real content by default
 
 ## Manual QA Prerequisites For Non-Production Write Testing
 

@@ -73,6 +73,87 @@ test('loadRealContentFeedPreview returns mapped signals from Supabase rows', asy
   assert.equal(signals[0].importance, 9.1);
 });
 
+test('loadRealContentFeedPreview filters failed or ineligible rows and emits preview diagnostics', async () => {
+  const originalConsoleInfo = console.info;
+  const infoCalls: unknown[][] = [];
+  console.info = (...args: unknown[]) => {
+    infoCalls.push(args);
+  };
+
+  try {
+    const signals = await loadRealContentFeedPreview(
+      new FakeRealContentFeedLoaderClient([
+        {
+          id: 'signal-real-valid',
+          primary_category: 'ai',
+          categories: ['ai'],
+          headline_en: 'Eligible preview signal',
+          headline_zh: null,
+          summary_en: 'Ready for preview.',
+          summary_zh: null,
+          why_it_matters_en: [],
+          why_it_matters_zh: [],
+          primary_source_name: 'OpenAI',
+          published_at: '2026-05-20T08:00:00.000Z',
+          lifecycle_stage: 'candidate',
+          generation_status: 'drafted',
+          overall_score: 88,
+          signal_topics: [],
+          signal_entities: [],
+          signal_source_items: [],
+        },
+        {
+          id: 'signal-real-failed',
+          primary_category: 'ai',
+          categories: ['ai'],
+          headline_en: 'Failed generation should not render',
+          headline_zh: null,
+          summary_en: 'Should be filtered.',
+          summary_zh: null,
+          why_it_matters_en: [],
+          why_it_matters_zh: [],
+          primary_source_name: 'OpenAI',
+          published_at: '2026-05-20T07:00:00.000Z',
+          lifecycle_stage: 'candidate_preview',
+          generation_status: 'failed',
+          overall_score: 20,
+          signal_topics: [],
+          signal_entities: [],
+          signal_source_items: [],
+        },
+        {
+          id: 'signal-real-published',
+          primary_category: 'ai',
+          categories: ['ai'],
+          headline_en: 'Published rows are not preview-eligible',
+          headline_zh: null,
+          summary_en: 'Should be filtered.',
+          summary_zh: null,
+          why_it_matters_en: [],
+          why_it_matters_zh: [],
+          primary_source_name: 'OpenAI',
+          published_at: '2026-05-20T06:00:00.000Z',
+          lifecycle_stage: 'published',
+          generation_status: 'ready',
+          overall_score: 60,
+          signal_topics: [],
+          signal_entities: [],
+          signal_source_items: [],
+        },
+      ]) as never,
+    );
+
+    assert.deepEqual(signals.map(signal => signal.id), ['signal-real-valid']);
+    assert.equal(infoCalls.length, 1);
+    assert.match(String(infoCalls[0][0]), /rowsFetched=3/);
+    assert.match(String(infoCalls[0][0]), /mappedCards=1/);
+    assert.match(String(infoCalls[0][0]), /filteredCount=2/);
+    assert.match(String(infoCalls[0][0]), /fallbackOccurred=false/);
+  } finally {
+    console.info = originalConsoleInfo;
+  }
+});
+
 test('loadRealContentFeedPreview scopes reads to preview-safe lifecycle rows', async () => {
   const client = new FakeRealContentFeedLoaderClient([]);
 
@@ -136,6 +217,22 @@ test('loadTodaySignals falls back to mock feed when Supabase is unavailable', as
   assert.deepEqual(result.signals.map(signal => signal.id), MOCK_SIGNALS.map(signal => signal.id));
 });
 
+test('loadTodaySignals keeps the read failure reason for preview-mode fallback logging', async () => {
+  const result = await loadTodaySignals({
+    enableRealContentFeed: true,
+    client: new FakeRealContentFeedLoaderClient([], {
+      message: 'permission denied for table intelligence_signals',
+      code: '42501',
+    }) as never,
+    mockSignals: MOCK_SIGNALS,
+  });
+
+  assert.equal(result.source, 'mock');
+  assert.equal(result.usedFallback, true);
+  assert.match(result.errorMessage ?? '', /permission denied/i);
+  assert.deepEqual(result.signals.map(signal => signal.id), MOCK_SIGNALS.map(signal => signal.id));
+});
+
 test('loadTodaySignals returns a real empty state without forcing a mock fallback', async () => {
   const result = await loadTodaySignals({
     enableRealContentFeed: true,
@@ -146,5 +243,6 @@ test('loadTodaySignals returns a real empty state without forcing a mock fallbac
   assert.equal(result.source, 'real');
   assert.equal(result.usedFallback, false);
   assert.equal(result.isEmpty, true);
+  assert.match(result.errorMessage ?? '', /returned 0 eligible preview rows/i);
   assert.deepEqual(result.signals, []);
 });

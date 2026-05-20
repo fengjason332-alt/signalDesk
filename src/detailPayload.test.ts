@@ -119,6 +119,80 @@ test('maps a real-content preview signal into a safe detail payload without full
   assert.equal(payload.content, undefined);
 });
 
+test('maps real-content preview provenance sources into detail payload', () => {
+  const payload = toDetailPayloadFromSignal(
+    mapRealContentSignalRowToSignal({
+      id: 'signal-real-preview-provenance',
+      primary_category: 'ai',
+      categories: ['ai'],
+      headline_en: 'OpenAI expands reasoning access in education',
+      headline_zh: null,
+      summary_en: '',
+      summary_zh: null,
+      why_it_matters_en: [],
+      why_it_matters_zh: [],
+      primary_source_name: 'OpenAI',
+      published_at: '2026-05-20T08:00:00.000Z',
+      lifecycle_stage: 'candidate_preview',
+      generation_status: 'drafted',
+      primary_source_item_id: 'raw-openai-1',
+      source_item_count: 2,
+      overall_score: 84,
+      signal_topics: [],
+      signal_entities: [],
+      signal_source_items: [
+        {
+          is_primary: true,
+          raw_source_item: {
+            id: 'raw-openai-1',
+            source_id: 'rss_openai_blog_ai',
+            title: 'OpenAI expands reasoning access in education',
+            dek: 'Students and teachers get access to improved reasoning tools.',
+            canonical_url: 'https://openai.com/news/example',
+            published_at: '2026-05-20T08:00:00.000Z',
+            metadata: {
+              source_name: 'OpenAI',
+            },
+          },
+        },
+        {
+          is_primary: false,
+          raw_source_item: {
+            id: 'raw-reuters-1',
+            source_id: 'rss_reuters_ai',
+            title: 'Reuters follow-up',
+            canonical_url: 'https://www.reuters.com/world/openai-follow-up',
+            published_at: '2026-05-20T09:00:00.000Z',
+            metadata: {
+              source_name: 'Reuters',
+            },
+          },
+        },
+      ],
+    }),
+  );
+
+  assert.equal(payload.previewMode, 'real_content');
+  assert.deepEqual(payload.provenanceSources, [
+    {
+      rawSourceItemId: 'raw-openai-1',
+      sourceId: 'rss_openai_blog_ai',
+      sourceName: 'OpenAI',
+      sourceUrl: 'https://openai.com/news/example',
+      publishedAt: '2026-05-20T08:00:00.000Z',
+      isPrimary: true,
+    },
+    {
+      rawSourceItemId: 'raw-reuters-1',
+      sourceId: 'rss_reuters_ai',
+      sourceName: 'Reuters',
+      sourceUrl: 'https://www.reuters.com/world/openai-follow-up',
+      publishedAt: '2026-05-20T09:00:00.000Z',
+      isPrimary: false,
+    },
+  ]);
+});
+
 test('maps a library item to a safe detail payload with complete arrays', () => {
   const payload = toDetailPayloadFromLibraryItem(MOCK_LIBRARY[0]);
 

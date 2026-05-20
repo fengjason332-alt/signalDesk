@@ -203,3 +203,222 @@ test('mapRealContentSignalRowToSignal does not require a signal title column and
   assert.equal(signal.source, 'rss_white_house_briefing');
   assert.equal(signal.timestamp, '2026-05-21');
 });
+
+test('mapRealContentSignalRowToSignal uses primary_source_item_id to choose the primary joined source and prefers publisher metadata for source label', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-primary-source-item-id',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'Primary source item id selection',
+    headline_zh: null,
+    summary_en: null,
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: '',
+    published_at: null,
+    primary_source_item_id: 'raw-preferred',
+    overall_score: 50,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [
+      {
+        is_primary: false,
+        raw_source_item: {
+          id: 'raw-other',
+          source_id: 'rss_internal_other',
+          title: 'Other title',
+          canonical_url: 'https://example.com/other',
+          published_at: '2026-05-20T07:00:00.000Z',
+          metadata: {
+            source_name: 'Other Source',
+          },
+        },
+      },
+      {
+        is_primary: false,
+        raw_source_item: {
+          id: 'raw-preferred',
+          source_id: 'rss_internal_preferred',
+          title: 'Preferred raw title',
+          canonical_url: 'https://example.com/preferred',
+          published_at: '2026-05-20T08:00:00.000Z',
+          metadata: {
+            publisher: 'Preferred Publisher',
+          },
+        },
+      },
+    ],
+  });
+
+  assert.equal(signal.titleZh, 'Primary source item id selection');
+  assert.equal(signal.source, 'Preferred Publisher');
+  assert.equal(signal.timestamp, '2026-05-20');
+  assert.deepEqual(signal.realContentPreview?.provenanceSources, [
+    {
+      rawSourceItemId: 'raw-other',
+      sourceId: 'rss_internal_other',
+      sourceName: 'Other Source',
+      sourceUrl: 'https://example.com/other',
+      publishedAt: '2026-05-20T07:00:00.000Z',
+      isPrimary: false,
+    },
+    {
+      rawSourceItemId: 'raw-preferred',
+      sourceId: 'rss_internal_preferred',
+      sourceName: 'Preferred Publisher',
+      sourceUrl: 'https://example.com/preferred',
+      publishedAt: '2026-05-20T08:00:00.000Z',
+      isPrimary: true,
+    },
+  ]);
+});
+
+test('mapRealContentSignalRowToSignal preserves preview provenance metadata across multiple linked sources', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-provenance',
+    primary_category: 'ai',
+    categories: null,
+    headline_en: null,
+    headline_zh: null,
+    summary_en: null,
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: 'OpenAI',
+    published_at: null,
+    created_at: '2026-05-20T09:00:00.000Z',
+    lifecycle_stage: 'candidate_preview',
+    generation_status: 'drafted',
+    primary_source_item_id: 'raw-1',
+    source_item_count: 2,
+    overall_score: 76,
+    tags: null,
+    signal_topics: null,
+    signal_entities: null,
+    signal_source_items: [
+      {
+        is_primary: true,
+        raw_source_item: {
+          id: 'raw-1',
+          source_id: 'rss_openai_blog_ai',
+          title: 'OpenAI expands access',
+          canonical_url: 'https://openai.com/index/openai-expands-access',
+          published_at: '2026-05-20T08:00:00.000Z',
+          metadata: {
+            source_name: 'OpenAI',
+          },
+        },
+      },
+      {
+        is_primary: false,
+        raw_source_item: {
+          id: 'raw-2',
+          source_id: 'rss_reuters_ai',
+          title: 'Reuters follow-up',
+          canonical_url: 'https://www.reuters.com/world/openai-follow-up',
+          published_at: '2026-05-20T09:30:00.000Z',
+          metadata: {
+            source_name: 'Reuters',
+          },
+        },
+      },
+    ],
+  });
+
+  assert.equal(signal.realContentPreview?.previewKind, 'real_content');
+  assert.equal(signal.realContentPreview?.lifecycleStage, 'candidate_preview');
+  assert.equal(signal.realContentPreview?.generationStatus, 'drafted');
+  assert.equal(signal.realContentPreview?.primarySourceItemId, 'raw-1');
+  assert.equal(signal.realContentPreview?.sourceItemCount, 2);
+  assert.deepEqual(signal.realContentPreview?.provenanceSources, [
+    {
+      rawSourceItemId: 'raw-1',
+      sourceId: 'rss_openai_blog_ai',
+      sourceName: 'OpenAI',
+      sourceUrl: 'https://openai.com/index/openai-expands-access',
+      publishedAt: '2026-05-20T08:00:00.000Z',
+      isPrimary: true,
+    },
+    {
+      rawSourceItemId: 'raw-2',
+      sourceId: 'rss_reuters_ai',
+      sourceName: 'Reuters',
+      sourceUrl: 'https://www.reuters.com/world/openai-follow-up',
+      publishedAt: '2026-05-20T09:30:00.000Z',
+      isPrimary: false,
+    },
+  ]);
+});
+
+test('mapRealContentSignalRowToSignal drops unsafe provenance URLs and falls back to primary_source_name provenance', () => {
+  const unsafeUrlSignal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-unsafe-url',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'Unsafe URL example',
+    headline_zh: null,
+    summary_en: null,
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: 'OpenAI',
+    published_at: '2026-05-20T08:00:00.000Z',
+    lifecycle_stage: 'candidate_preview',
+    generation_status: 'drafted',
+    overall_score: 55,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [
+      {
+        is_primary: true,
+        raw_source_item: {
+          id: 'raw-unsafe-1',
+          source_id: 'rss_openai_blog_ai',
+          canonical_url: 'javascript:alert(1)',
+          published_at: '2026-05-20T08:00:00.000Z',
+          metadata: {
+            source_name: 'OpenAI',
+          },
+        },
+      },
+    ],
+  });
+
+  const primaryNameOnlySignal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-primary-name-only',
+    primary_category: 'macro',
+    categories: ['macro'],
+    headline_en: null,
+    headline_zh: null,
+    summary_en: null,
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: 'White House Briefing Room',
+    published_at: '2026-05-20T08:00:00.000Z',
+    lifecycle_stage: 'candidate',
+    generation_status: null,
+    overall_score: 61,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [],
+  });
+
+  assert.deepEqual(unsafeUrlSignal.realContentPreview?.provenanceSources, [
+    {
+      rawSourceItemId: 'raw-unsafe-1',
+      sourceId: 'rss_openai_blog_ai',
+      sourceName: 'OpenAI',
+      publishedAt: '2026-05-20T08:00:00.000Z',
+      isPrimary: true,
+    },
+  ]);
+
+  assert.deepEqual(primaryNameOnlySignal.realContentPreview?.provenanceSources, [
+    {
+      sourceName: 'White House Briefing Room',
+      isPrimary: true,
+    },
+  ]);
+});

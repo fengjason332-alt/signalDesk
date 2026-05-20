@@ -2,10 +2,11 @@
 
 ## Scope
 
-Phase 4 Task 8 is still server-side only.
+Phase 4 Task 10 adds preview hardening only.
 
-- Do not change the UI.
-- Do not switch the Today feed away from mock content.
+- Do not change the visual style.
+- Do not switch the Today feed away from mock content by default.
+- Do not switch Radar away from mock content.
 - Do not call AI.
 - Do not add client secrets or `.env` files.
 - Do not run live writes automatically.
@@ -36,6 +37,14 @@ After Task 9 preview-read integration:
 - the default Today experience is still mock content
 - preview mode must be enabled locally with:
   - `VITE_USE_REAL_CONTENT_FEED=true`
+
+After Task 10 preview hardening:
+
+- preview cards and detail views should tolerate sparse real rows without crashing
+- preview detail now preserves richer provenance when available from joined source rows
+- preview rows with `generation_status = failed` should not render
+- preview diagnostics should appear in the console only when `VITE_USE_REAL_CONTENT_FEED=true`
+- no UI debug panel should appear
 
 ## Manual Migration Rollout
 
@@ -262,6 +271,15 @@ Task 9 does not switch the app by default. To preview real content locally:
    - the existing visual style is unchanged
    - cards render safely even without AI summaries or translation blocks
    - clicking a preview card opens a safe detail view with available source/date/summary/provenance fields
+   - detail does not show a fake generated article body when full blocks are unavailable
+   - source, date, categories, and score remain visible
+   - AI-related preview cards still respect the existing Today filters
+   - provenance can show multiple preserved sources when the joined rows contain them
+6. Toggle preview mode back off:
+   - unset `VITE_USE_REAL_CONTENT_FEED` or set it to a non-`true` value
+   - restart the app
+   - confirm Today returns to the mock feed by default
+   - confirm Radar remains mock/demo content
 
 If the preview read fails:
 

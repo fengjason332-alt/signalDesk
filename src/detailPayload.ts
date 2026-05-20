@@ -1,4 +1,10 @@
-import { LibraryItem, Signal, Topic, WatchlistItem } from './types';
+import {
+  LibraryItem,
+  Signal,
+  SignalProvenanceSource,
+  Topic,
+  WatchlistItem,
+} from './types';
 
 export interface DetailPayload {
   id: string;
@@ -25,6 +31,8 @@ export interface DetailPayload {
   libraryMeta?: {
     title: string;
   };
+  provenanceSources?: SignalProvenanceSource[];
+  previewMode?: 'real_content';
 }
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
@@ -92,6 +100,8 @@ export function toDetailPayloadFromSignal(signal: Signal): DetailPayload {
     timestamp: safeText(signal.timestamp, 'Unknown publish time'),
     content: signal.content,
     glossary: signal.glossary,
+    provenanceSources: signal.realContentPreview?.provenanceSources,
+    previewMode: signal.realContentPreview?.previewKind,
   };
 }
 

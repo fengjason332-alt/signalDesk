@@ -45,6 +45,24 @@ export function getCategoryLabel(category: CategoryKey) {
 export type ReadingMode = 'Chinese Only' | 'Bilingual' | 'Original';
 export type TranslationStyle = 'Professional Analysis' | 'Simple Chinese' | 'Accurate Translation' | 'Student-Friendly Explanation';
 
+export interface SignalProvenanceSource {
+  rawSourceItemId?: string;
+  sourceId?: string;
+  sourceName: string;
+  sourceUrl?: string;
+  publishedAt?: string;
+  isPrimary?: boolean;
+}
+
+export interface RealContentPreviewMeta {
+  previewKind: 'real_content';
+  lifecycleStage?: 'candidate_preview' | 'candidate' | 'draft';
+  generationStatus?: string | null;
+  primarySourceItemId?: string | null;
+  sourceItemCount?: number;
+  provenanceSources: SignalProvenanceSource[];
+}
+
 export interface AppSettings {
   readingMode: ReadingMode;
   translationStyle: TranslationStyle;
@@ -78,6 +96,7 @@ export interface Signal {
     term: string;
     definition: string;
   }[];
+  realContentPreview?: RealContentPreviewMeta;
 }
 
 export interface Topic {

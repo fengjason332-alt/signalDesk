@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Bookmark, ChevronDown, Share2, Globe, FileText, Languages, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Bookmark, ChevronDown, Share2, Globe, FileText, Languages, CheckCircle2, ExternalLink, Zap } from 'lucide-react';
 import { getCategoryLabel, ReadingMode, TranslationStyle } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApp } from '../AppContext';
@@ -112,9 +112,17 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
 
         {/* Quick Summary Card */}
         <div className="bg-surface rounded-2xl border border-outline/20 p-6 space-y-4 shadow-xl">
-          <h3 className="text-[11px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
-            AI Summary / 核心洞察
-          </h3>
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-[11px] font-bold uppercase tracking-widest text-primary flex items-center gap-2">
+              AI Summary / 核心洞察
+            </h3>
+            {detail.previewMode === 'real_content' && (
+              <div className="flex items-center gap-2 text-primary text-xs font-bold whitespace-nowrap">
+                <Zap size={12} fill="currentColor" />
+                <span>{detail.importance.toFixed(1)} / 10</span>
+              </div>
+            )}
+          </div>
           <p className="text-xl text-on-surface font-medium leading-relaxed">
             {detail.summaryZh}
           </p>
@@ -134,6 +142,57 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {detail.provenanceSources && detail.provenanceSources.length > 0 && (
+          <div className="bg-surface-low rounded-2xl border border-outline/10 p-6 space-y-4">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[11px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Source Provenance / 来源溯源
+              </h3>
+              {detail.previewMode !== 'real_content' && (
+                <div className="flex items-center gap-2 text-primary text-xs font-bold">
+                  <Zap size={12} fill="currentColor" />
+                  <span>{detail.importance.toFixed(1)} / 10</span>
+                </div>
+              )}
+            </div>
+            <div className="space-y-3">
+              {detail.provenanceSources.map((source, index) => (
+                <div
+                  key={`${source.rawSourceItemId ?? source.sourceUrl ?? source.sourceName}-${index}`}
+                  className="rounded-xl border border-outline/10 bg-surface-high/50 p-4 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-on-surface">
+                      {source.sourceName}
+                    </div>
+                    {source.isPrimary && (
+                      <span className="text-[10px] uppercase font-bold tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded whitespace-nowrap">
+                        Primary
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-on-surface-variant space-y-1">
+                    {source.sourceId && <div>Source ID: {source.sourceId}</div>}
+                    {source.publishedAt && <div>Published: {source.publishedAt}</div>}
+                    {source.rawSourceItemId && <div>Source Item: {source.rawSourceItemId}</div>}
+                  </div>
+                  {source.sourceUrl && (
+                    <a
+                      href={source.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 text-xs text-primary hover:text-primary/80 transition-colors"
+                    >
+                      <ExternalLink size={12} />
+                      View source link
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -237,7 +296,9 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
               <p>
                 {detail.kind === 'library'
                   ? 'Full document content is not available in this prototype yet.'
-                  : 'Detailed analysis for this signal is being synthesized...'}
+                  : detail.previewMode === 'real_content'
+                    ? 'This preview includes headline, summary, score, and source provenance only. Full article body is not stored yet.'
+                    : 'Detailed analysis for this signal is being synthesized...'}
               </p>
             </div>
           )}
