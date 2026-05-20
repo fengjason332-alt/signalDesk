@@ -89,8 +89,12 @@ create unique index if not exists raw_source_items_source_external_id_idx
   where external_id is not null;
 create unique index if not exists raw_source_items_canonical_url_hash_idx
   on public.raw_source_items (canonical_url_hash);
+create index if not exists raw_source_items_title_hash_idx
+  on public.raw_source_items (title_hash);
 create index if not exists raw_source_items_content_hash_idx
   on public.raw_source_items (content_hash);
+create index if not exists raw_source_items_source_published_at_idx
+  on public.raw_source_items (source_id, published_at desc);
 create index if not exists raw_source_items_published_at_idx
   on public.raw_source_items (published_at desc);
 
@@ -118,6 +122,10 @@ create table if not exists public.raw_source_item_entities (
 
 create table if not exists public.intelligence_signals (
   id uuid primary key default gen_random_uuid(),
+  candidate_key text not null,
+  lifecycle_stage text not null default 'candidate'
+    check (lifecycle_stage in ('candidate', 'draft')),
+  deterministic_seed_version text not null default 'phase4_det_v1',
   primary_category category_key_enum not null,
   categories category_key_enum[] not null default '{}'::category_key_enum[],
   headline_en text not null,
@@ -138,6 +146,11 @@ create table if not exists public.intelligence_signals (
   confidence_score integer not null default 0,
   relevance_score integer not null default 0,
   source_reliability_score integer not null default 0,
+  recency_score integer not null default 0,
+  entity_importance_score integer not null default 0,
+  topic_relevance_score integer not null default 0,
+  source_count_score integer not null default 0,
+  duplicate_confidence_score integer not null default 0,
   overall_score integer not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -147,10 +160,17 @@ create table if not exists public.intelligence_signals (
     and confidence_score between 0 and 100
     and relevance_score between 0 and 100
     and source_reliability_score between 0 and 100
+    and recency_score between 0 and 100
+    and entity_importance_score between 0 and 100
+    and topic_relevance_score between 0 and 100
+    and source_count_score between 0 and 100
+    and duplicate_confidence_score between 0 and 100
     and overall_score between 0 and 100
   )
 );
 
+create unique index if not exists intelligence_signals_candidate_key_idx
+  on public.intelligence_signals (candidate_key);
 create index if not exists intelligence_signals_primary_category_idx
   on public.intelligence_signals (primary_category, published_at desc);
 create index if not exists intelligence_signals_overall_score_idx
@@ -163,6 +183,10 @@ create table if not exists public.signal_source_items (
   created_at timestamptz not null default now(),
   primary key (signal_id, raw_source_item_id)
 );
+
+create unique index if not exists signal_source_items_one_primary_per_signal_idx
+  on public.signal_source_items (signal_id)
+  where is_primary = true;
 
 create table if not exists public.signal_entities (
   signal_id uuid not null references public.intelligence_signals(id) on delete cascade,

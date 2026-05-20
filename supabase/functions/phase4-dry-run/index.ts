@@ -29,16 +29,18 @@ export function createConfiguredPhase4Handler() {
   const serviceRoleKey = getServerEnv('SUPABASE_SERVICE_ROLE_KEY');
   const allowWrites = isEnabled('PHASE4_ENABLE_CONTENT_WRITES');
   const allowLiveFetch = isEnabled('PHASE4_ENABLE_LIVE_FETCH');
+  const writeAuthToken = getServerEnv('PHASE4_WRITE_AUTH_TOKEN');
   const canCreateStore = Boolean(supabaseUrl && serviceRoleKey);
 
   const contentStore =
-    allowWrites && canCreateStore
+    allowWrites && canCreateStore && writeAuthToken
       ? createSupabaseContentStore(createClient(supabaseUrl!, serviceRoleKey!))
       : null;
 
   return createPhase4IngestionHandler({
     allowLiveFetch,
     allowWrites: allowWrites && Boolean(contentStore),
+    writeAuthToken: writeAuthToken ?? null,
     contentStore,
   });
 }

@@ -7,6 +7,7 @@ import {
 import { generateCandidateSignals } from './signalGeneration';
 import { getActiveEnglishRssSources } from './sourceRegistry';
 import type {
+  Phase4CandidateSignalWriteInput,
   Phase4ContentEntityUpsert,
   Phase4ContentStore,
   Phase4RawItemEntityLinkUpsert,
@@ -14,6 +15,7 @@ import type {
 } from './supabaseContentStore';
 import { CONTENT_ENTITY_CATALOG, mapTopicsAndEntities } from './topicEntityMapping';
 import type {
+  CandidateSignalRecord,
   DeterministicEntityMatch,
   IngestionRunStatus,
   Phase4DryRunPreview,
@@ -37,6 +39,7 @@ export interface Phase4IngestionOptions {
   allowLiveFetch?: boolean;
   now?: () => string;
   allowWrites?: boolean;
+  writeAuthToken?: string | null;
   contentStore?: Phase4ContentStore | null;
 }
 
@@ -46,10 +49,10 @@ const WRITE_STEP_ENABLEMENT = {
   insert_raw_source_items: true,
   upsert_content_entities: true,
   insert_raw_source_item_entities: true,
-  insert_intelligence_signals: false,
-  insert_signal_source_items: false,
-  insert_signal_entities: false,
-  insert_signal_topics: false,
+  insert_intelligence_signals: true,
+  insert_signal_source_items: true,
+  insert_signal_entities: true,
+  insert_signal_topics: true,
 } as const;
 
 const WRITE_STEP_ORDER = Object.keys(WRITE_STEP_ENABLEMENT) as Array<
@@ -60,6 +63,23 @@ const COUNTRY_CODE_BY_ENTITY_NAME: Record<string, string> = {
   China: 'CN',
   Australia: 'AU',
 };
+
+interface PendingRunState {
+  source: SourceRegistryEntry;
+  runRef:
+    | {
+        id: string;
+        source_id: string;
+        started_at: string;
+      }
+    | null;
+  errorMessage: string | null;
+  fetchedCount: number;
+  normalizedCount: number;
+  insertedCount: number;
+  skippedCount: number;
+  failedCount: number;
+}
 
 const isExplicitWriteRequest = (payload: Phase4DryRunRequest) => payload.dryRun === false;
 
@@ -74,6 +94,34 @@ const buildWriteSteps = (dryRun: boolean) =>
 
 const toErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Phase 4 ingestion failed.';
+
+const getWriteResponseStatus = (result: Phase4IngestionResult) => {
+  if (result.dry_run) {
+    return 200;
+  }
+
+  if (result.ingestion_runs.some(run => run.status === 'failed')) {
+    return 500;
+  }
+
+  if (result.ingestion_runs.some(run => run.status === 'partial')) {
+    return 207;
+  }
+
+  return 200;
+};
+
+const appendErrorMessage = (current: string | null, next: string) => {
+  if (!current) {
+    return next;
+  }
+
+  if (current.includes(next)) {
+    return current;
+  }
+
+  return `${current}; ${next}`;
+};
 
 const toRawItemWriteInput = (
   item: RawSourceItemRecord,
@@ -167,6 +215,106 @@ async function persistRawItemAndEntities(
   };
 }
 
+const buildSignalConfidenceScore = (candidate: CandidateSignalRecord) =>
+  Math.round(
+    (candidate.scoring_seed.source_reliability_score +
+      candidate.scoring_seed.duplicate_confidence_score) /
+      2,
+  );
+
+const buildCandidateSignalWriteInput = (
+  candidate: CandidateSignalRecord,
+  persistedPrimarySourceItemId: string | null,
+  generatedAt: string,
+): Phase4CandidateSignalWriteInput => ({
+  candidate_key: candidate.candidate_id,
+  lifecycle_stage: 'candidate',
+  deterministic_seed_version: candidate.scoring_seed.seed_version,
+  primary_category: candidate.primary_category,
+  categories: [...candidate.categories],
+  headline_en: candidate.title_seed,
+  headline_zh: null,
+  summary_en: '',
+  summary_zh: null,
+  why_it_matters_en: [],
+  why_it_matters_zh: [],
+  primary_source_name: candidate.primary_source_name ?? 'Unknown source',
+  primary_source_item_id: persistedPrimarySourceItemId,
+  source_item_count: candidate.source_count,
+  published_at: candidate.published_at,
+  generated_at: generatedAt,
+  generation_status: 'pending',
+  tags: [],
+  importance_score: candidate.scoring_seed.entity_importance_score,
+  urgency_score: candidate.scoring_seed.recency_score,
+  confidence_score: buildSignalConfidenceScore(candidate),
+  relevance_score: candidate.scoring_seed.topic_relevance_score,
+  source_reliability_score: candidate.scoring_seed.source_reliability_score,
+  recency_score: candidate.scoring_seed.recency_score,
+  entity_importance_score: candidate.scoring_seed.entity_importance_score,
+  topic_relevance_score: candidate.scoring_seed.topic_relevance_score,
+  source_count_score: candidate.scoring_seed.source_count_score,
+  duplicate_confidence_score: candidate.scoring_seed.duplicate_confidence_score,
+  overall_score: candidate.scoring_seed.overall_seed_score,
+});
+
+async function persistCandidateSignal(
+  candidate: CandidateSignalRecord,
+  store: Phase4ContentStore,
+  persistedRawItemIdByPreviewId: Map<string, string>,
+  generatedAt: string,
+) {
+  const persistedSourceItemIds = candidate.source_item_ids.map(sourceItemId => {
+    const persistedId = persistedRawItemIdByPreviewId.get(sourceItemId);
+    if (!persistedId) {
+      throw new Error(
+        `Missing persisted raw source item for candidate ${candidate.candidate_id}: ${sourceItemId}`,
+      );
+    }
+
+    return persistedId;
+  });
+
+  const persistedPrimarySourceItemId = candidate.primary_preview_raw_source_item_id
+    ? persistedRawItemIdByPreviewId.get(candidate.primary_preview_raw_source_item_id) ?? null
+    : null;
+
+  const persistedSignal = await store.upsertCandidateSignal(
+    buildCandidateSignalWriteInput(
+      candidate,
+      persistedPrimarySourceItemId,
+      generatedAt,
+    ),
+  );
+
+  for (const rawSourceItemId of persistedSourceItemIds) {
+    await store.upsertSignalSourceItemLink({
+      signal_id: persistedSignal.id,
+      raw_source_item_id: rawSourceItemId,
+      is_primary:
+        persistedPrimarySourceItemId !== null &&
+        rawSourceItemId === persistedPrimarySourceItemId,
+    });
+  }
+
+  for (const entityMatch of candidate.entity_matches) {
+    await store.upsertSignalEntityLink({
+      signal_id: persistedSignal.id,
+      entity_id: entityMatch.entity_id,
+      relevance_score: entityMatch.relevance_score,
+      mention_count: entityMatch.mention_count,
+    });
+  }
+
+  for (const topicMatch of candidate.topic_matches) {
+    await store.upsertSignalTopicLink({
+      signal_id: persistedSignal.id,
+      topic_id: topicMatch.topic_id,
+      relevance_score: topicMatch.relevance_score,
+    });
+  }
+}
+
 const resolveRunStatus = (counts: {
   fetched: number;
   inserted: number;
@@ -224,8 +372,12 @@ export async function runPhase4Ingestion(
   }
 
   const previewRawItems: RawSourceItemRecord[] = [];
+  const signalCandidateRawItems: RawSourceItemRecord[] = [];
+  const persistedRawItemIdByPreviewId = new Map<string, string>();
   const sourcePreviews: Phase4IngestionResult['source_previews'] = [];
   const ingestionRuns: Phase4IngestionResult['ingestion_runs'] = [];
+  const pendingRuns: PendingRunState[] = [];
+  const pendingRunBySourceId = new Map<string, PendingRunState>();
 
   let fetchedItemCount = 0;
   let normalizedItemCount = 0;
@@ -234,24 +386,22 @@ export async function runPhase4Ingestion(
   let failedItemCount = 0;
 
   for (const source of selectedSources) {
-    let runRef:
-      | {
-          id: string;
-          source_id: string;
-          started_at: string;
-        }
-      | null = null;
-    let runCompletedAt: string | null = null;
-    let sourceErrorMessage: string | null = null;
-    let sourceFetchedCount = 0;
-    let sourceNormalizedCount = 0;
-    let sourceInsertedCount = 0;
-    let sourceSkippedCount = 0;
-    let sourceFailedCount = 0;
+    const pendingRun: PendingRunState = {
+      source,
+      runRef: null,
+      errorMessage: null,
+      fetchedCount: 0,
+      normalizedCount: 0,
+      insertedCount: 0,
+      skippedCount: 0,
+      failedCount: 0,
+    };
+    pendingRuns.push(pendingRun);
+    pendingRunBySourceId.set(source.id, pendingRun);
 
     try {
       if (!dryRun) {
-        runRef = await contentStore!.createIngestionRun({
+        pendingRun.runRef = await contentStore!.createIngestionRun({
           source_id: source.id,
           started_at: now,
         });
@@ -259,21 +409,22 @@ export async function runPhase4Ingestion(
 
       const feed = await fetchSourceFeed(source, options.fetchImpl);
       const feedItems = feed.items.slice(0, maxItemsPerSource);
-      sourceFetchedCount = feedItems.length;
+      pendingRun.fetchedCount = feedItems.length;
       fetchedItemCount += feedItems.length;
 
       for (const feedItem of feedItems) {
         const normalizedItem = normalizeFeedItem(feed.source, feedItem, discoveredAt);
         const rawItem = mapFeedItemToRawSourceItem(feed.source, normalizedItem, {
           discoveredAt,
-          ingestionRunId: runRef?.id ?? null,
+          ingestionRunId: pendingRun.runRef?.id ?? null,
         });
 
         previewRawItems.push(rawItem);
         normalizedItemCount += 1;
-        sourceNormalizedCount += 1;
+        pendingRun.normalizedCount += 1;
 
         if (dryRun) {
+          signalCandidateRawItems.push(rawItem);
           continue;
         }
 
@@ -281,20 +432,25 @@ export async function runPhase4Ingestion(
           const persistedItem = await persistRawItemAndEntities(
             rawItem,
             contentStore!,
-            runRef!.id,
+            pendingRun.runRef!.id,
           );
+          persistedRawItemIdByPreviewId.set(rawItem.id, persistedItem.raw_source_item_id);
+          signalCandidateRawItems.push(rawItem);
 
           if (persistedItem.inserted) {
             insertedItemCount += 1;
-            sourceInsertedCount += 1;
+            pendingRun.insertedCount += 1;
           } else {
             skippedDuplicateCount += 1;
-            sourceSkippedCount += 1;
+            pendingRun.skippedCount += 1;
           }
         } catch (error) {
           failedItemCount += 1;
-          sourceFailedCount += 1;
-          sourceErrorMessage ??= toErrorMessage(error);
+          pendingRun.failedCount += 1;
+          pendingRun.errorMessage = appendErrorMessage(
+            pendingRun.errorMessage,
+            toErrorMessage(error),
+          );
         }
       }
     } catch (error) {
@@ -303,58 +459,12 @@ export async function runPhase4Ingestion(
       }
 
       const message = toErrorMessage(error);
-      sourceErrorMessage = sourceErrorMessage ?? message;
-      if (sourceFetchedCount === 0) {
-        sourceFailedCount = Math.max(sourceFailedCount, 1);
+      pendingRun.errorMessage = appendErrorMessage(pendingRun.errorMessage, message);
+      if (pendingRun.fetchedCount === 0) {
+        pendingRun.failedCount = Math.max(pendingRun.failedCount, 1);
         failedItemCount += 1;
       }
     }
-
-    if (!dryRun && runRef) {
-      const status = resolveRunStatus({
-        fetched: sourceFetchedCount,
-        inserted: sourceInsertedCount,
-        skipped: sourceSkippedCount,
-        failed: sourceFailedCount,
-      });
-
-      runCompletedAt = getNow(payload, options.now, new Date().toISOString());
-      await contentStore!.finalizeIngestionRun(runRef.id, {
-        completed_at: runCompletedAt,
-        status,
-        items_fetched: sourceFetchedCount,
-        items_inserted: sourceInsertedCount,
-        items_skipped_as_duplicates: sourceSkippedCount,
-        items_failed: sourceFailedCount,
-        error_message: sourceErrorMessage,
-      });
-
-      ingestionRuns.push({
-        run_id: runRef.id,
-        source_id: source.id,
-        status,
-        started_at: runRef.started_at,
-        completed_at: runCompletedAt,
-        items_fetched: sourceFetchedCount,
-        items_inserted: sourceInsertedCount,
-        items_skipped_as_duplicates: sourceSkippedCount,
-        items_failed: sourceFailedCount,
-        error_message: sourceErrorMessage,
-      });
-    }
-
-    sourcePreviews.push({
-      source_id: source.id,
-      source_name: source.name,
-      fetched_count: sourceFetchedCount,
-      normalized_count: sourceNormalizedCount,
-      inserted_count: sourceInsertedCount,
-      skipped_count: sourceSkippedCount,
-      failed_count: sourceFailedCount,
-      run_id: runRef?.id ?? null,
-      run_status: ingestionRuns.find(run => run.run_id === runRef?.id)?.status ?? null,
-      error_message: sourceErrorMessage,
-    });
   }
 
   const dedupeRelationships: Phase4IngestionResult['dedupe_relationships'] = [];
@@ -375,10 +485,88 @@ export async function runPhase4Ingestion(
     }
   }
 
-  const candidateSignals = generateCandidateSignals(previewRawItems, {
-    sourceRegistry: selectedSources,
-    now,
-  });
+  const candidateSignals = generateCandidateSignals(
+    dryRun ? previewRawItems : signalCandidateRawItems,
+    {
+      sourceRegistry: selectedSources,
+      now,
+    },
+  );
+
+  if (!dryRun) {
+    for (const candidateSignal of candidateSignals) {
+      try {
+        await persistCandidateSignal(
+          candidateSignal,
+          contentStore!,
+          persistedRawItemIdByPreviewId,
+          now,
+        );
+      } catch (error) {
+        const message = toErrorMessage(error);
+        failedItemCount += 1;
+
+        for (const sourceId of candidateSignal.source_ids) {
+          const pendingRun = pendingRunBySourceId.get(sourceId);
+          if (!pendingRun) {
+            continue;
+          }
+
+          pendingRun.failedCount += 1;
+          pendingRun.errorMessage = appendErrorMessage(pendingRun.errorMessage, message);
+        }
+      }
+    }
+  }
+
+  for (const pendingRun of pendingRuns) {
+    const status = resolveRunStatus({
+      fetched: pendingRun.fetchedCount,
+      inserted: pendingRun.insertedCount,
+      skipped: pendingRun.skippedCount,
+      failed: pendingRun.failedCount,
+    });
+
+    let completedAt: string | null = null;
+    if (!dryRun && pendingRun.runRef) {
+      completedAt = getNow(payload, options.now, new Date().toISOString());
+      await contentStore!.finalizeIngestionRun(pendingRun.runRef.id, {
+        completed_at: completedAt,
+        status,
+        items_fetched: pendingRun.fetchedCount,
+        items_inserted: pendingRun.insertedCount,
+        items_skipped_as_duplicates: pendingRun.skippedCount,
+        items_failed: pendingRun.failedCount,
+        error_message: pendingRun.errorMessage,
+      });
+
+      ingestionRuns.push({
+        run_id: pendingRun.runRef.id,
+        source_id: pendingRun.source.id,
+        status,
+        started_at: pendingRun.runRef.started_at,
+        completed_at: completedAt,
+        items_fetched: pendingRun.fetchedCount,
+        items_inserted: pendingRun.insertedCount,
+        items_skipped_as_duplicates: pendingRun.skippedCount,
+        items_failed: pendingRun.failedCount,
+        error_message: pendingRun.errorMessage,
+      });
+    }
+
+    sourcePreviews.push({
+      source_id: pendingRun.source.id,
+      source_name: pendingRun.source.name,
+      fetched_count: pendingRun.fetchedCount,
+      normalized_count: pendingRun.normalizedCount,
+      inserted_count: pendingRun.insertedCount,
+      skipped_count: pendingRun.skippedCount,
+      failed_count: pendingRun.failedCount,
+      run_id: pendingRun.runRef?.id ?? null,
+      run_status: dryRun ? null : status,
+      error_message: pendingRun.errorMessage,
+    });
+  }
 
   return {
     dry_run: dryRun,
@@ -446,11 +634,28 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
       );
     }
 
+    if (body.dryRun === false && options.writeAuthToken) {
+      const requestToken = request.headers.get('x-phase4-write-token');
+      if (requestToken !== options.writeAuthToken) {
+        return new Response(
+          JSON.stringify({
+            error: 'Write mode requires a valid Phase 4 write token.',
+          }),
+          {
+            status: 403,
+            headers: {
+              'content-type': 'application/json',
+            },
+          },
+        );
+      }
+    }
+
     try {
       const preview = await runPhase4Ingestion(body, options);
 
       return new Response(JSON.stringify(preview), {
-        status: 200,
+        status: getWriteResponseStatus(preview),
         headers: {
           'content-type': 'application/json',
         },

@@ -221,7 +221,47 @@ Server-only future env:
 1. Task 0: content-domain foundation types, additive mappers, migration draft
 2. Task 1: source registry and RSS-ingestion skeleton
 3. Task 2: normalization and raw-item deduplication
-4. Task 3: signal generation and topic/entity mapping
-5. Task 4: summary and translation generation
-6. Task 5: Today feed integration with mock fallback
-7. Task 6: reliability hardening, retries, and ops cleanup
+4. Task 3: deterministic topic/entity mapping and candidate signal generation
+5. Task 4: dry-run pipeline and deterministic scoring seed
+6. Task 5: raw content persistence into `content_ingestion_runs`, `raw_source_items`, `content_entities`, and `raw_source_item_entities`
+7. Task 6: deterministic candidate signal persistence into `intelligence_signals`, `signal_source_items`, `signal_entities`, and `signal_topics`
+8. Task 7: AI-disabled signal enrichment hardening and first safe path toward richer persisted signal content
+9. Task 8: summary and translation generation
+10. Task 9: Today feed integration with mock fallback
+11. Task 10: reliability hardening, retries, and ops cleanup
+
+## Current Repo Status
+
+- Task 0 foundations are present, including the draft content-schema migration
+- the server-side RSS path already supports explicit raw-item write mode into:
+  - `content_ingestion_runs`
+  - `raw_source_items`
+  - `content_entities`
+  - `raw_source_item_entities`
+- the server-side write path now also persists deterministic candidate signals into:
+  - `intelligence_signals`
+  - `signal_source_items`
+  - `signal_entities`
+  - `signal_topics`
+- persisted candidate signals are intentionally lifecycle-limited to `candidate` / `draft` style rows, with deterministic seed fields stored for scoring reproducibility
+- dry-run remains the default behavior
+- this repo state still does not write:
+  - `signal_translation_blocks`
+  - AI-generated summaries
+  - AI-generated translations
+- this repo state still does not wire Today or any UI surface to real persisted content
+
+## Manual QA Prerequisites For Write Mode
+
+- use a non-production Supabase project only
+- apply `supabase/migrations/202605170001_phase4_content_foundation.sql`
+- seed `content_sources` rows for any registry source ids you plan to request
+- ensure `canonical_topics` is present before expecting `signal_topics` writes to succeed
+- provide server-only env:
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `PHASE4_ENABLE_CONTENT_WRITES=true`
+  - `PHASE4_WRITE_AUTH_TOKEN=<server-side secret>`
+  - `PHASE4_ENABLE_LIVE_FETCH=true` only when intentionally testing live network fetches
+- call the Phase 4 Edge Function with `POST`, `dryRun: false`, and a matching `x-phase4-write-token` header
+- verify candidate-only signal rows plus link-table provenance; do not expect translation blocks or AI summaries yet

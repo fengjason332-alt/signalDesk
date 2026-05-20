@@ -8,6 +8,7 @@ import {
 import { computeRawItemHashes, normalizeFeedItem } from './lib/content/rss';
 import { runPhase4Ingestion } from './lib/content/phase4DryRun';
 import type {
+  Phase4CandidateSignalWriteInput,
   Phase4ContentStore,
   Phase4ContentEntityUpsert,
   Phase4ContentIngestionRunCreate,
@@ -15,7 +16,11 @@ import type {
   Phase4RawItemEntityLinkUpsert,
   Phase4RawSourceItemMatch,
   Phase4RawSourceItemWriteInput,
+  Phase4SignalEntityLinkUpsert,
+  Phase4SignalSourceItemLinkUpsert,
+  Phase4SignalTopicLinkUpsert,
 } from './lib/content/supabaseContentStore';
+import type { SourceRegistryEntry } from './lib/content/types';
 
 class MockPhase4ContentStore implements Phase4ContentStore {
   public assertedSourceIds: string[][] = [];
@@ -24,10 +29,19 @@ class MockPhase4ContentStore implements Phase4ContentStore {
   public insertedRawItems: Phase4RawSourceItemWriteInput[] = [];
   public upsertedEntities: Phase4ContentEntityUpsert[] = [];
   public linkedEntities: Phase4RawItemEntityLinkUpsert[] = [];
+  public upsertedSignals: Phase4CandidateSignalWriteInput[] = [];
+  public linkedSignalSourceItems: Phase4SignalSourceItemLinkUpsert[] = [];
+  public linkedSignalEntities: Phase4SignalEntityLinkUpsert[] = [];
+  public linkedSignalTopics: Phase4SignalTopicLinkUpsert[] = [];
   public existingMatches = new Map<string, Phase4RawSourceItemMatch>();
   public failInsertForCanonicalUrl: string | null = null;
+  public failSignalCandidateKey: string | null = null;
+  public failFirstSignalUpsert = false;
   private runCounter = 0;
   private rawCounter = 0;
+  private signalCounter = 0;
+  private signalIdByCandidateKey = new Map<string, string>();
+  private failedFirstSignalUpsert = false;
 
   async assertSourceIdsExist(sourceIds: string[]) {
     this.assertedSourceIds.push([...sourceIds]);
@@ -60,7 +74,7 @@ class MockPhase4ContentStore implements Phase4ContentStore {
     this.insertedRawItems.push(item);
     this.rawCounter += 1;
 
-    return {
+    const row = {
       id: `raw-db-${this.rawCounter}`,
       source_id: item.source_id,
       external_id: item.external_id,
@@ -69,6 +83,8 @@ class MockPhase4ContentStore implements Phase4ContentStore {
       content_hash: item.content_hash,
       published_at: item.published_at,
     };
+    this.existingMatches.set(item.canonical_url_hash, row);
+    return row;
   }
 
   async upsertEntity(entity: Phase4ContentEntityUpsert) {
@@ -81,12 +97,116 @@ class MockPhase4ContentStore implements Phase4ContentStore {
   async upsertRawItemEntityLink(link: Phase4RawItemEntityLinkUpsert) {
     this.linkedEntities.push(link);
   }
+
+  async upsertCandidateSignal(signal: Phase4CandidateSignalWriteInput) {
+    if (
+      (this.failFirstSignalUpsert && !this.failedFirstSignalUpsert) ||
+      this.failSignalCandidateKey === signal.candidate_key
+    ) {
+      this.failedFirstSignalUpsert = true;
+      throw new Error(`signal upsert failed for ${signal.candidate_key}`);
+    }
+
+    const existingIndex = this.upsertedSignals.findIndex(
+      existing => existing.candidate_key === signal.candidate_key,
+    );
+
+    if (existingIndex >= 0) {
+      this.upsertedSignals[existingIndex] = signal;
+      return {
+        id: this.signalIdByCandidateKey.get(signal.candidate_key)!,
+        candidate_key: signal.candidate_key,
+      };
+    }
+
+    this.signalCounter += 1;
+    const id = `signal-${this.signalCounter}`;
+    this.signalIdByCandidateKey.set(signal.candidate_key, id);
+    this.upsertedSignals.push(signal);
+    return {
+      id,
+      candidate_key: signal.candidate_key,
+    };
+  }
+
+  async upsertSignalSourceItemLink(link: Phase4SignalSourceItemLinkUpsert) {
+    const existingIndex = this.linkedSignalSourceItems.findIndex(
+      existing =>
+        existing.signal_id === link.signal_id &&
+        existing.raw_source_item_id === link.raw_source_item_id,
+    );
+
+    if (existingIndex >= 0) {
+      this.linkedSignalSourceItems[existingIndex] = link;
+      return;
+    }
+
+    this.linkedSignalSourceItems.push(link);
+  }
+
+  async upsertSignalEntityLink(link: Phase4SignalEntityLinkUpsert) {
+    const existingIndex = this.linkedSignalEntities.findIndex(
+      existing =>
+        existing.signal_id === link.signal_id && existing.entity_id === link.entity_id,
+    );
+
+    if (existingIndex >= 0) {
+      this.linkedSignalEntities[existingIndex] = link;
+      return;
+    }
+
+    this.linkedSignalEntities.push(link);
+  }
+
+  async upsertSignalTopicLink(link: Phase4SignalTopicLinkUpsert) {
+    const existingIndex = this.linkedSignalTopics.findIndex(
+      existing =>
+        existing.signal_id === link.signal_id && existing.topic_id === link.topic_id,
+    );
+
+    if (existingIndex >= 0) {
+      this.linkedSignalTopics[existingIndex] = link;
+      return;
+    }
+
+    this.linkedSignalTopics.push(link);
+  }
 }
 
 const createFetchImpl = (xml: string) => async () => ({
   ok: true,
   status: 200,
   text: async () => xml,
+});
+
+const OPENAI_OFFICIAL_SOURCE: SourceRegistryEntry = {
+  ...SAMPLE_AI_RSS_SOURCE,
+  id: 'rss_openai_fixture_official',
+  name: 'OpenAI Fixture Official',
+  url: 'https://example.com/feeds/openai.xml',
+  reliability_tier: 'official',
+};
+
+const OPENAI_OFFICIAL_RSS_FEED_XML = `<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>OpenAI Fixture Feed</title>
+    <item>
+      <guid>openai-official-001</guid>
+      <title>OpenAI details new power planning for AI data centers</title>
+      <link>https://example.com/openai/power-planning</link>
+      <pubDate>Sat, 17 May 2026 01:15:00 GMT</pubDate>
+      <description><![CDATA[<p>OpenAI says data center expansion will require new power capacity and long-term infrastructure planning.</p>]]></description>
+      <content:encoded><![CDATA[<div><p>OpenAI says data center expansion will require new power capacity and long-term infrastructure planning.</p></div>]]></content:encoded>
+      <author>OpenAI</author>
+    </item>
+  </channel>
+</rss>`;
+
+const createSourceAwareFetchImpl = (sources: Record<string, string>) => async (url: string) => ({
+  ok: true,
+  status: 200,
+  text: async () => sources[url] ?? SAMPLE_AI_RSS_FEED_XML,
 });
 
 test('runPhase4Ingestion keeps dry-run as the default and never writes without explicit enablement', async () => {
@@ -114,6 +234,10 @@ test('runPhase4Ingestion keeps dry-run as the default and never writes without e
   assert.equal(store.insertedRawItems.length, 0);
   assert.equal(store.upsertedEntities.length, 0);
   assert.equal(store.linkedEntities.length, 0);
+  assert.equal(store.upsertedSignals.length, 0);
+  assert.equal(store.linkedSignalSourceItems.length, 0);
+  assert.equal(store.linkedSignalEntities.length, 0);
+  assert.equal(store.linkedSignalTopics.length, 0);
 });
 
 test('runPhase4Ingestion writes expected raw items and records a succeeded ingestion run in explicit write mode', async () => {
@@ -142,12 +266,17 @@ test('runPhase4Ingestion writes expected raw items and records a succeeded inges
   assert.deepEqual(store.assertedSourceIds, [[SAMPLE_AI_RSS_SOURCE.id]]);
   assert.equal(store.createdRuns.length, 1);
   assert.equal(store.insertedRawItems.length, 2);
+  assert.equal(store.upsertedSignals.length, result.candidate_signals.length);
+  assert.equal(store.linkedSignalSourceItems.length, 2);
+  assert.equal(store.linkedSignalEntities.length > 0, true);
+  assert.equal(store.linkedSignalTopics.length > 0, true);
   assert.equal(result.ingestion_runs.length, 1);
   assert.equal(result.ingestion_runs[0]?.status, 'succeeded');
   assert.equal(result.ingestion_runs[0]?.items_inserted, 2);
   assert.equal(result.ingestion_runs[0]?.items_skipped_as_duplicates, 0);
   assert.equal(typeof result.ingestion_runs[0]?.started_at, 'string');
   assert.equal(typeof result.ingestion_runs[0]?.completed_at, 'string');
+  assert.equal(result.write_steps.every(step => step.enabled === true), true);
 });
 
 test('runPhase4Ingestion skips duplicate raw items safely and still links entities to the persisted raw item', async () => {
@@ -201,6 +330,89 @@ test('runPhase4Ingestion skips duplicate raw items safely and still links entiti
   assert.equal(
     store.linkedEntities.some(link => link.raw_source_item_id === 'raw-existing-1'),
     true,
+  );
+});
+
+test('runPhase4Ingestion persists deterministic candidate signals with signal-layer provenance links in write mode', async () => {
+  const store = new MockPhase4ContentStore();
+
+  const result = await runPhase4Ingestion(
+    {
+      dryRun: false,
+      sourceIds: [SAMPLE_AI_RSS_SOURCE.id, OPENAI_OFFICIAL_SOURCE.id],
+      discoveredAt: '2026-05-17T12:00:00.000Z',
+      maxItemsPerSource: 1,
+    },
+    {
+      sourceRegistry: [SAMPLE_AI_RSS_SOURCE, OPENAI_OFFICIAL_SOURCE],
+      fetchImpl: createSourceAwareFetchImpl({
+        [SAMPLE_AI_RSS_SOURCE.url]: SAMPLE_AI_RSS_FEED_XML,
+        [OPENAI_OFFICIAL_SOURCE.url]: OPENAI_OFFICIAL_RSS_FEED_XML,
+      }),
+      now: () => '2026-05-17T12:00:00.000Z',
+      contentStore: store,
+      allowWrites: true,
+    },
+  );
+
+  assert.equal(result.candidate_signals.length, 1);
+  assert.equal(store.upsertedSignals.length, 1);
+  assert.equal(store.upsertedSignals[0]?.candidate_key, result.candidate_signals[0]?.candidate_id);
+  assert.equal(store.upsertedSignals[0]?.lifecycle_stage, 'candidate');
+  assert.equal(store.upsertedSignals[0]?.deterministic_seed_version, 'phase4_det_v1');
+  assert.equal(store.upsertedSignals[0]?.headline_en, result.candidate_signals[0]?.title_seed);
+  assert.equal(store.linkedSignalSourceItems.length, 2);
+  assert.equal(
+    store.linkedSignalSourceItems.filter(link => link.is_primary === true).length,
+    1,
+  );
+  assert.equal(
+    new Set(store.linkedSignalSourceItems.map(link => link.raw_source_item_id)).size,
+    2,
+  );
+  assert.equal(
+    store.linkedSignalEntities.some(link => link.entity_id === 'entity_openai'),
+    true,
+  );
+  assert.equal(
+    store.linkedSignalTopics.some(link => link.topic_id === 'topic_ai_data_center_power'),
+    true,
+  );
+});
+
+test('runPhase4Ingestion upserts duplicate deterministic candidate signals safely across repeated writes', async () => {
+  const store = new MockPhase4ContentStore();
+  const options = {
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: createFetchImpl(SAMPLE_AI_RSS_FEED_XML),
+    now: () => '2026-05-17T12:00:00.000Z',
+    contentStore: store,
+    allowWrites: true,
+  };
+  const payload = {
+    dryRun: false as const,
+    sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+    discoveredAt: '2026-05-17T12:00:00.000Z',
+  };
+
+  const first = await runPhase4Ingestion(payload, options);
+  const second = await runPhase4Ingestion(payload, options);
+
+  assert.equal(first.candidate_signals.length, second.candidate_signals.length);
+  assert.equal(store.insertedRawItems.length, 2);
+  assert.equal(second.ingestion_runs[0]?.items_skipped_as_duplicates, 2);
+  assert.equal(
+    new Set(store.upsertedSignals.map(signal => signal.candidate_key)).size,
+    store.upsertedSignals.length,
+  );
+  assert.equal(store.linkedSignalSourceItems.length, 2);
+  assert.equal(
+    new Set(
+      store.linkedSignalSourceItems.map(
+        link => `${link.signal_id}:${link.raw_source_item_id}`,
+      ),
+    ).size,
+    store.linkedSignalSourceItems.length,
   );
 });
 
@@ -273,4 +485,66 @@ test('runPhase4Ingestion records a failed ingestion run when raw item persistenc
   assert.match(result.ingestion_runs[0]?.error_message ?? '', /insert failed/i);
   assert.equal(store.finalizedRuns.length, 1);
   assert.equal(store.finalizedRuns[0]?.update.status, 'failed');
+});
+
+test('runPhase4Ingestion records a partial ingestion run when deterministic signal persistence fails after raw writes succeed', async () => {
+  const store = new MockPhase4ContentStore();
+  store.failFirstSignalUpsert = true;
+
+  const result = await runPhase4Ingestion(
+    {
+      dryRun: false,
+      sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+      discoveredAt: '2026-05-17T12:00:00.000Z',
+    },
+    {
+      sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+      fetchImpl: createFetchImpl(SAMPLE_AI_RSS_FEED_XML),
+      now: () => '2026-05-17T12:00:00.000Z',
+      contentStore: store,
+      allowWrites: true,
+    },
+  );
+
+  assert.equal(result.inserted_item_count, 2);
+  assert.equal(result.failed_item_count, 1);
+  assert.equal(result.ingestion_runs[0]?.status, 'partial');
+  assert.equal(result.ingestion_runs[0]?.items_inserted, 2);
+  assert.equal(result.ingestion_runs[0]?.items_failed, 1);
+  assert.match(result.ingestion_runs[0]?.error_message ?? '', /signal upsert failed/i);
+  assert.equal(store.upsertedSignals.length, 1);
+  assert.equal(store.finalizedRuns[0]?.update.status, 'partial');
+});
+
+test('runPhase4Ingestion marks all contributing source runs partial when a multi-source candidate signal write fails', async () => {
+  const store = new MockPhase4ContentStore();
+  store.failFirstSignalUpsert = true;
+
+  const result = await runPhase4Ingestion(
+    {
+      dryRun: false,
+      sourceIds: [SAMPLE_AI_RSS_SOURCE.id, OPENAI_OFFICIAL_SOURCE.id],
+      discoveredAt: '2026-05-17T12:00:00.000Z',
+      maxItemsPerSource: 1,
+    },
+    {
+      sourceRegistry: [SAMPLE_AI_RSS_SOURCE, OPENAI_OFFICIAL_SOURCE],
+      fetchImpl: createSourceAwareFetchImpl({
+        [SAMPLE_AI_RSS_SOURCE.url]: SAMPLE_AI_RSS_FEED_XML,
+        [OPENAI_OFFICIAL_SOURCE.url]: OPENAI_OFFICIAL_RSS_FEED_XML,
+      }),
+      now: () => '2026-05-17T12:00:00.000Z',
+      contentStore: store,
+      allowWrites: true,
+    },
+  );
+
+  assert.equal(result.ingestion_runs.length, 2);
+  assert.equal(result.ingestion_runs.every(run => run.status === 'partial'), true);
+  assert.equal(
+    result.ingestion_runs.every(run =>
+      (run.error_message ?? '').includes('signal upsert failed'),
+    ),
+    true,
+  );
 });

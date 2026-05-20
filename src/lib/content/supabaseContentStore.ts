@@ -7,7 +7,9 @@ import type {
   ContentMetadata,
   IngestionRunStatus,
   IngestionStatus,
+  SignalGenerationStatus,
 } from './types';
+import type { CategoryKey } from '../../types';
 
 export interface Phase4ContentIngestionRunCreate {
   source_id: string;
@@ -73,6 +75,71 @@ export interface Phase4RawItemEntityLinkUpsert {
   confidence_score: number;
 }
 
+export interface Phase4CandidateSignalWriteInput {
+  candidate_key: string;
+  lifecycle_stage: 'candidate' | 'draft';
+  deterministic_seed_version: string;
+  primary_category: CategoryKey;
+  categories: CategoryKey[];
+  headline_en: string;
+  headline_zh: string | null;
+  summary_en: string;
+  summary_zh: string | null;
+  why_it_matters_en: string[];
+  why_it_matters_zh: string[];
+  primary_source_name: string;
+  primary_source_item_id: string | null;
+  source_item_count: number;
+  published_at: string;
+  generated_at: string;
+  generation_status: SignalGenerationStatus;
+  tags: string[];
+  importance_score: number;
+  urgency_score: number;
+  confidence_score: number;
+  relevance_score: number;
+  source_reliability_score: number;
+  recency_score: number;
+  entity_importance_score: number;
+  topic_relevance_score: number;
+  source_count_score: number;
+  duplicate_confidence_score: number;
+  overall_score: number;
+}
+
+interface ExistingCandidateSignalRow {
+  id: string;
+  candidate_key: string;
+  headline_en: string;
+  headline_zh: string | null;
+  summary_en: string;
+  summary_zh: string | null;
+  why_it_matters_en: string[];
+  why_it_matters_zh: string[];
+  generation_status: SignalGenerationStatus;
+  lifecycle_stage: 'candidate' | 'draft';
+  tags: string[];
+}
+
+export interface Phase4SignalSourceItemLinkUpsert {
+  signal_id: string;
+  raw_source_item_id: string;
+  is_primary: boolean;
+}
+
+export interface Phase4SignalEntityLinkUpsert {
+  signal_id: string;
+  entity_id: string;
+  relevance_score: number;
+  mention_count: number;
+}
+
+export interface Phase4SignalTopicLinkUpsert {
+  signal_id: string;
+  topic_id: string;
+  relevance_score: number;
+}
+
 export interface Phase4ContentStore {
   assertSourceIdsExist(sourceIds: string[]): Promise<void>;
   createIngestionRun(input: Phase4ContentIngestionRunCreate): Promise<{
@@ -92,6 +159,12 @@ export interface Phase4ContentStore {
   ): Promise<Phase4RawSourceItemMatch>;
   upsertEntity(entity: Phase4ContentEntityUpsert): Promise<{ id: string }>;
   upsertRawItemEntityLink(link: Phase4RawItemEntityLinkUpsert): Promise<void>;
+  upsertCandidateSignal(
+    signal: Phase4CandidateSignalWriteInput,
+  ): Promise<{ id: string; candidate_key: string }>;
+  upsertSignalSourceItemLink(link: Phase4SignalSourceItemLinkUpsert): Promise<void>;
+  upsertSignalEntityLink(link: Phase4SignalEntityLinkUpsert): Promise<void>;
+  upsertSignalTopicLink(link: Phase4SignalTopicLinkUpsert): Promise<void>;
 }
 
 type SupabaseRuntimeClient = Pick<SupabaseClient<any, any, any>, 'from'>;
@@ -147,12 +220,50 @@ const DEDUPE_STRENGTH: Record<
   none: 0,
 };
 
+// Only suppress strong same-story duplicates here. Medium-confidence matches can
+// still represent distinct publisher observations, and we want to preserve that
+// provenance at the raw-item layer for later clustering.
 const SKIPPABLE_DUPLICATE_CONFIDENCES = new Set<
   ReturnType<typeof compareRawSourceItems>
->(['exact', 'high', 'medium']);
+>(['exact', 'high']);
 
 const RAW_ITEM_MATCH_COLUMNS =
   'id, source_id, external_id, canonical_url_hash, title_hash, content_hash, published_at';
+
+const EXISTING_SIGNAL_COLUMNS =
+  'id, candidate_key, headline_en, headline_zh, summary_en, summary_zh, why_it_matters_en, why_it_matters_zh, generation_status, lifecycle_stage, tags';
+
+const hasEnrichedSignalContent = (signal: ExistingCandidateSignalRow) =>
+  signal.summary_en.trim().length > 0 ||
+  signal.summary_zh !== null ||
+  signal.why_it_matters_en.length > 0 ||
+  signal.why_it_matters_zh.length > 0 ||
+  signal.headline_zh !== null ||
+  signal.generation_status !== 'pending' ||
+  signal.lifecycle_stage !== 'candidate' ||
+  signal.tags.length > 0;
+
+const mergeCandidateSignalWriteInput = (
+  signal: Phase4CandidateSignalWriteInput,
+  existing: ExistingCandidateSignalRow | null,
+): Phase4CandidateSignalWriteInput => {
+  if (!existing || !hasEnrichedSignalContent(existing)) {
+    return signal;
+  }
+
+  return {
+    ...signal,
+    headline_en: existing.headline_en,
+    headline_zh: existing.headline_zh,
+    summary_en: existing.summary_en,
+    summary_zh: existing.summary_zh,
+    why_it_matters_en: [...existing.why_it_matters_en],
+    why_it_matters_zh: [...existing.why_it_matters_zh],
+    generation_status: existing.generation_status,
+    lifecycle_stage: existing.lifecycle_stage,
+    tags: [...existing.tags],
+  };
+};
 
 export function createSupabaseContentStore(
   client: SupabaseRuntimeClient,
@@ -327,6 +438,63 @@ export function createSupabaseContentStore(
             onConflict: 'raw_source_item_id,entity_id',
           }),
         'upsert raw_source_item_entities',
+      );
+    },
+
+    async upsertCandidateSignal(signal) {
+      const existing = await runSupabaseQuery(
+        client
+          .from('intelligence_signals')
+          .select(EXISTING_SIGNAL_COLUMNS)
+          .eq('candidate_key', signal.candidate_key)
+          .maybeSingle(),
+        'load intelligence_signals by candidate_key',
+      );
+
+      const row = await runSupabaseQuery(
+        client
+          .from('intelligence_signals')
+          .upsert(mergeCandidateSignalWriteInput(signal, existing as ExistingCandidateSignalRow | null), {
+            onConflict: 'candidate_key',
+          })
+          .select('id, candidate_key')
+          .single(),
+        'upsert intelligence_signals',
+      );
+
+      return row as { id: string; candidate_key: string };
+    },
+
+    async upsertSignalSourceItemLink(link) {
+      await runSupabaseQuery(
+        client
+          .from('signal_source_items')
+          .upsert(link, {
+            onConflict: 'signal_id,raw_source_item_id',
+          }),
+        'upsert signal_source_items',
+      );
+    },
+
+    async upsertSignalEntityLink(link) {
+      await runSupabaseQuery(
+        client
+          .from('signal_entities')
+          .upsert(link, {
+            onConflict: 'signal_id,entity_id',
+          }),
+        'upsert signal_entities',
+      );
+    },
+
+    async upsertSignalTopicLink(link) {
+      await runSupabaseQuery(
+        client
+          .from('signal_topics')
+          .upsert(link, {
+            onConflict: 'signal_id,topic_id',
+          }),
+        'upsert signal_topics',
       );
     },
   };

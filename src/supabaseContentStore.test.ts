@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 
 import { createSupabaseContentStore } from './lib/content/supabaseContentStore';
 import type {
+  Phase4CandidateSignalWriteInput,
   Phase4ContentEntityUpsert,
   Phase4RawItemEntityLinkUpsert,
   Phase4RawSourceItemWriteInput,
+  Phase4SignalEntityLinkUpsert,
+  Phase4SignalSourceItemLinkUpsert,
+  Phase4SignalTopicLinkUpsert,
 } from './lib/content/supabaseContentStore';
 
 type ContentTableName =
@@ -13,7 +17,11 @@ type ContentTableName =
   | 'content_ingestion_runs'
   | 'raw_source_items'
   | 'content_entities'
-  | 'raw_source_item_entities';
+  | 'raw_source_item_entities'
+  | 'intelligence_signals'
+  | 'signal_source_items'
+  | 'signal_entities'
+  | 'signal_topics';
 
 class FakeContentRuntimeClient {
   tables: Record<ContentTableName, Record<string, unknown>[]> = {
@@ -22,10 +30,15 @@ class FakeContentRuntimeClient {
     raw_source_items: [],
     content_entities: [],
     raw_source_item_entities: [],
+    intelligence_signals: [],
+    signal_source_items: [],
+    signal_entities: [],
+    signal_topics: [],
   };
 
   private runCounter = 1;
   private rawCounter = 1;
+  private signalCounter = 1;
 
   from(table: ContentTableName) {
     return new FakeContentRuntimeTable(this, table);
@@ -50,6 +63,15 @@ class FakeContentRuntimeClient {
     if (table === 'raw_source_items') {
       const row = {
         id: value.id ?? `raw-db-${this.rawCounter++}`,
+        ...value,
+      };
+      this.tables[table].push(row);
+      return row;
+    }
+
+    if (table === 'intelligence_signals') {
+      const row = {
+        id: value.id ?? `signal-db-${this.signalCounter++}`,
         ...value,
       };
       this.tables[table].push(row);
@@ -87,7 +109,10 @@ class FakeContentRuntimeClient {
     }
 
     const row = {
-      ...(table === 'raw_source_item_entities' ? { id: `link-${this.tables[table].length + 1}` } : {}),
+      ...(table === 'raw_source_item_entities'
+        ? { id: `link-${this.tables[table].length + 1}` }
+        : {}),
+      ...(table === 'intelligence_signals' ? { id: `signal-db-${this.signalCounter++}` } : {}),
       ...value,
     };
     this.tables[table].push(row);
@@ -312,6 +337,24 @@ test('createSupabaseContentStore does not suppress insertion for low-confidence 
   assert.equal(existing, null);
 });
 
+test('createSupabaseContentStore preserves cross-source provenance by not suppressing medium-confidence matches', async () => {
+  const client = new FakeContentRuntimeClient();
+  const store = createSupabaseContentStore(client as never);
+
+  client.tables.raw_source_items.push({
+    id: 'raw-medium-1',
+    source_id: 'rss_other_source',
+    external_id: 'other-guid',
+    canonical_url_hash: 'other-url-hash',
+    title_hash: 'other-title-hash',
+    content_hash: RAW_ITEM_INPUT.content_hash,
+    published_at: RAW_ITEM_INPUT.published_at,
+  });
+
+  const existing = await store.findMatchingRawItem(RAW_ITEM_INPUT);
+  assert.equal(existing, null);
+});
+
 test('createSupabaseContentStore upserts entities and raw item entity links through a mocked Supabase client', async () => {
   const client = new FakeContentRuntimeClient();
   const store = createSupabaseContentStore(client as never);
@@ -343,4 +386,170 @@ test('createSupabaseContentStore upserts entities and raw item entity links thro
   assert.equal(client.tables.content_entities[0]?.id, 'entity_openai');
   assert.equal(client.tables.raw_source_item_entities.length, 1);
   assert.equal(client.tables.raw_source_item_entities[0]?.entity_id, 'entity_openai');
+});
+
+test('createSupabaseContentStore upserts deterministic candidate signals and signal links without duplicating rows', async () => {
+  const client = new FakeContentRuntimeClient();
+  const store = createSupabaseContentStore(client as never);
+
+  const signal: Phase4CandidateSignalWriteInput = {
+    candidate_key: 'candidate_fixture_ai_power',
+    lifecycle_stage: 'candidate',
+    deterministic_seed_version: 'phase4_det_v1',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'OpenAI expands power agreements for new data centers',
+    headline_zh: null,
+    summary_en: '',
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: 'SignalDesk Fixture AI Feed',
+    primary_source_item_id: 'raw-db-1',
+    source_item_count: 2,
+    published_at: '2026-05-17T01:00:00.000Z',
+    generated_at: '2026-05-17T12:00:00.000Z',
+    generation_status: 'pending',
+    tags: [],
+    importance_score: 84,
+    urgency_score: 85,
+    confidence_score: 92,
+    relevance_score: 74,
+    source_reliability_score: 88,
+    recency_score: 85,
+    entity_importance_score: 84,
+    topic_relevance_score: 74,
+    source_count_score: 65,
+    duplicate_confidence_score: 95,
+    overall_score: 81,
+  };
+
+  const first = await store.upsertCandidateSignal(signal);
+  const second = await store.upsertCandidateSignal({
+    ...signal,
+    source_item_count: 3,
+    source_count_score: 78,
+    overall_score: 83,
+  });
+
+  const sourceItemLink: Phase4SignalSourceItemLinkUpsert = {
+    signal_id: first.id,
+    raw_source_item_id: 'raw-db-1',
+    is_primary: true,
+  };
+  const entityLink: Phase4SignalEntityLinkUpsert = {
+    signal_id: first.id,
+    entity_id: 'entity_openai',
+    relevance_score: 92,
+    mention_count: 2,
+  };
+  const topicLink: Phase4SignalTopicLinkUpsert = {
+    signal_id: first.id,
+    topic_id: 'topic_ai_data_center_power',
+    relevance_score: 90,
+  };
+
+  await store.upsertSignalSourceItemLink(sourceItemLink);
+  await store.upsertSignalSourceItemLink(sourceItemLink);
+  await store.upsertSignalEntityLink(entityLink);
+  await store.upsertSignalEntityLink(entityLink);
+  await store.upsertSignalTopicLink(topicLink);
+  await store.upsertSignalTopicLink(topicLink);
+
+  assert.equal(first.id, second.id);
+  assert.equal(client.tables.intelligence_signals.length, 1);
+  assert.equal(client.tables.intelligence_signals[0]?.candidate_key, signal.candidate_key);
+  assert.equal(client.tables.intelligence_signals[0]?.source_item_count, 3);
+  assert.equal(client.tables.intelligence_signals[0]?.source_count_score, 78);
+  assert.equal(client.tables.signal_source_items.length, 1);
+  assert.equal(client.tables.signal_source_items[0]?.is_primary, true);
+  assert.equal(client.tables.signal_entities.length, 1);
+  assert.equal(client.tables.signal_entities[0]?.mention_count, 2);
+  assert.equal(client.tables.signal_topics.length, 1);
+  assert.equal(client.tables.signal_topics[0]?.topic_id, 'topic_ai_data_center_power');
+});
+
+test('createSupabaseContentStore preserves richer signal fields on rerun instead of clobbering future enrichment', async () => {
+  const client = new FakeContentRuntimeClient();
+  const store = createSupabaseContentStore(client as never);
+
+  client.tables.intelligence_signals.push({
+    id: 'signal-db-existing',
+    candidate_key: 'candidate_fixture_ai_power',
+    lifecycle_stage: 'draft',
+    deterministic_seed_version: 'phase4_det_v1',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'Refined OpenAI power expansion headline',
+    headline_zh: 'OpenAI 扩张电力布局',
+    summary_en: 'Existing enriched summary',
+    summary_zh: '已有中文摘要',
+    why_it_matters_en: ['Existing why it matters'],
+    why_it_matters_zh: ['已有中文要点'],
+    primary_source_name: 'SignalDesk Fixture AI Feed',
+    primary_source_item_id: 'raw-db-1',
+    source_item_count: 2,
+    published_at: '2026-05-17T01:00:00.000Z',
+    generated_at: '2026-05-17T12:00:00.000Z',
+    generation_status: 'generated',
+    tags: ['existing-tag'],
+    importance_score: 84,
+    urgency_score: 85,
+    confidence_score: 92,
+    relevance_score: 74,
+    source_reliability_score: 88,
+    recency_score: 85,
+    entity_importance_score: 84,
+    topic_relevance_score: 74,
+    source_count_score: 65,
+    duplicate_confidence_score: 95,
+    overall_score: 81,
+  });
+
+  const updated = await store.upsertCandidateSignal({
+    candidate_key: 'candidate_fixture_ai_power',
+    lifecycle_stage: 'candidate',
+    deterministic_seed_version: 'phase4_det_v1',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'OpenAI expands power agreements for new data centers',
+    headline_zh: null,
+    summary_en: '',
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: 'SignalDesk Fixture AI Feed',
+    primary_source_item_id: 'raw-db-1',
+    source_item_count: 3,
+    published_at: '2026-05-17T01:00:00.000Z',
+    generated_at: '2026-05-17T13:00:00.000Z',
+    generation_status: 'pending',
+    tags: [],
+    importance_score: 86,
+    urgency_score: 87,
+    confidence_score: 93,
+    relevance_score: 75,
+    source_reliability_score: 88,
+    recency_score: 87,
+    entity_importance_score: 86,
+    topic_relevance_score: 75,
+    source_count_score: 78,
+    duplicate_confidence_score: 95,
+    overall_score: 84,
+  });
+
+  assert.equal(updated.id, 'signal-db-existing');
+  assert.equal(client.tables.intelligence_signals.length, 1);
+  assert.equal(
+    client.tables.intelligence_signals[0]?.headline_en,
+    'Refined OpenAI power expansion headline',
+  );
+  assert.equal(client.tables.intelligence_signals[0]?.headline_zh, 'OpenAI 扩张电力布局');
+  assert.equal(client.tables.intelligence_signals[0]?.summary_en, 'Existing enriched summary');
+  assert.equal(client.tables.intelligence_signals[0]?.summary_zh, '已有中文摘要');
+  assert.equal(client.tables.intelligence_signals[0]?.generation_status, 'generated');
+  assert.equal(client.tables.intelligence_signals[0]?.lifecycle_stage, 'draft');
+  assert.deepEqual(client.tables.intelligence_signals[0]?.tags, ['existing-tag']);
+  assert.equal(client.tables.intelligence_signals[0]?.source_item_count, 3);
+  assert.equal(client.tables.intelligence_signals[0]?.overall_score, 84);
 });
