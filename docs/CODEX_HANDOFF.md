@@ -58,16 +58,16 @@ Phase 4 foundation:
 
 ## Current Next Recommended Task
 
-Phase 4 Task 9:
-- keep the pipeline server-side only
-- keep Today on mock content until the persisted signal layer is stable enough for controlled integration
-- use the Task 7/8 manual readiness assets before any non-production write smoke test:
+Phase 4 Task 10:
+- keep the pipeline server-side only for writes and enrichment
+- keep Today on mock content by default, even though a read-only preview path now exists behind `VITE_USE_REAL_CONTENT_FEED=true`
+- use the Task 7/8/9 manual readiness assets before any non-production read-preview or write smoke test:
   - `docs/PHASE_4_MANUAL_QA.md`
   - `supabase/manual/phase4_content_sources_smoke_seed.sql`
   - `supabase/manual/phase4_content_readiness_checks.sql`
 - next likely work branches:
-  - controlled multi-source smoke-test follow-through and stronger write observability
-  - or the first summary / translation persistence step, still without frontend Today integration until the signal layer is stable
+  - preview hardening around real-content read observability, anon-read policy expectations, and richer provenance/detail rendering
+  - or the first AI-generated summary / translation persistence step, still without changing the default Today feed
 
 ## Phase 4 Task 5 Status
 
@@ -141,6 +141,38 @@ Phase 4 Task 9:
   - write translation blocks
   - write AI summaries
   - switch the Today feed away from mock content
+
+## Phase 4 Task 9 Status
+
+- the frontend now has a read-only real-content preview adapter in:
+  - `src/lib/content/realContentFeed.ts`
+- the adapter reads persisted candidate-signal data from:
+  - `intelligence_signals`
+  - `signal_source_items`
+  - `raw_source_items`
+  - `signal_entities`
+  - `signal_topics`
+  - `canonical_topics` when topic names are available
+- the adapter maps those rows into the existing `Signal` shape with deterministic fallbacks for:
+  - titles
+  - summaries
+  - source labels
+  - timestamps
+  - why-it-matters bullets
+  - categories / topics / entities / tags
+- Today now supports a feature-flagged preview path:
+  - `VITE_USE_REAL_CONTENT_FEED=true`
+- default behavior is still the mock feed
+- if the preview read fails or Supabase read access is unavailable, Today falls back to the mock feed and shows a non-breaking prototype toast
+- this preview path is read-only:
+  - it does not write Phase 4 content rows
+  - it does not change Phase 3 user-state sync behavior
+- detail navigation remains safe for preview signals even when full article blocks are unavailable
+- this still does not:
+  - call AI
+  - use translations
+  - use AI-generated summaries
+  - switch the default Today experience away from mock content
 
 ## Manual QA Prerequisites For Non-Production Write Testing
 

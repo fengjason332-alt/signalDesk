@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Header } from '../components/Header';
 import { SignalCard } from '../components/SignalCard';
 import { MOCK_SIGNALS } from '../mockData';
@@ -7,6 +7,13 @@ import { useApp } from '../AppContext';
 import { Plus } from 'lucide-react';
 import { AddTopicModal } from '../components/AddTopicModal';
 import { getTodayFilterOptions, getVisibleTodaySignals } from '../topicPreferences';
+import {
+  isRealContentFeedEnabled,
+  type RealContentFeedLoaderClient,
+  loadTodaySignals,
+  REAL_CONTENT_FEED_FALLBACK_MESSAGE,
+} from '../lib/content/realContentFeed';
+import { supabase } from '../lib/supabase/client';
 
 interface TodayViewProps {
   onSignalClick: (signal: Signal) => void;
@@ -14,18 +21,83 @@ interface TodayViewProps {
 }
 
 export default function TodayView({ onSignalClick, onResultSelect }: TodayViewProps) {
-  const { settings } = useApp();
+  const { settings, showPrototypeToast } = useApp();
   const [activeFilter, setActiveFilter] = useState<Category | 'All'>('All');
   const [isAddTopicModalOpen, setIsAddTopicModalOpen] = useState(false);
+  const prototypeToastRef = useRef(showPrototypeToast);
+  const [feedSignals, setFeedSignals] = useState<Signal[]>(
+    isRealContentFeedEnabled ? [] : MOCK_SIGNALS,
+  );
+  const [isLoadingRealFeed, setIsLoadingRealFeed] = useState(isRealContentFeedEnabled);
+  const [feedSource, setFeedSource] = useState<'mock' | 'real'>(
+    isRealContentFeedEnabled ? 'real' : 'mock',
+  );
+  const realContentClient = supabase as unknown as RealContentFeedLoaderClient | null;
   
   const filters = getTodayFilterOptions(settings.preferredTopics);
-  const filteredSignals = getVisibleTodaySignals(MOCK_SIGNALS, settings, activeFilter);
+  const filteredSignals = getVisibleTodaySignals(feedSignals, settings, activeFilter);
 
   useEffect(() => {
     if (activeFilter !== 'All' && !settings.preferredTopics.includes(activeFilter)) {
       setActiveFilter('All');
     }
   }, [activeFilter, settings.preferredTopics]);
+
+  useEffect(() => {
+    prototypeToastRef.current = showPrototypeToast;
+  }, [showPrototypeToast]);
+
+  useEffect(() => {
+    if (!isRealContentFeedEnabled) {
+      setFeedSignals(MOCK_SIGNALS);
+      setIsLoadingRealFeed(false);
+      setFeedSource('mock');
+      return;
+    }
+
+    let isCancelled = false;
+    setIsLoadingRealFeed(true);
+
+    void loadTodaySignals({
+      enableRealContentFeed: true,
+      client: realContentClient,
+      mockSignals: MOCK_SIGNALS,
+    })
+      .then(result => {
+        if (isCancelled) {
+          return;
+        }
+
+        setFeedSignals(result.signals);
+        setIsLoadingRealFeed(false);
+        setFeedSource(result.source);
+
+        if (result.usedFallback) {
+          console.warn(
+            result.errorMessage ?? '[Phase 4 real content preview] Falling back to mock feed.',
+          );
+          prototypeToastRef.current(REAL_CONTENT_FEED_FALLBACK_MESSAGE);
+        }
+      })
+      .catch(error => {
+        if (isCancelled) {
+          return;
+        }
+
+        console.warn(
+          '[Phase 4 real content preview] Unexpected TodayView load failure, showing mock feed.',
+          error,
+        );
+        setFeedSignals(MOCK_SIGNALS);
+        setFeedSource('mock');
+        setIsLoadingRealFeed(false);
+        prototypeToastRef.current(REAL_CONTENT_FEED_FALLBACK_MESSAGE);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [realContentClient]);
 
   return (
     <div className="flex flex-col min-h-full">
@@ -61,13 +133,21 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
         </div>
 
         <div className="space-y-4 pb-20">
-          {filteredSignals.length > 0 ? (
+          {isLoadingRealFeed ? (
+            <div className="py-20 text-center text-on-surface-variant/40 italic flex flex-col items-center justify-center">
+              <p>Loading real-content preview...</p>
+            </div>
+          ) : filteredSignals.length > 0 ? (
             filteredSignals.map(signal => (
               <SignalCard key={signal.id} signal={signal} onClick={onSignalClick} />
             ))
           ) : (
             <div className="py-20 text-center text-on-surface-variant/40 italic flex flex-col items-center justify-center">
-              <p>No signals found matching your current filters.</p>
+              <p>
+                {feedSource === 'real'
+                  ? 'No real-content signals found matching your current filters yet.'
+                  : 'No signals found matching your current filters.'}
+              </p>
             </div>
           )}
         </div>

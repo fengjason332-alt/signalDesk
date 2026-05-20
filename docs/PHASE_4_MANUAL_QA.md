@@ -29,6 +29,14 @@ After the Task 8 deterministic topic-mapping improvements:
 - `signal_topics` should now become greater than `0` for clearly mappable AI / crypto / policy items
 - multi-source runs should now report `partial_success` instead of hiding all successful sources behind one batch-wide failure
 
+After Task 9 preview-read integration:
+
+- the frontend can now read persisted Phase 4 content rows into the existing Today card shape
+- this path is preview-only and read-only
+- the default Today experience is still mock content
+- preview mode must be enabled locally with:
+  - `VITE_USE_REAL_CONTENT_FEED=true`
+
 ## Manual Migration Rollout
 
 Use a non-production Supabase project only.
@@ -225,4 +233,36 @@ Do not expect:
 - `signal_translation_blocks` writes
 - AI summaries
 - AI translations
-- Today feed integration
+- the default Today feed to switch away from mock content on its own
+
+## Frontend Preview Verification
+
+Task 9 does not switch the app by default. To preview real content locally:
+
+1. Ensure the app already has working client-side Supabase env:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY`
+2. Confirm real content rows exist in Supabase:
+   - `intelligence_signals`
+   - `signal_source_items`
+   - `raw_source_items`
+   - `signal_entities`
+   - `signal_topics`
+3. Enable preview mode locally:
+   - `VITE_USE_REAL_CONTENT_FEED=true`
+4. Start the app normally.
+5. Open Today and verify:
+   - the existing visual style is unchanged
+   - cards render safely even without AI summaries or translation blocks
+   - clicking a preview card opens a safe detail view with available source/date/summary/provenance fields
+
+If the preview read fails:
+
+- Today should fall back to the mock feed
+- a non-breaking prototype toast should appear
+- the app should not crash
+- the most likely operational cause is missing anon/client read access across the Phase 4 content tables or joined lookup tables
+
+Known limitation:
+
+- there is still no AI-generated summary or translation in this preview path, so fallback text may appear when persisted rows are sparse

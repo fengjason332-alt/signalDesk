@@ -227,9 +227,10 @@ Server-only future env:
 7. Task 6: deterministic candidate signal persistence into `intelligence_signals`, `signal_source_items`, `signal_entities`, and `signal_topics`
 8. Task 7: controlled Supabase smoke-test readiness and manual rollout assets
 9. Task 8: multi-source ingestion hardening, topic mapping improvement, and operational observability
-10. Task 9: summary and translation generation
-11. Task 10: Today feed integration with mock fallback
-12. Task 11: reliability hardening, retries, and ops cleanup
+10. Task 9: read-only real-content adapter plus feature-flagged Today preview with mock fallback
+11. Task 10: preview hardening, provenance/detail improvements, and safer read rollout validation
+12. Task 11: summary and translation generation
+13. Task 12: broader frontend rollout, retries, and ops cleanup
 
 ## Current Repo Status
 
@@ -248,16 +249,39 @@ Server-only future env:
 - deterministic topic mapping now covers broader obvious AI / crypto / policy patterns so `signal_topics` can populate for more real RSS items
 - persisted candidate signals are intentionally lifecycle-limited to `candidate` / `draft` style rows, with deterministic seed fields stored for scoring reproducibility
 - dry-run remains the default behavior
+- the frontend now has a read-only Phase 4 preview adapter that can map persisted content rows into the existing `Signal` card/detail shape
+- the real-content preview path is behind `VITE_USE_REAL_CONTENT_FEED=true`
+- default Today behavior remains the mock feed, and preview read failures fall back to the mock feed without breaking the UI
 - this repo state still does not write:
   - `signal_translation_blocks`
   - AI-generated summaries
   - AI-generated translations
-- this repo state still does not wire Today or any UI surface to real persisted content
+- this repo state still does not switch Today or any UI surface to real persisted content by default
 - Task 7 readiness assets now live in:
   - `docs/PHASE_4_MANUAL_QA.md`
   - `supabase/manual/phase4_content_sources_smoke_seed.sql`
   - `supabase/manual/phase4_content_readiness_checks.sql`
   - `src/lib/content/phase4SmokeTestRequest.ts`
+
+## Task 9 Notes
+
+- Task 9 adds read capability only
+- the frontend reads from existing Phase 4 content tables but does not write them
+- the preview adapter is deterministic and intentionally not the final AI-enriched signal presentation layer
+- the preview path tolerates missing:
+  - bilingual summaries
+  - translation blocks
+  - richer article body content
+- local verification should first confirm that:
+  - `intelligence_signals` has rows
+  - `signal_source_items` has rows
+  - `signal_topics` and `signal_entities` contain expected links for at least one signal
+- local preview enablement:
+  - set `VITE_USE_REAL_CONTENT_FEED=true`
+  - keep the existing Supabase client env configured
+- preview success still depends on anon/client read access for the Phase 4 content tables and any joined lookup tables; if that read contract is unavailable, the frontend falls back to the mock feed
+- known limitation:
+  - there are still no AI-generated summaries or translations in the preview path
 
 ## Manual QA Prerequisites For Write Mode
 

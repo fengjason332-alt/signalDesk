@@ -12,6 +12,7 @@ test('env example includes the required Supabase client variables', () => {
 
   assert.match(envExample, /VITE_SUPABASE_URL=/);
   assert.match(envExample, /VITE_SUPABASE_ANON_KEY=/);
+  assert.match(envExample, /VITE_USE_REAL_CONTENT_FEED=false/);
 });
 
 test('normalizeSupabaseEnvValue trims configured values and drops blanks', () => {

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { MOCK_LIBRARY, MOCK_SIGNALS, MOCK_TOPICS, MOCK_WATCHLIST } from './mockData';
+import { mapRealContentSignalRowToSignal } from './lib/content/realContentFeed';
 import {
   isSignalRelatedToTopic,
   isSignalRelatedToWatchlistItem,
@@ -51,6 +52,71 @@ test('maps a signal to a complete detail payload', () => {
   assert.deepEqual(payload.topics, MOCK_SIGNALS[0].topics);
   assert.deepEqual(payload.entities, MOCK_SIGNALS[0].entities);
   assert.ok(Array.isArray(payload.whyItMatters));
+});
+
+test('maps sparse real-content signals to a safe detail payload', () => {
+  const payload = toDetailPayloadFromSignal({
+    id: 'signal-real-sparse',
+    categories: [],
+    topics: [],
+    entities: [],
+    titleZh: '',
+    titleEn: '',
+    summaryZh: '',
+    whyItMatters: [],
+    importance: Number.NaN,
+    source: '',
+    timestamp: '',
+    tags: [],
+  });
+
+  assert.equal(payload.titleZh, 'Untitled signal');
+  assert.equal(payload.summaryZh, 'Summary unavailable.');
+  assert.deepEqual(payload.whyItMatters, []);
+  assert.equal(payload.importance, 0);
+  assert.equal(payload.source, 'Unknown source');
+  assert.equal(payload.timestamp, 'Unknown publish time');
+});
+
+test('maps a real-content preview signal into a safe detail payload without full article blocks', () => {
+  const payload = toDetailPayloadFromSignal(
+    mapRealContentSignalRowToSignal({
+      id: 'signal-real-preview',
+      primary_category: 'ai',
+      categories: ['ai'],
+      headline_en: 'OpenAI expands reasoning access in education',
+      headline_zh: null,
+      summary_en: '',
+      summary_zh: null,
+      why_it_matters_en: [],
+      why_it_matters_zh: [],
+      primary_source_name: 'OpenAI',
+      published_at: '2026-05-20T08:00:00.000Z',
+      source_item_count: 1,
+      overall_score: 84,
+      signal_topics: [],
+      signal_entities: [],
+      signal_source_items: [
+        {
+          is_primary: true,
+          raw_source_item: {
+            title: 'OpenAI expands reasoning access in education',
+            dek: 'Students and teachers get access to improved reasoning tools.',
+            canonical_url: 'https://openai.com/news/example',
+            published_at: '2026-05-20T08:00:00.000Z',
+            metadata: null,
+          },
+        },
+      ],
+    }),
+  );
+
+  assert.equal(payload.kind, 'signal');
+  assert.equal(payload.titleZh, 'OpenAI expands reasoning access in education');
+  assert.equal(payload.summaryZh, 'Students and teachers get access to improved reasoning tools.');
+  assert.equal(payload.source, 'OpenAI');
+  assert.equal(payload.timestamp, '2026-05-20');
+  assert.equal(payload.content, undefined);
 });
 
 test('maps a library item to a safe detail payload with complete arrays', () => {

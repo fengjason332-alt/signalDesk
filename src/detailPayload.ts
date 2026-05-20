@@ -28,6 +28,7 @@ export interface DetailPayload {
 }
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
+const safeText = (value: string | undefined, fallback: string) => value?.trim() || fallback;
 
 const uniqueStrings = (values: string[]) => {
   const seen = new Set<string>();
@@ -78,17 +79,17 @@ export function toDetailPayloadFromSignal(signal: Signal): DetailPayload {
   return {
     id: signal.id,
     kind: 'signal',
-    titleZh: signal.titleZh,
-    titleEn: signal.titleEn,
-    summaryZh: signal.summaryZh,
+    titleZh: safeText(signal.titleZh, 'Untitled signal'),
+    titleEn: signal.titleEn?.trim() || undefined,
+    summaryZh: safeText(signal.summaryZh, 'Summary unavailable.'),
     categories: normalizeSignalCategories(signal),
     topics: normalizeSignalTopics(signal),
     entities: normalizeSignalEntities(signal),
     tags: normalizeSignalTags(signal),
     whyItMatters: Array.isArray(signal.whyItMatters) ? signal.whyItMatters : [],
-    importance: signal.importance,
-    source: signal.source,
-    timestamp: signal.timestamp,
+    importance: Number.isFinite(signal.importance) ? signal.importance : 0,
+    source: safeText(signal.source, 'Unknown source'),
+    timestamp: safeText(signal.timestamp, 'Unknown publish time'),
     content: signal.content,
     glossary: signal.glossary,
   };
