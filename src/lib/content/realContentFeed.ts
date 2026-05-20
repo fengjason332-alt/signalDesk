@@ -115,6 +115,8 @@ interface PreviewReadDiagnostics {
   rowsFetched: number;
   mappedCards: number;
   filteredCount: number;
+  skippedRows: number;
+  fallbackReason: string | null;
 }
 
 const CATEGORY_KEY_SET = new Set<CategoryKey>(CATEGORY_KEYS);
@@ -142,6 +144,9 @@ const uniqueStrings = (values: Array<string | null | undefined>) => {
 const isCategoryKey = (value: string): value is CategoryKey =>
   CATEGORY_KEY_SET.has(value as CategoryKey);
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
 const sortByRelevanceDescending = <T extends { relevance_score?: number | null }>(
   values: T[] | null | undefined,
 ) =>
@@ -159,6 +164,18 @@ const coerceCategoryKeys = (
   ]);
 
   return normalizedCategories.filter(isCategoryKey);
+};
+
+const resolvePrimaryCategory = (row: RealContentSignalRow): CategoryKey | null => {
+  if (isCategoryKey(normalizeText(row.primary_category))) {
+    return normalizeText(row.primary_category) as CategoryKey;
+  }
+
+  const fallbackCategory = uniqueStrings(Array.isArray(row.categories) ? row.categories : [])
+    .map(category => normalizeText(category))
+    .find(isCategoryKey);
+
+  return fallbackCategory ?? null;
 };
 
 const clampImportance = (overallScore: number | null | undefined) => {
@@ -184,6 +201,58 @@ const getPrimarySourceItem = (row: RealContentSignalRow) => {
     (row.signal_source_items ?? [])[0] ??
     null
   );
+};
+
+const getSortTimestamp = (value: string | null | undefined) => {
+  const normalizedValue = normalizeText(value);
+  if (!normalizedValue) {
+    return Number.NEGATIVE_INFINITY;
+  }
+
+  const parsedTime = new Date(normalizedValue).getTime();
+  return Number.isNaN(parsedTime) ? Number.NEGATIVE_INFINITY : parsedTime;
+};
+
+const getSortScore = (value: number | null | undefined) =>
+  Number.isFinite(value) ? Number(value) : Number.NEGATIVE_INFINITY;
+
+const compareNumberDescending = (left: number, right: number) => {
+  if (left === right) {
+    return 0;
+  }
+
+  return left > right ? -1 : 1;
+};
+
+const compareRealContentRows = (
+  left: RealContentSignalRow,
+  right: RealContentSignalRow,
+) => {
+  const scoreDelta = compareNumberDescending(
+    getSortScore(left.overall_score),
+    getSortScore(right.overall_score),
+  );
+  if (scoreDelta !== 0) {
+    return scoreDelta;
+  }
+
+  const publishedAtDelta = compareNumberDescending(
+    getSortTimestamp(left.published_at),
+    getSortTimestamp(right.published_at),
+  );
+  if (publishedAtDelta !== 0) {
+    return publishedAtDelta;
+  }
+
+  const createdAtDelta = compareNumberDescending(
+    getSortTimestamp(left.created_at),
+    getSortTimestamp(right.created_at),
+  );
+  if (createdAtDelta !== 0) {
+    return createdAtDelta;
+  }
+
+  return normalizeText(left.id).localeCompare(normalizeText(right.id));
 };
 
 const isPrimarySourceItem = (
@@ -375,7 +444,38 @@ const buildPreviewProvenanceSources = (row: RealContentSignalRow) => {
     }
   }
 
-  return provenanceSources;
+  return provenanceSources.sort((left, right) => {
+    if (Boolean(left.isPrimary) !== Boolean(right.isPrimary)) {
+      return left.isPrimary ? -1 : 1;
+    }
+
+    const publishedAtDelta = compareNumberDescending(
+      getSortTimestamp(left.publishedAt),
+      getSortTimestamp(right.publishedAt),
+    );
+    if (publishedAtDelta !== 0) {
+      return publishedAtDelta;
+    }
+
+    const leftStableKey = [
+      left.sourceName,
+      left.sourceId,
+      left.rawSourceItemId,
+      left.sourceUrl,
+    ]
+      .filter(Boolean)
+      .join('::');
+    const rightStableKey = [
+      right.sourceName,
+      right.sourceId,
+      right.rawSourceItemId,
+      right.sourceUrl,
+    ]
+      .filter(Boolean)
+      .join('::');
+
+    return leftStableKey.localeCompare(rightStableKey);
+  });
 };
 
 const isPreviewEligibleRow = (row: RealContentSignalRow) => {
@@ -531,8 +631,20 @@ const logPreviewDiagnostics = (
   diagnostics: PreviewReadDiagnostics & { fallbackOccurred: boolean },
 ) => {
   console.info(
-    `[Phase 4 real content preview] rowsFetched=${diagnostics.rowsFetched} mappedCards=${diagnostics.mappedCards} filteredCount=${diagnostics.filteredCount} fallbackOccurred=${diagnostics.fallbackOccurred}`,
+    `[Phase 4 real content preview] rowsFetched=${diagnostics.rowsFetched} mappedCards=${diagnostics.mappedCards} filteredCount=${diagnostics.filteredCount} skippedRows=${diagnostics.skippedRows} fallbackOccurred=${diagnostics.fallbackOccurred} fallbackReason=${diagnostics.fallbackReason ?? 'none'}`,
   );
+};
+
+const parseRealContentSignalRow = (row: unknown): RealContentSignalRow => {
+  if (!isRecord(row)) {
+    throw new Error('row is not an object');
+  }
+
+  if (!normalizeText(typeof row.id === 'string' ? row.id : '')) {
+    throw new Error('row.id is required');
+  }
+
+  return row as unknown as RealContentSignalRow;
 };
 
 export function resolveRealContentFeedEnabled(value: string | undefined) {
@@ -547,6 +659,11 @@ export const isRealContentFeedEnabled = resolveRealContentFeedEnabled(
 // read-only. It maps persisted candidate signals into the current frontend
 // card/detail shape before any later AI summary/translation enrichment exists.
 export function mapRealContentSignalRowToSignal(row: RealContentSignalRow): Signal {
+  const primaryCategory = resolvePrimaryCategory(row);
+  if (!primaryCategory) {
+    throw new Error('row must include at least one supported category');
+  }
+
   const primarySourceItem = getPrimarySourceItem(row);
   const topics = coerceTopics(row);
   const entities = coerceEntities(row);
@@ -554,8 +671,8 @@ export function mapRealContentSignalRowToSignal(row: RealContentSignalRow): Sign
 
   return {
     id: row.id,
-    category: row.primary_category,
-    categories: coerceCategoryKeys(row.primary_category, row.categories),
+    category: primaryCategory,
+    categories: coerceCategoryKeys(primaryCategory, row.categories),
     topics,
     entities,
     titleZh: coerceTitle(
@@ -663,8 +780,27 @@ async function fetchRealContentFeedPreview(
   }
 
   const rows = (data ?? []) as RealContentSignalRow[];
-  const eligibleRows = rows.filter(isPreviewEligibleRow);
-  const signals = eligibleRows.map(mapRealContentSignalRowToSignal);
+  const eligibleRows = rows.filter(isPreviewEligibleRow).sort(compareRealContentRows);
+  const signals: Signal[] = [];
+  let skippedRows = 0;
+
+  for (const row of eligibleRows) {
+    try {
+      signals.push(mapRealContentSignalRowToSignal(parseRealContentSignalRow(row)));
+    } catch (error) {
+      skippedRows += 1;
+      console.warn(
+        `[Phase 4 real content preview] Skipping malformed preview row id=${isRecord(row) && typeof row.id === 'string' ? row.id : 'unknown'} reason=${
+          error instanceof Error ? error.message : 'unknown mapping error'
+        }`,
+      );
+    }
+  }
+
+  const fallbackReason =
+    eligibleRows.length > 0 && signals.length === 0 && skippedRows > 0
+      ? 'all_eligible_rows_failed_mapping'
+      : null;
 
   return {
     signals,
@@ -672,6 +808,8 @@ async function fetchRealContentFeedPreview(
       rowsFetched: rows.length,
       mappedCards: signals.length,
       filteredCount: rows.length - eligibleRows.length,
+      skippedRows,
+      fallbackReason,
     },
   };
 }
@@ -714,11 +852,23 @@ export async function loadTodaySignals({
 
   try {
     const { signals, diagnostics } = await fetchRealContentFeedPreview(client);
+    if (diagnostics.fallbackReason) {
+      logPreviewDiagnostics({ ...diagnostics, fallbackOccurred: true });
+      return {
+        signals: [...mockSignals],
+        source: 'mock',
+        usedFallback: true,
+        errorMessage:
+          `[Phase 4 real content preview] All eligible preview rows failed mapping. rowsFetched=${diagnostics.rowsFetched} skippedRows=${diagnostics.skippedRows}.`,
+        isEmpty: false,
+      };
+    }
+
     logPreviewDiagnostics({ ...diagnostics, fallbackOccurred: false });
 
     const emptyDebugMessage =
       signals.length === 0
-        ? `[Phase 4 real content preview] Read succeeded but returned 0 eligible preview rows. rowsFetched=${diagnostics.rowsFetched} filteredCount=${diagnostics.filteredCount}.`
+        ? `[Phase 4 real content preview] Read succeeded but returned 0 eligible preview rows. rowsFetched=${diagnostics.rowsFetched} filteredCount=${diagnostics.filteredCount} skippedRows=${diagnostics.skippedRows}.`
         : null;
 
     return {
@@ -730,7 +880,7 @@ export async function loadTodaySignals({
     };
   } catch (error) {
     console.info(
-      '[Phase 4 real content preview] rowsFetched=0 mappedCards=0 filteredCount=0 fallbackOccurred=true',
+      '[Phase 4 real content preview] rowsFetched=0 mappedCards=0 filteredCount=0 skippedRows=0 fallbackOccurred=true fallbackReason=read_failed',
     );
     return {
       signals: [...mockSignals],

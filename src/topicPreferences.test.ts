@@ -80,3 +80,61 @@ test('custom muted topics use conservative fallback matching', () => {
   assert.equal(matchesMutedTopics(MOCK_SIGNALS[0], ['AI']), false);
   assert.equal(matchesMutedTopics(MOCK_SIGNALS[4], ['TradeWar']), true);
 });
+
+test('AI filter matches OpenAI real-content categories and canonical topics', () => {
+  const settings = buildSettings({
+    preferredTopics: ['ai'] as any,
+  });
+
+  const visibleSignals = getVisibleTodaySignals(
+    [
+      {
+        id: 'real-openai-signal',
+        categories: ['ai'],
+        topics: ['OpenAI Reasoning Models'],
+        entities: ['OpenAI'],
+        titleZh: 'OpenAI 推理模型更新',
+        titleEn: 'OpenAI reasoning model update',
+        summaryZh: 'OpenAI 发布新的推理模型能力。',
+        whyItMatters: ['This is relevant to AI users.'],
+        importance: 9,
+        source: 'OpenAI',
+        timestamp: '2026-05-20',
+        tags: ['OpenAI', 'OpenAI Reasoning Models'],
+      },
+    ],
+    settings,
+    'ai',
+  ).map(signal => signal.id);
+
+  assert.deepEqual(visibleSignals, ['real-openai-signal']);
+});
+
+test('nonmatching filters produce a normal empty state for real-content signals', () => {
+  const settings = buildSettings({
+    preferredTopics: ['energy'] as any,
+  });
+
+  const visibleSignals = getVisibleTodaySignals(
+    [
+      {
+        id: 'real-openai-signal',
+        categories: ['ai'],
+        topics: ['OpenAI Reasoning Models'],
+        entities: ['OpenAI'],
+        titleZh: 'OpenAI 推理模型更新',
+        titleEn: 'OpenAI reasoning model update',
+        summaryZh: 'OpenAI 发布新的推理模型能力。',
+        whyItMatters: ['This is relevant to AI users.'],
+        importance: 9,
+        source: 'OpenAI',
+        timestamp: '2026-05-20',
+        tags: ['OpenAI', 'OpenAI Reasoning Models'],
+      },
+    ],
+    settings,
+    'energy',
+  );
+
+  assert.deepEqual(visibleSignals, []);
+});

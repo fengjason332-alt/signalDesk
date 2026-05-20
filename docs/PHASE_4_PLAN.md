@@ -229,8 +229,9 @@ Server-only future env:
 9. Task 8: multi-source ingestion hardening, topic mapping improvement, and operational observability
 10. Task 9: read-only real-content adapter plus feature-flagged Today preview with mock fallback
 11. Task 10: preview hardening, provenance/detail improvements, and safer read rollout validation
-12. Task 11: summary and translation generation
-13. Task 12: broader frontend rollout, retries, and ops cleanup
+12. Task 11: preview quality hardening for deterministic ranking, multi-source provenance display readiness, safe row skipping, and filter parity
+13. Task 12: summary and translation generation
+14. Task 13: broader frontend rollout, retries, and ops cleanup
 
 ## Current Repo Status
 
@@ -252,6 +253,11 @@ Server-only future env:
 - the frontend now has a read-only Phase 4 preview adapter that can map persisted content rows into the existing `Signal` card/detail shape
 - the real-content preview path is behind `VITE_USE_REAL_CONTENT_FEED=true`
 - default Today behavior remains the mock feed, and preview read failures fall back to the mock feed without breaking the UI
+- preview quality hardening now also ensures:
+  - deterministic client-side ranking for preview rows
+  - primary-first multi-source provenance ordering
+  - per-row malformed preview skips with safe mock fallback only when all eligible rows fail mapping
+  - preview-only diagnostics that include fetched, mapped, skipped, and fallback-reason counts without logging raw article text
 - this repo state still does not write:
   - `signal_translation_blocks`
   - AI-generated summaries

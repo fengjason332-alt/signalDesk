@@ -38,7 +38,7 @@ Before changing code, read:
 - Preserve local-first user-state behavior
 - Preserve working Supabase user-state sync
 - Do not move mock content into Supabase unless the current phase explicitly requires it
-- Do not wire TodayView to real Supabase content until a later Phase 4 task explicitly does that
+- Do not switch Today to real content by default; the current real-content path is preview-only behind `VITE_USE_REAL_CONTENT_FEED=true`
 - Do not expose ingestion or AI secrets in client code
 
 ## Current Content/State Split
@@ -58,17 +58,18 @@ Phase 4 foundation:
 
 ## Current Next Recommended Task
 
-Phase 4 Task 10:
+Phase 4 Task 12:
 - keep the pipeline server-side only for writes and enrichment
 - keep Today on mock content by default, even though a read-only preview path now exists behind `VITE_USE_REAL_CONTENT_FEED=true`
-- keep Radar on mock/demo content
-- use the Task 7/8/9 manual readiness assets before any non-production read-preview or write smoke test:
+- keep Radar, Watchlist, and Library on mock/demo content
+- use the Task 7-11 manual readiness assets before any non-production read-preview or write smoke test:
   - `docs/PHASE_4_MANUAL_QA.md`
   - `supabase/manual/phase4_content_sources_smoke_seed.sql`
   - `supabase/manual/phase4_content_readiness_checks.sql`
+  - `supabase/manual/phase4_preview_read_policies.sql`
 - next likely work branches:
-  - preview hardening around real-content read observability, anon-read policy expectations, and richer provenance/detail rendering
-  - or the first AI-generated summary / translation persistence step, still without changing the default Today feed
+  - the first AI-generated summary / translation persistence step, still without changing the default Today feed
+  - or broader preview rollout hardening after more real-content rows and multi-source candidates exist
 
 ## Phase 4 Task 5 Status
 
@@ -199,17 +200,48 @@ Phase 4 Task 10:
   - write Phase 4 content from the client
   - switch Today or Radar to real content by default
 
+## Phase 4 Task 11 Status
+
+- preview ranking is now deterministic on the client for the real-content path only:
+  - higher `overall_score`
+  - newer `published_at`
+  - newer `created_at`
+  - stable tie-breaker
+- preview mapping now skips malformed rows instead of breaking the whole feed
+- if every eligible preview row fails mapping, Today falls back safely to the mock feed with a clear preview-only diagnostic
+- preview diagnostics now report:
+  - raw rows fetched
+  - mapped card count
+  - skipped row count
+  - filtered row count
+  - fallback reason when applicable
+- multi-source provenance remains read-only and now renders with:
+  - primary source first
+  - preserved source names
+  - safe HTTP(S) links only
+  - lightweight `source_item_count` UI hints
+- category/topic filtering for preview rows still works through the normalized frontend signal shape, including AI/OpenAI preview rows
+- this is still preview-only:
+  - `VITE_USE_REAL_CONTENT_FEED=true` is still required locally
+  - mock remains the default Today feed
+  - Radar, Watchlist, and Library remain mock/demo content
+  - no AI calls, client writes, or client secrets were added
+
 ## Manual QA Prerequisites For Non-Production Write Testing
 
 - apply the draft migration `supabase/migrations/202605170001_phase4_content_foundation.sql` in a non-production Supabase project only
 - ensure `content_sources` rows exist for the selected registry source ids before enabling write mode
 - ensure `canonical_topics` is already seeded so deterministic `signal_topics` links can insert cleanly
+- for frontend preview reads, also apply:
+  - `supabase/manual/phase4_preview_read_policies.sql`
 - set server-only env vars:
   - `SUPABASE_URL`
   - `SUPABASE_SERVICE_ROLE_KEY`
   - `PHASE4_ENABLE_CONTENT_WRITES=true`
   - `PHASE4_WRITE_AUTH_TOKEN=<server-side secret>`
   - `PHASE4_ENABLE_LIVE_FETCH=true` only when live fetch is intentionally being exercised
+- set client preview env only when intentionally exercising the read-only preview:
+  - `VITE_USE_REAL_CONTENT_FEED=true`
 - invoke the Edge Function with `POST`, an explicit body containing `dryRun: false`, and a matching `x-phase4-write-token` header
 - use `liveFetch: true` only for intentional live-source smoke tests; the safe default request builder leaves it off
 - verify results in:

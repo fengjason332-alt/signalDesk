@@ -173,6 +173,7 @@ test('maps real-content preview provenance sources into detail payload', () => {
   );
 
   assert.equal(payload.previewMode, 'real_content');
+  assert.equal(payload.provenanceSourceCount, 2);
   assert.deepEqual(payload.provenanceSources, [
     {
       rawSourceItemId: 'raw-openai-1',

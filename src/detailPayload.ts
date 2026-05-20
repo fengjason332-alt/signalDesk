@@ -32,6 +32,7 @@ export interface DetailPayload {
     title: string;
   };
   provenanceSources?: SignalProvenanceSource[];
+  provenanceSourceCount?: number;
   previewMode?: 'real_content';
 }
 
@@ -101,6 +102,7 @@ export function toDetailPayloadFromSignal(signal: Signal): DetailPayload {
     content: signal.content,
     glossary: signal.glossary,
     provenanceSources: signal.realContentPreview?.provenanceSources,
+    provenanceSourceCount: signal.realContentPreview?.sourceItemCount,
     previewMode: signal.realContentPreview?.previewKind,
   };
 }

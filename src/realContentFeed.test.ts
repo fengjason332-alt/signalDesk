@@ -256,20 +256,20 @@ test('mapRealContentSignalRowToSignal uses primary_source_item_id to choose the 
   assert.equal(signal.timestamp, '2026-05-20');
   assert.deepEqual(signal.realContentPreview?.provenanceSources, [
     {
-      rawSourceItemId: 'raw-other',
-      sourceId: 'rss_internal_other',
-      sourceName: 'Other Source',
-      sourceUrl: 'https://example.com/other',
-      publishedAt: '2026-05-20T07:00:00.000Z',
-      isPrimary: false,
-    },
-    {
       rawSourceItemId: 'raw-preferred',
       sourceId: 'rss_internal_preferred',
       sourceName: 'Preferred Publisher',
       sourceUrl: 'https://example.com/preferred',
       publishedAt: '2026-05-20T08:00:00.000Z',
       isPrimary: true,
+    },
+    {
+      rawSourceItemId: 'raw-other',
+      sourceId: 'rss_internal_other',
+      sourceName: 'Other Source',
+      sourceUrl: 'https://example.com/other',
+      publishedAt: '2026-05-20T07:00:00.000Z',
+      isPrimary: false,
     },
   ]);
 });
@@ -418,6 +418,138 @@ test('mapRealContentSignalRowToSignal drops unsafe provenance URLs and falls bac
   assert.deepEqual(primaryNameOnlySignal.realContentPreview?.provenanceSources, [
     {
       sourceName: 'White House Briefing Room',
+      isPrimary: true,
+    },
+  ]);
+});
+
+test('mapRealContentSignalRowToSignal preserves source count, primary source first, and safe multi-source provenance metadata', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-source-count',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'OpenAI model launch corroborated by multiple outlets',
+    headline_zh: null,
+    summary_en: 'Multiple outlets corroborate the same update.',
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: 'OpenAI',
+    published_at: '2026-05-20T08:00:00.000Z',
+    lifecycle_stage: 'candidate_preview',
+    generation_status: 'drafted',
+    primary_source_item_id: 'raw-openai-1',
+    source_item_count: 3,
+    overall_score: 92,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [
+      {
+        is_primary: false,
+        raw_source_item: {
+          id: 'raw-reuters-1',
+          source_id: 'rss_reuters_ai',
+          canonical_url: 'https://www.reuters.com/world/openai-follow-up',
+          published_at: '2026-05-20T09:00:00.000Z',
+          metadata: {
+            source_name: 'Reuters',
+          },
+        },
+      },
+      {
+        is_primary: true,
+        raw_source_item: {
+          id: 'raw-openai-1',
+          source_id: 'rss_openai_blog_ai',
+          canonical_url: 'https://openai.com/news/example',
+          published_at: '2026-05-20T08:00:00.000Z',
+          metadata: {
+            source_name: 'OpenAI',
+          },
+        },
+      },
+      {
+        is_primary: false,
+        raw_source_item: {
+          id: 'raw-axios-1',
+          source_id: 'rss_axios_ai',
+          canonical_url: 'https://www.axios.com/2026/05/20/openai',
+          published_at: '2026-05-20T10:00:00.000Z',
+          metadata: {
+            source_name: 'Axios',
+          },
+        },
+      },
+    ],
+  });
+
+  assert.equal(signal.realContentPreview?.sourceItemCount, 3);
+  assert.deepEqual(signal.realContentPreview?.provenanceSources, [
+    {
+      rawSourceItemId: 'raw-openai-1',
+      sourceId: 'rss_openai_blog_ai',
+      sourceName: 'OpenAI',
+      sourceUrl: 'https://openai.com/news/example',
+      publishedAt: '2026-05-20T08:00:00.000Z',
+      isPrimary: true,
+    },
+    {
+      rawSourceItemId: 'raw-axios-1',
+      sourceId: 'rss_axios_ai',
+      sourceName: 'Axios',
+      sourceUrl: 'https://www.axios.com/2026/05/20/openai',
+      publishedAt: '2026-05-20T10:00:00.000Z',
+      isPrimary: false,
+    },
+    {
+      rawSourceItemId: 'raw-reuters-1',
+      sourceId: 'rss_reuters_ai',
+      sourceName: 'Reuters',
+      sourceUrl: 'https://www.reuters.com/world/openai-follow-up',
+      publishedAt: '2026-05-20T09:00:00.000Z',
+      isPrimary: false,
+    },
+  ]);
+});
+
+test('mapRealContentSignalRowToSignal excludes unsafe source URLs from mapped source and provenance links', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-unsafe-source-link',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'Unsafe source link example',
+    headline_zh: null,
+    summary_en: null,
+    summary_zh: null,
+    why_it_matters_en: [],
+    why_it_matters_zh: [],
+    primary_source_name: '',
+    published_at: '2026-05-20T08:00:00.000Z',
+    overall_score: 80,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [
+      {
+        is_primary: true,
+        raw_source_item: {
+          id: 'raw-source-link-1',
+          source_id: 'rss_openai_blog_ai',
+          canonical_url: 'javascript:alert(1)',
+          metadata: {
+            source_name: '',
+            source_url: 'data:text/html;base64,abc',
+          },
+        },
+      },
+    ],
+  });
+
+  assert.equal(signal.source, 'rss_openai_blog_ai');
+  assert.deepEqual(signal.realContentPreview?.provenanceSources, [
+    {
+      rawSourceItemId: 'raw-source-link-1',
+      sourceId: 'rss_openai_blog_ai',
+      sourceName: 'rss_openai_blog_ai',
       isPrimary: true,
     },
   ]);

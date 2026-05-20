@@ -2,15 +2,17 @@
 
 ## Scope
 
-Phase 4 Task 10 adds preview hardening only.
+Phase 4 Task 11 is a quality-only follow-up to the preview read path.
 
 - Do not change the visual style.
 - Do not switch the Today feed away from mock content by default.
 - Do not switch Radar away from mock content.
+- Do not switch Watchlist or Library away from mock/demo content.
 - Do not call AI.
 - Do not add client secrets or `.env` files.
 - Do not run live writes automatically.
 - Do not apply migrations automatically.
+- Do not add client-side writes.
 
 ## Current Smoke-Test Status
 
@@ -46,6 +48,29 @@ After Task 10 preview hardening:
 - preview diagnostics should appear in the console only when `VITE_USE_REAL_CONTENT_FEED=true`
 - no UI debug panel should appear
 
+After Task 11 preview quality hardening:
+
+- real-content preview cards should sort deterministically by:
+  - higher `overall_score`
+  - newer `published_at`
+  - newer `created_at`
+  - stable tie-breaker
+- one malformed preview row should be skipped without breaking the rest of the feed
+- if all eligible preview rows are malformed, Today should fall back to the mock feed with a preview-only console diagnostic and the usual non-scary prototype toast
+- preview diagnostics should include:
+  - raw rows fetched
+  - mapped cards count
+  - skipped rows count
+  - fallback reason when applicable
+- diagnostics must not log secrets or raw article text
+- multi-source preview detail should show:
+  - primary source clearly labeled
+  - multiple sources rendered cleanly
+  - only safe HTTP(S) source links
+  - source ids only when they are short/useful
+- preview card/detail metadata may show lightweight source counts when more than one source is linked
+- category/topic filters should work for preview rows using mapped categories and canonical topic names, including AI/OpenAI examples
+
 ## Manual Migration Rollout
 
 Use a non-production Supabase project only.
@@ -60,6 +85,8 @@ Use a non-production Supabase project only.
    - `supabase/manual/phase4_content_readiness_checks.sql`
 5. Run the preview read-only policy SQL manually before frontend preview tests:
    - `supabase/manual/phase4_preview_read_policies.sql`
+6. Enable the local preview env only when intentionally testing the read path:
+   - `VITE_USE_REAL_CONTENT_FEED=true`
 
 The smoke subset is intentionally small:
 
@@ -84,6 +111,8 @@ After the manual SQL steps:
   - `supabase/manual/phase4_preview_read_policies.sql`
 - for Task 9 preview reads, the frontend now also needs the manual read-only policy file applied:
   - `supabase/manual/phase4_preview_read_policies.sql`
+- for Task 11 local preview validation, the frontend also needs:
+  - `VITE_USE_REAL_CONTENT_FEED=true`
 
 ## Edge Function Deployment
 
@@ -112,6 +141,12 @@ Only enable `PHASE4_ENABLE_LIVE_FETCH=true` when you are intentionally exercisin
 - `PHASE4_ENABLE_CONTENT_WRITES=true`
 - `PHASE4_WRITE_AUTH_TOKEN=<secret>`
 - `PHASE4_ENABLE_LIVE_FETCH=true` only for intentional live fetch tests
+
+## Required Client Preview Env
+
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_USE_REAL_CONTENT_FEED=true` only for intentional local preview testing
 
 ## Smoke-Test Request Helper
 

@@ -41,6 +41,10 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
 
   const saveTargetType = detail.kind === 'signal' ? 'signal' : 'library_item';
   const isSaved = isSavedItem(saveTargetType, detail.id);
+  const provenanceSourceCount =
+    detail.previewMode === 'real_content'
+      ? Math.max(detail.provenanceSourceCount ?? 0, detail.provenanceSources?.length ?? 0)
+      : detail.provenanceSources?.length ?? 0;
 
   const handleSaveNote = () => {
     saveNote(detail.id, localNote);
@@ -99,6 +103,11 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
             <span className="text-[10px] text-on-surface-variant tracking-wide font-medium whitespace-nowrap">
               {detail.source.toUpperCase()} · {detail.timestamp.toUpperCase()}
             </span>
+            {detail.previewMode === 'real_content' && provenanceSourceCount > 1 && (
+              <span className="text-[10px] text-on-surface-variant tracking-wide font-medium whitespace-nowrap">
+                {provenanceSourceCount} SOURCES
+              </span>
+            )}
           </div>
           <h1 className="text-3xl font-bold text-on-surface leading-tight">
             {detail.titleZh}
@@ -170,14 +179,17 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
                     </div>
                     {source.isPrimary && (
                       <span className="text-[10px] uppercase font-bold tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded whitespace-nowrap">
-                        Primary
+                        Primary source
                       </span>
                     )}
                   </div>
                   <div className="text-xs text-on-surface-variant space-y-1">
-                    {source.sourceId && <div>Source ID: {source.sourceId}</div>}
                     {source.publishedAt && <div>Published: {source.publishedAt}</div>}
-                    {source.rawSourceItemId && <div>Source Item: {source.rawSourceItemId}</div>}
+                    {source.sourceId &&
+                      source.sourceId !== source.sourceName &&
+                      source.sourceId.length <= 32 && (
+                        <div>Source ID: {source.sourceId}</div>
+                      )}
                   </div>
                   {source.sourceUrl && (
                     <a

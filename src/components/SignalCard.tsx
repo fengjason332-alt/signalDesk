@@ -13,6 +13,9 @@ export function SignalCard({ signal, onClick }: SignalCardProps) {
   const { savedSignals, toggleSaveSignal } = useApp();
   const [feedback, setFeedback] = useState<'useful' | 'not-useful' | null>(null);
   const isSaved = savedSignals.includes(signal.id);
+  const previewSourceCount = signal.realContentPreview?.sourceItemCount ?? 0;
+  const showPreviewSourceCount =
+    signal.realContentPreview?.previewKind === 'real_content' && previewSourceCount > 1;
 
   const handleToggleSave = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -54,7 +57,15 @@ export function SignalCard({ signal, onClick }: SignalCardProps) {
       </p>
 
       <div className="text-[10px] text-on-surface-variant font-medium mb-4 flex items-center gap-2 uppercase tracking-wide">
-        {signal.source} · {signal.timestamp}
+        <span>{signal.source}</span>
+        <span>·</span>
+        <span>{signal.timestamp}</span>
+        {showPreviewSourceCount && (
+          <>
+            <span>·</span>
+            <span>{previewSourceCount} sources</span>
+          </>
+        )}
       </div>
 
       <div className="bg-surface-high/50 rounded-lg p-3 mb-4 border border-outline/5 transition-colors group-hover:bg-surface-high">
