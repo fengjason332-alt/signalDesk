@@ -2,327 +2,216 @@
 
 ## Scope
 
-Phase 4 Task 11 is a quality-only follow-up to the preview read path.
+This document covers the current manual QA path for the real-content ingestion pipeline and the read-only Today preview path.
 
-- Do not change the visual style.
-- Do not switch the Today feed away from mock content by default.
-- Do not switch Radar away from mock content.
-- Do not switch Watchlist or Library away from mock/demo content.
-- Do not call AI.
-- Do not add client secrets or `.env` files.
-- Do not run live writes automatically.
-- Do not apply migrations automatically.
-- Do not add client-side writes.
+Important boundaries:
+- default Today remains mock
+- Radar remains mock
+- Watchlist and Library remain on current behavior
+- the frontend real-content path is read-only
+- no AI summary or translation exists yet
+- do not commit `.env` or secrets
 
-## Current Smoke-Test Status
+## Current Known Good State
 
-The first controlled non-production smoke tests have already succeeded:
-
-- the Edge Function deployed successfully with `--no-verify-jwt`
+The active preview environment has already proven:
+- Phase 4 migration applied successfully
+- `content_sources` smoke seed applied
+- readiness checks passed
+- preview read policies applied
+- `phase4-dry-run` deployed successfully
 - `liveFetch: true` plus `dryRun: true` succeeded
-- `liveFetch: true` plus `dryRun: false` succeeded
-- Phase 4 content tables now contain rows
-- rerunning the same source did not duplicate:
-  - `raw_source_items`
-  - `intelligence_signals`
-- `content_ingestion_runs` increments per run as expected
+- guarded write-mode smoke test succeeded
+- Supabase content tables contain real rows
+- duplicate reruns do not duplicate raw items or deterministic candidate signals
+- Today real-content preview works when explicitly enabled
 
-After the Task 8 deterministic topic-mapping improvements:
+## 1. Supabase Migration Applied
 
-- `signal_topics` should now become greater than `0` for clearly mappable AI / crypto / policy items
-- multi-source runs should now report `partial_success` instead of hiding all successful sources behind one batch-wide failure
+Manual migration file:
+- `supabase/migrations/202605170001_phase4_content_foundation.sql`
 
-After Task 9 preview-read integration:
+Verify conceptually:
+- required Phase 4 content tables exist
+- indexes referenced by the adapters exist
+- the schema matches the current server-side write/read adapters
 
-- the frontend can now read persisted Phase 4 content rows into the existing Today card shape
-- this path is preview-only and read-only
-- the default Today experience is still mock content
-- preview mode must be enabled locally with:
-  - `VITE_USE_REAL_CONTENT_FEED=true`
+Do not apply this automatically from the app.
 
-After Task 10 preview hardening:
+## 2. content_sources Seeded
 
-- preview cards and detail views should tolerate sparse real rows without crashing
-- preview detail now preserves richer provenance when available from joined source rows
-- preview rows with `generation_status = failed` should not render
-- preview diagnostics should appear in the console only when `VITE_USE_REAL_CONTENT_FEED=true`
-- no UI debug panel should appear
+Manual seed file:
+- `supabase/manual/phase4_content_sources_smoke_seed.sql`
 
-After Task 11 preview quality hardening:
+Use it manually after the migration.
 
-- real-content preview cards should sort deterministically by:
-  - higher `overall_score`
-  - newer `published_at`
-  - newer `created_at`
-  - stable tie-breaker
-- one malformed preview row should be skipped without breaking the rest of the feed
-- if all eligible preview rows are malformed, Today should fall back to the mock feed with a preview-only console diagnostic and the usual non-scary prototype toast
-- preview diagnostics should include:
-  - raw rows fetched
-  - mapped cards count
-  - skipped rows count
-  - fallback reason when applicable
-- diagnostics must not log secrets or raw article text
-- multi-source preview detail should show:
-  - primary source clearly labeled
-  - multiple sources rendered cleanly
-  - only safe HTTP(S) source links
-  - source ids only when they are short/useful
-- preview card/detail metadata may show lightweight source counts when more than one source is linked
-- category/topic filters should work for preview rows using mapped categories and canonical topic names, including AI/OpenAI examples
+Smoke-test subset currently includes a small set of sources such as:
+- OpenAI / AI
+- markets / stocks stand-in
+- crypto
+- US policy / macro-adjacent source
 
-## Manual Migration Rollout
+Verify conceptually:
+- expected source ids exist
+- rerunning the seed is safe and idempotent
 
-Use a non-production Supabase project only.
+## 3. Readiness Checks
 
-1. Apply the existing migration manually:
-   - `supabase/migrations/202605170001_phase4_content_foundation.sql`
-2. Confirm Phase 3 topics are present:
-   - if `canonical_topics` is empty, manually run `supabase/migrations/202605060002_seed_canonical_topics.sql`
-3. Seed the small smoke-test `content_sources` subset manually:
-   - `supabase/manual/phase4_content_sources_smoke_seed.sql`
-4. Run the readiness checks manually:
-   - `supabase/manual/phase4_content_readiness_checks.sql`
-5. Run the preview read-only policy SQL manually before frontend preview tests:
-   - `supabase/manual/phase4_preview_read_policies.sql`
-6. Enable the local preview env only when intentionally testing the read path:
-   - `VITE_USE_REAL_CONTENT_FEED=true`
+Manual check file:
+- `supabase/manual/phase4_content_readiness_checks.sql`
 
-The smoke subset is intentionally small:
+Use it manually to confirm:
+- required Phase 4 tables exist
+- required indexes exist
+- `content_sources` rows exist
+- `canonical_topics` rows exist
+- existing expected policies are visible
 
-- `rss_openai_blog_ai`
-- `rss_yahoo_finance_markets`
-- `rss_coindesk_crypto`
-- `rss_white_house_briefing`
+## 4. Edge Function Deployment
 
-`rss_yahoo_finance_markets` is the current stock / semiconductor-adjacent stand-in because the registry does not yet contain a dedicated Nvidia or semiconductor feed.
+Function:
+- `phase4-dry-run`
 
-## Readiness Expectations
+Typical non-production deployment flow:
 
-After the manual SQL steps:
+```bash
+supabase login
+supabase link --project-ref <project-ref>
+supabase functions deploy phase4-dry-run --no-verify-jwt
+```
 
-- all Phase 4 tables from `202605170001_phase4_content_foundation.sql` should exist
-- `canonical_topics` should already be seeded
-- the smoke-test `content_sources` ids above should exist
-- the required draft indexes should exist
-- `canonical_topics` should still show its authenticated read policy from Phase 3
-- the Phase 4 content tables should remain server-only for writes
-- the frontend preview path now relies on a separate manual read-only policy rollout:
-  - `supabase/manual/phase4_preview_read_policies.sql`
-- for Task 9 preview reads, the frontend now also needs the manual read-only policy file applied:
-  - `supabase/manual/phase4_preview_read_policies.sql`
-- for Task 11 local preview validation, the frontend also needs:
-  - `VITE_USE_REAL_CONTENT_FEED=true`
-
-## Edge Function Deployment
-
-These CLI steps were aligned with current Supabase docs:
-
-1. Authenticate and link the non-production project:
-   - `supabase login`
-   - `supabase link --project-ref <project-ref>`
-2. Set the required server-side secrets:
-   - preview-only stage:
-     - `supabase secrets set SUPABASE_URL=https://<project-ref>.supabase.co`
-     - `supabase secrets set SUPABASE_SERVICE_ROLE_KEY=<service-role-key>`
-     - `supabase secrets set PHASE4_ENABLE_LIVE_FETCH=true`
-   - write-mode stage only, immediately before an intentional write smoke test:
-     - `supabase secrets set PHASE4_ENABLE_CONTENT_WRITES=true`
-     - `supabase secrets set PHASE4_WRITE_AUTH_TOKEN=<long-random-secret>`
-3. Deploy the function:
-   - `supabase functions deploy phase4-dry-run`
-
-Only enable `PHASE4_ENABLE_LIVE_FETCH=true` when you are intentionally exercising live fetch against real feeds.
-
-## Required Server Env
-
+Required server-side env concepts:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `PHASE4_ENABLE_CONTENT_WRITES=true`
-- `PHASE4_WRITE_AUTH_TOKEN=<secret>`
-- `PHASE4_ENABLE_LIVE_FETCH=true` only for intentional live fetch tests
+- `PHASE4_ENABLE_CONTENT_WRITES`
+- `PHASE4_WRITE_AUTH_TOKEN`
+- `PHASE4_ENABLE_LIVE_FETCH`
 
-## Required Client Preview Env
+Do not put real values in repo files.
 
+## 5. Dry-Run Smoke Test
+
+Run dry-run first.
+
+Example:
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --data '{
+    "dryRun": true,
+    "liveFetch": true,
+    "maxItemsPerSource": 1,
+    "sourceIds": ["rss_openai_blog_ai", "rss_coindesk_crypto"]
+  }'
+```
+
+Expected conceptually:
+- request succeeds without content writes
+- response includes readable run summary
+- per-source previews are visible
+- candidate signals can appear in preview output
+
+## 6. Write-Mode Smoke Test
+
+Only run after dry-run looks healthy.
+
+Write mode must remain guarded by:
+- `dryRun: false`
+- server-side write enablement
+- configured `PHASE4_WRITE_AUTH_TOKEN`
+- matching request token
+
+Example:
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --header 'x-phase4-write-token: <phase4-write-auth-token>' \
+  --data '{
+    "dryRun": false,
+    "liveFetch": true,
+    "maxItemsPerSource": 1,
+    "sourceIds": ["rss_openai_blog_ai", "rss_coindesk_crypto"]
+  }'
+```
+
+Expected conceptually:
+- content rows may be written
+- ingestion run status is recorded
+- rerunning the same sources should not blindly duplicate raw items or deterministic candidate signals
+
+## 7. Row Count Verification
+
+Verify conceptually after a successful write smoke test:
+- `content_ingestion_runs` should increment per run
+- `raw_source_items` should grow when genuinely new items appear
+- duplicate reruns should not create duplicate `raw_source_items`
+- `intelligence_signals` should grow only when genuinely new deterministic candidates appear
+- `signal_topics` should become non-zero when clearly mappable items exist
+- provenance/link tables should populate when source/entity/topic matches exist
+
+Do not hardcode fragile exact counts as a requirement.
+
+## 8. Preview Read Policies
+
+Manual read-only policy file:
+- `supabase/manual/phase4_preview_read_policies.sql`
+
+Apply it manually before frontend preview testing.
+
+It should support read-only preview access to the Phase 4 read tables used by the frontend adapter.
+
+## 9. Frontend Real-Content Preview
+
+Required local env:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
-- `VITE_USE_REAL_CONTENT_FEED=true` only for intentional local preview testing
+- `VITE_USE_REAL_CONTENT_FEED=true`
 
-## Smoke-Test Request Helper
+Verify:
+- Today shows real Supabase-backed cards
+- existing visual style remains unchanged
+- AI/OpenAI content can match the AI filter
+- nonmatching filters show a normal empty state
+- preview read failures fall back safely to mock
 
-Use [src/lib/content/phase4SmokeTestRequest.ts](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/src/lib/content/phase4SmokeTestRequest.ts) to build request payloads safely.
+## 10. Detail Provenance
 
-Default payload:
+Click a real-content card and verify:
+- Detail opens safely
+- headline/title renders
+- source/date/category render or safely fallback
+- summary renders or safely fallback
+- score renders when available
+- source provenance is visible
+- safe source links render when valid
+- no fake full article body is shown
+- a limited-preview message is shown when full body content is unavailable
 
-```ts
-buildPhase4SmokeTestRequest()
-// => { dryRun: true, liveFetch: false, maxItemsPerSource: 3 }
-```
+## 11. Mock Fallback By Setting VITE_USE_REAL_CONTENT_FEED=false
 
-Recommended live dry-run payload:
+Disable preview mode locally:
+- unset `VITE_USE_REAL_CONTENT_FEED`
+- or set `VITE_USE_REAL_CONTENT_FEED=false`
 
-```ts
-buildPhase4SmokeTestRequest({
-  sourceIds: ['rss_openai_blog_ai', 'rss_coindesk_crypto'],
-  liveFetch: true,
-})
-```
+Verify:
+- Today returns to mock by default
+- Radar remains mock
+- the app does not depend on Phase 4 preview reads for its normal default experience
 
-Always provide explicit `sourceIds` for live smoke tests in this environment.
-Do not rely on helper defaults when live fetch is enabled.
+## Suggested Manual Order
 
-## Example Curl
-
-Dry-run preview with intentional live fetch:
-
-```bash
-curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
-  --header 'Content-Type: application/json' \
-  --header 'apikey: <publishable-key>' \
-  --data '{
-    "dryRun": true,
-    "liveFetch": true,
-    "maxItemsPerSource": 3,
-    "sourceIds": ["rss_openai_blog_ai", "rss_coindesk_crypto"]
-  }'
-```
-
-Write mode with explicit auth token:
-
-```bash
-curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
-  --header 'Content-Type: application/json' \
-  --header 'apikey: <publishable-key>' \
-  --header 'x-phase4-write-token: <phase4-write-auth-token>' \
-  --data '{
-    "dryRun": false,
-    "liveFetch": true,
-    "maxItemsPerSource": 3,
-    "sourceIds": ["rss_openai_blog_ai", "rss_coindesk_crypto"]
-  }'
-```
-
-Write mode should fail clearly unless:
-
-- `dryRun` is `false`
-- server writes are enabled
-- `PHASE4_WRITE_AUTH_TOKEN` is configured
-- the caller provides a matching `x-phase4-write-token`
-
-## Recommended Next Multi-Source Smoke Test
-
-Start with a two-source dry-run preview:
-
-```bash
-curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
-  --header 'Content-Type: application/json' \
-  --header 'apikey: <publishable-key>' \
-  --data '{
-    "dryRun": true,
-    "liveFetch": true,
-    "maxItemsPerSource": 1,
-    "sourceIds": ["rss_openai_blog_ai", "rss_coindesk_crypto"]
-  }'
-```
-
-If that looks healthy, the next bounded write-mode smoke test is:
-
-```bash
-curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
-  --header 'Content-Type: application/json' \
-  --header 'apikey: <publishable-key>' \
-  --header 'x-phase4-write-token: <phase4-write-auth-token>' \
-  --data '{
-    "dryRun": false,
-    "liveFetch": true,
-    "maxItemsPerSource": 1,
-    "sourceIds": ["rss_openai_blog_ai", "rss_coindesk_crypto"]
-  }'
-```
-
-Expected behavior for a healthy multi-source partial success:
-
-- HTTP `207`
-- top-level `overall_status: "partial_success"`
-- `summary.overall_status: "partial_success"`
-- one or more `source_previews[].status` values may be `failed`
-- successful sources should still show:
-  - fetched / normalized counts
-  - inserted / skipped counts
-  - candidate signals when applicable
-- dry-run requests should keep returning preview payloads even if one source fails
-
-## What To Verify After A Manual Write Test
-
-When a write-mode run succeeds, inspect:
-
-- `content_ingestion_runs`
-- `raw_source_items`
-- `content_entities`
-- `raw_source_item_entities`
-- `intelligence_signals`
-- `signal_source_items`
-- `signal_entities`
-- `signal_topics`
-
-After rerunning the same source ids with the same small `maxItemsPerSource`:
-
-- `content_ingestion_runs` should increment
-- `raw_source_items` should not duplicate previously inserted identical items
-- `intelligence_signals` should not duplicate previously inserted deterministic candidates
-- `signal_source_items`, `signal_entities`, and `signal_topics` may upsert in place, but should not fan out duplicate rows for the same link identity
-
-Important note on counters:
-
-- top-level `failed_item_count` is candidate/item scoped
-- `source_previews[].failed_count` is per-source scoped
-- in multi-source candidate-write failures, those numbers are intentionally not additive
-
-Do not expect:
-
-- `signal_translation_blocks` writes
-- AI summaries
-- AI translations
-- the default Today feed to switch away from mock content on its own
-
-## Frontend Preview Verification
-
-Task 9 does not switch the app by default. To preview real content locally:
-
-1. Ensure the app already has working client-side Supabase env:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-   - `VITE_USE_REAL_CONTENT_FEED=true`
-2. Confirm real content rows exist in Supabase:
-   - `intelligence_signals`
-   - `signal_source_items`
-   - `raw_source_items`
-   - `signal_entities`
-   - `signal_topics`
-3. Confirm the manual read-only preview policy SQL has already been run:
-   - `supabase/manual/phase4_preview_read_policies.sql`
-4. Start the app normally.
-5. Open Today and verify:
-   - the existing visual style is unchanged
-   - cards render safely even without AI summaries or translation blocks
-   - clicking a preview card opens a safe detail view with available source/date/summary/provenance fields
-   - detail does not show a fake generated article body when full blocks are unavailable
-   - source, date, categories, and score remain visible
-   - AI-related preview cards still respect the existing Today filters
-   - provenance can show multiple preserved sources when the joined rows contain them
-6. Toggle preview mode back off:
-   - unset `VITE_USE_REAL_CONTENT_FEED` or set it to a non-`true` value
-   - restart the app
-   - confirm Today returns to the mock feed by default
-   - confirm Radar remains mock/demo content
-
-If the preview read fails:
-
-- Today should fall back to the mock feed
-- a non-breaking prototype toast should appear
-- the app should not crash
-- the most likely operational cause is missing anon/client read access across the Phase 4 content tables or joined lookup tables
-
-Known limitation:
-
-- there is still no AI-generated summary or translation in this preview path, so fallback text may appear when persisted rows are sparse
+1. Apply `supabase/migrations/202605170001_phase4_content_foundation.sql`
+2. Apply `supabase/manual/phase4_content_sources_smoke_seed.sql`
+3. Run `supabase/manual/phase4_content_readiness_checks.sql`
+4. Apply `supabase/manual/phase4_preview_read_policies.sql`
+5. Deploy `phase4-dry-run`
+6. Run dry-run smoke test
+7. Run guarded write-mode smoke test
+8. Verify row-count behavior conceptually
+9. Enable frontend preview with `VITE_USE_REAL_CONTENT_FEED=true`
+10. Verify Today preview and Detail provenance
+11. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds

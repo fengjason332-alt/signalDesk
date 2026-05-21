@@ -1,255 +1,116 @@
 # SignalDesk Codex Handoff
 
-## Read First
+## Latest Handoff: 2026-05-20
+
+This handoff supersedes older Phase 4 notes. Use this section first before touching code.
+
+### Current Working State
+
+- SignalDesk is no longer pure mock-only
+- Phase 3 user-state sync works and must be preserved
+- Phase 4 content pipeline exists and has been smoke-tested successfully
+- the active preview environment already has:
+  - Phase 4 schema applied
+  - `content_sources` smoke seed applied
+  - readiness checks passed
+  - preview read policies applied
+  - deployed `phase4-dry-run` Edge Function
+  - successful live RSS dry-run and write-mode smoke tests
+  - real rows in Phase 4 content tables
+- Today can preview real Supabase content when:
+  - `VITE_USE_REAL_CONTENT_FEED=true`
+  - `VITE_SUPABASE_URL` is set
+  - `VITE_SUPABASE_ANON_KEY` is set
+  - `supabase/manual/phase4_preview_read_policies.sql` has been applied
+- clicking a real content card opens Detail safely
+- Detail shows provenance and safe source links when available
+- full article body is not stored yet and must not be faked
+- Radar remains mock
+- Watchlist and Library remain on mock or existing behavior
+- the default Today feed remains mock when `VITE_USE_REAL_CONTENT_FEED=false`
+- the frontend real-content path is read-only
+- no AI summary exists yet
+- no AI translation exists yet
+- no AI provider calls exist yet
+
+### Current Test Status
+
+Latest required verification for this repo should remain:
+
+```bash
+node --import tsx --test src/*.test.ts
+npm run lint
+npm run build
+```
+
+### Read First
 
 Before changing code, read:
 - [AGENTS.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/AGENTS.md)
 - [PROJECT_CONTEXT.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/PROJECT_CONTEXT.md)
 - [ROADMAP.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/ROADMAP.md)
 - [README.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/README.md)
-- [docs/PRD.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PRD.md)
-- [docs/PHASE3_CHANGES_SUMMARY.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PHASE3_CHANGES_SUMMARY.md)
 - [docs/PHASE_4_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PHASE_4_PLAN.md)
+- [docs/PHASE_4_MANUAL_QA.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PHASE_4_MANUAL_QA.md)
 
-## Current Product State
+### Required Client Env
 
-- Product: SignalDesk
-- Form factor: mobile-first PWA-style intelligence dashboard
-- Visual style: dark dotted-grid, cyan accent, rounded dark cards
-- Main tabs: Today, Radar, Watchlist, Library, Settings
-- Current content source: frontend mock/demo content
-- Current real persistence: local-first V2 user state with optional Supabase sync
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
+- `VITE_USE_REAL_CONTENT_FEED=false` by default
 
-## Current Technical State
+Enable preview only when intentionally testing:
+- `VITE_USE_REAL_CONTENT_FEED=true`
 
-- Phase 3 user-state sync is implemented
-- Supabase Auth is wired
-- Supabase user-state tables and canonical topic seed exist
-- app remains safe in local-only mode without Supabase env vars
-- Today feed still renders mock cards
-- Phase 4 Task 0 foundation is now present:
-  - content-domain TypeScript types
-  - additive generated-signal mapper
-  - draft content-schema migration
+### Required Server-Side Env Concepts
 
-## Important Constraints
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `PHASE4_ENABLE_CONTENT_WRITES`
+- `PHASE4_WRITE_AUTH_TOKEN`
+- `PHASE4_ENABLE_LIVE_FETCH`
 
-- Preserve the current SignalDesk visual style
-- Preserve local-first user-state behavior
-- Preserve working Supabase user-state sync
-- Do not move mock content into Supabase unless the current phase explicitly requires it
-- Do not switch Today to real content by default; the current real-content path is preview-only behind `VITE_USE_REAL_CONTENT_FEED=true`
-- Do not expose ingestion or AI secrets in client code
+Do not commit any of these secrets or real values.
 
-## Current Content/State Split
+### Supabase SQL Files To Know
 
-Mock/demo content:
-- [src/mockData.ts](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/src/mockData.ts)
+- `supabase/migrations/202605170001_phase4_content_foundation.sql`
+- `supabase/manual/phase4_content_sources_smoke_seed.sql`
+- `supabase/manual/phase4_content_readiness_checks.sql`
+- `supabase/manual/phase4_preview_read_policies.sql`
 
-Real persisted user state:
-- [src/storage.ts](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/src/storage.ts)
-- [src/AppContext.tsx](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/src/AppContext.tsx)
-- [src/lib/persistence](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/src/lib/persistence)
+### Manual QA Checklist
 
-Phase 4 foundation:
-- [src/lib/content/types.ts](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/src/lib/content/types.ts)
-- [src/lib/content/mappers.ts](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/src/lib/content/mappers.ts)
-- [supabase/migrations/202605170001_phase4_content_foundation.sql](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/supabase/migrations/202605170001_phase4_content_foundation.sql)
+1. Confirm the Phase 4 migration is applied in the target non-production project
+2. Confirm `content_sources` smoke seed has been applied
+3. Run readiness checks
+4. Confirm preview read policies are applied
+5. Deploy `phase4-dry-run`
+6. Run `liveFetch: true` plus `dryRun: true`
+7. Run a guarded write-mode smoke test with `dryRun: false`
+8. Verify:
+   - ingestion runs increment
+   - duplicate reruns do not duplicate raw items or candidate signals
+   - `signal_topics` can populate for clearly mappable items
+9. Enable `VITE_USE_REAL_CONTENT_FEED=true` locally
+10. Verify Today preview and Detail provenance
+11. Set `VITE_USE_REAL_CONTENT_FEED=false` again and confirm Today returns to mock
 
-## Current Next Recommended Task
+### Boundaries For The Next Session
+
+- Do not switch default Today feed yet.
+- Do not touch Radar real-data integration yet.
+- Do not add AI calls yet.
+- Do not commit `.env` or secrets.
+- Do not add frontend writes to Phase 4 content tables.
+- Do not weaken write-mode guardrails for the Edge Function.
+- Do not fabricate full article bodies in Detail.
+
+### Exact Next Recommended Task
 
 Phase 4 Task 12:
-- keep the pipeline server-side only for writes and enrichment
-- keep Today on mock content by default, even though a read-only preview path now exists behind `VITE_USE_REAL_CONTENT_FEED=true`
-- keep Radar, Watchlist, and Library on mock/demo content
-- use the Task 7-11 manual readiness assets before any non-production read-preview or write smoke test:
-  - `docs/PHASE_4_MANUAL_QA.md`
-  - `supabase/manual/phase4_content_sources_smoke_seed.sql`
-  - `supabase/manual/phase4_content_readiness_checks.sql`
-  - `supabase/manual/phase4_preview_read_policies.sql`
-- next likely work branches:
-  - the first AI-generated summary / translation persistence step, still without changing the default Today feed
-  - or broader preview rollout hardening after more real-content rows and multi-source candidates exist
-
-## Phase 4 Task 5 Status
-
-- the server-side RSS path now supports explicit write mode into `content_ingestion_runs`, `raw_source_items`, `content_entities`, and `raw_source_item_entities`
-- dry-run remains the default; writes require `dryRun: false` plus an explicitly enabled server-side content store
-- the Edge Function path stays safe by default; real server-side fetch/write execution should only be enabled in a non-production environment with explicit server env flags and a service-role-backed content store
-- this still does not write `intelligence_signals` or translation blocks
-- this still does not switch the Today feed or any frontend surface away from mock content
-- manual write testing later requires the draft Phase 4 migration to be applied in a non-production environment and matching `content_sources` rows to exist for the selected registry source ids
-
-## Phase 4 Task 6 Status
-
-- explicit write mode now also persists deterministic candidate signals into:
-  - `intelligence_signals`
-  - `signal_source_items`
-  - `signal_entities`
-  - `signal_topics`
-- candidate signal writes stay server-side only and still require `dryRun: false` plus explicit server-side write enablement
-- persisted signal rows now carry a deterministic `candidate_key`, `lifecycle_stage`, and deterministic scoring seed fields for recency, entity importance, topic relevance, source count, duplicate confidence, and overall seed score
-- raw source provenance is preserved through `signal_source_items`, with a persisted `primary_source_item_id` and `is_primary` links
-- run finalization now records partial/failed status when deterministic signal persistence fails after raw item writes
-- this still does not write `signal_translation_blocks`
-- this still does not write AI-generated summaries or translations
-- this still does not switch the Today feed or any frontend surface away from mock content
-
-## Phase 4 Task 7 Status
-
-- manual migration/readiness guidance now lives in:
-  - `docs/PHASE_4_MANUAL_QA.md`
-  - `supabase/manual/phase4_content_sources_smoke_seed.sql`
-  - `supabase/manual/phase4_content_readiness_checks.sql`
-- smoke-test payload construction now has a safe helper in:
-  - `src/lib/content/phase4SmokeTestRequest.ts`
-- the Edge handler now returns clearer server-side guardrail payloads for:
-  - writes disabled
-  - missing server write token configuration
-  - missing request write token
-  - mismatched request write token
-- dry-run remains the default
-- live fetch remains opt-in and should only be enabled intentionally
-- this still does not call AI
-- this still does not change the UI or switch the Today feed
-
-## Phase 4 Task 8 Status
-
-- multi-source ingestion now behaves more safely when one selected source fails:
-  - successful sources continue
-  - failed sources report their own `error_message`
-  - top-level batch status now distinguishes:
-    - `succeeded`
-    - `partial_success`
-    - `failed`
-- dry-run remains the default
-- write mode remains guarded by:
-  - `dryRun: false`
-  - server-side write enablement
-  - a configured `PHASE4_WRITE_AUTH_TOKEN`
-  - a matching `x-phase4-write-token` request header
-- deterministic topic mapping now covers a broader set of obvious AI / crypto / policy patterns, including:
-  - OpenAI reasoning / education style AI content
-  - bitcoin ETF / stablecoin policy content
-  - Australia critical minerals policy content
-- deterministic candidate-signal writes now expose clearer observability fields:
-  - top-level `overall_status`
-  - top-level `summary`
-  - per-source `status`
-  - signal inserted/skipped counts
-- `signal_topics` should now become non-zero when content clearly maps to canonical topics
-- this still does not:
-  - call AI
-  - write translation blocks
-  - write AI summaries
-  - switch the Today feed away from mock content
-
-## Phase 4 Task 9 Status
-
-- the frontend now has a read-only real-content preview adapter in:
-  - `src/lib/content/realContentFeed.ts`
-- the adapter reads persisted candidate-signal data from:
-  - `intelligence_signals`
-  - `signal_source_items`
-  - `raw_source_items`
-  - `signal_entities`
-  - `signal_topics`
-  - `canonical_topics` when topic names are available
-- the adapter maps those rows into the existing `Signal` shape with deterministic fallbacks for:
-  - titles
-  - summaries
-  - source labels
-  - timestamps
-  - why-it-matters bullets
-  - categories / topics / entities / tags
-- Today now supports a feature-flagged preview path:
-  - `VITE_USE_REAL_CONTENT_FEED=true`
-- default behavior is still the mock feed
-- if the preview read fails or Supabase read access is unavailable, Today falls back to the mock feed and shows a non-breaking prototype toast
-- this preview path is read-only:
-  - it does not write Phase 4 content rows
-  - it does not change Phase 3 user-state sync behavior
-- detail navigation remains safe for preview signals even when full article blocks are unavailable
-- this still does not:
-  - call AI
-  - use translations
-  - use AI-generated summaries
-  - switch the default Today experience away from mock content
-
-## Phase 4 Task 10 Status
-
-- preview hardening now improves read-only real-content detail safety only:
-  - richer provenance mapping from `primary_source_name`, `signal_source_items`, and joined `raw_source_items`
-  - preserved source item ids, source ids, source names, source URLs, and published timestamps when available
-  - safer fallbacks for sparse headline, summary, topic, entity, source-link, and generation-status fields
-- preview eligibility remains limited to:
-  - `candidate_preview`
-  - `candidate`
-  - `draft`
-- rows with `generation_status = failed` are excluded from preview mapping
-- preview-only console diagnostics now report:
-  - rows fetched
-  - mapped card count
-  - filtered count when defensive client-side filtering removes rows
-  - whether fallback occurred
-- Today still defaults to the mock feed unless `VITE_USE_REAL_CONTENT_FEED=true`
-- Radar still remains mock/demo only
-- preview read failure still falls back to the mock Today feed without crashing
-- this still does not:
-  - call AI
-  - write Phase 4 content from the client
-  - switch Today or Radar to real content by default
-
-## Phase 4 Task 11 Status
-
-- preview ranking is now deterministic on the client for the real-content path only:
-  - higher `overall_score`
-  - newer `published_at`
-  - newer `created_at`
-  - stable tie-breaker
-- preview mapping now skips malformed rows instead of breaking the whole feed
-- if every eligible preview row fails mapping, Today falls back safely to the mock feed with a clear preview-only diagnostic
-- preview diagnostics now report:
-  - raw rows fetched
-  - mapped card count
-  - skipped row count
-  - filtered row count
-  - fallback reason when applicable
-- multi-source provenance remains read-only and now renders with:
-  - primary source first
-  - preserved source names
-  - safe HTTP(S) links only
-  - lightweight `source_item_count` UI hints
-- category/topic filtering for preview rows still works through the normalized frontend signal shape, including AI/OpenAI preview rows
-- this is still preview-only:
-  - `VITE_USE_REAL_CONTENT_FEED=true` is still required locally
-  - mock remains the default Today feed
-  - Radar, Watchlist, and Library remain mock/demo content
-  - no AI calls, client writes, or client secrets were added
-
-## Manual QA Prerequisites For Non-Production Write Testing
-
-- apply the draft migration `supabase/migrations/202605170001_phase4_content_foundation.sql` in a non-production Supabase project only
-- ensure `content_sources` rows exist for the selected registry source ids before enabling write mode
-- ensure `canonical_topics` is already seeded so deterministic `signal_topics` links can insert cleanly
-- for frontend preview reads, also apply:
-  - `supabase/manual/phase4_preview_read_policies.sql`
-- set server-only env vars:
-  - `SUPABASE_URL`
-  - `SUPABASE_SERVICE_ROLE_KEY`
-  - `PHASE4_ENABLE_CONTENT_WRITES=true`
-  - `PHASE4_WRITE_AUTH_TOKEN=<server-side secret>`
-  - `PHASE4_ENABLE_LIVE_FETCH=true` only when live fetch is intentionally being exercised
-- set client preview env only when intentionally exercising the read-only preview:
-  - `VITE_USE_REAL_CONTENT_FEED=true`
-- invoke the Edge Function with `POST`, an explicit body containing `dryRun: false`, and a matching `x-phase4-write-token` header
-- use `liveFetch: true` only for intentional live-source smoke tests; the safe default request builder leaves it off
-- verify results in:
-  - `content_ingestion_runs`
-  - `raw_source_items`
-  - `content_entities`
-  - `raw_source_item_entities`
-  - `intelligence_signals`
-  - `signal_source_items`
-  - `signal_entities`
-  - `signal_topics`
+- enrichment-ready schema / non-AI enrichment placeholders
+- keep the real-content path read-only on the client
+- keep Today mock by default
+- keep Radar on mock
+- keep AI integration deferred until the preview path is more stable

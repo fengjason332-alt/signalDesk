@@ -4,10 +4,14 @@
 
 SignalDesk is a Chinese-first, mobile-first PWA-style intelligence dashboard for scanning, tracking, saving, and reviewing high-signal developments across a focused set of strategic domains.
 
-It is designed to feel like a calm personal intelligence desk, not:
+It is designed to feel like:
+- a calm personal intelligence desk
+- a premium reading-oriented dashboard
+
+It should not drift into:
 - a trading terminal
 - a military command screen
-- a generic social/news feed
+- a generic noisy news feed
 
 ## Coverage Areas
 
@@ -22,7 +26,7 @@ It is designed to feel like a calm personal intelligence desk, not:
 - Macro
 - Geopolitics
 
-## Current Visual Language
+## Visual Language
 
 - dark dotted-grid background
 - cyan primary accents
@@ -36,15 +40,29 @@ It is designed to feel like a calm personal intelligence desk, not:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Task 0: content-domain foundation models, additive mapper utilities, and a draft Supabase content migration
+- Phase 4 Tasks 0-11: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, and preview-detail hardening
 
 ## Current App Architecture
 
-- Vite + React client application
+Main client shell:
+- Vite + React application
 - `AppContext` as the main UI state coordinator
-- local-first persistence through the V2 user-state model
+- local-first persistence for user state
 - optional Supabase Auth + Postgres sync for user state
-- mock/demo content rendered from frontend fixtures
+
+Phase 4 server-side content pipeline:
+- curated RSS source registry
+- Edge Function entrypoint: `supabase/functions/phase4-dry-run`
+- normalization and deduplication helpers
+- deterministic topic/entity mapping
+- deterministic candidate signal generation
+- deterministic scoring seed helpers
+- Supabase persistence for raw items and deterministic candidate signals
+
+Phase 4 read path:
+- read-only adapter from Supabase content tables into the frontend `Signal` shape
+- feature-flagged Today preview behind `VITE_USE_REAL_CONTENT_FEED=true`
+- safe Detail preview with provenance and limited-preview messaging when full body content is unavailable
 
 Main tabs:
 - Today
@@ -55,11 +73,11 @@ Main tabs:
 
 ## Current Persistence Model
 
-User state persists locally first in `localStorage` via the V2 schema and syncs to Supabase only when:
+Phase 3 user state persists locally first in `localStorage` and syncs to Supabase only when:
 - `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are configured
 - the user has an authenticated session
 
-Persisted user state currently includes:
+Persisted user state includes:
 - onboarding completion
 - reading/translation settings
 - selected core domains
@@ -70,71 +88,97 @@ Persisted user state currently includes:
 - notes
 - lightweight feedback state
 
+Phase 4 content persistence is server-side only:
+- raw RSS items
+- deterministic content entities and links
+- deterministic candidate signals and provenance links
+
+The frontend does not write Phase 4 content tables.
+
 ## Mock Content vs Real Persisted State
 
-Mock/demo content:
-- Today feed cards
-- Radar content
-- Watchlist fixture catalog
-- Library fixture content
-- detail payload content
+Still mock or existing fixture behavior:
+- default Today feed
+- Radar
+- Watchlist fixture catalog / existing behavior
+- Library fixture content / existing behavior
 
-Current source of truth for mock content:
-- [src/mockData.ts](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/src/mockData.ts)
-
-Real persisted state:
+Real persisted user state:
 - local `signaldesk_state_v2`
-- Supabase `user_profiles`
-- Supabase `user_topic_preferences`
-- Supabase `user_saved_items`
-- Supabase `user_watchlist_items`
-- Supabase `user_notes`
-- Supabase `user_feedback`
+- Supabase Phase 3 user-state tables
 
-Supabase does not currently store live news/content items in the shipped app.
+Real persisted Phase 4 content state:
+- `content_ingestion_runs`
+- `raw_source_items`
+- `content_entities`
+- `raw_source_item_entities`
+- `intelligence_signals`
+- `signal_source_items`
+- `signal_entities`
+- `signal_topics`
 
-## Supabase Status
+Preview-only real-content frontend path:
+- Today can read real candidate-signal rows when explicitly enabled
+- Detail can show provenance and safe source links
+- full article body is not stored yet and must not be fabricated
 
-Phase 3 user-state sync is implemented and working locally:
-- Supabase Auth is wired
-- canonical topics are seeded
-- user-state sync is local-first and debounced
-- missing Supabase env vars fall back safely to local-only mode
+## Current Phase 4 Status
 
-Phase 4 content storage is not live yet:
-- a draft content-schema migration now exists in the repo
-- it has not been wired into the client feed
-- it should not be treated as applied or production-ready ingestion
+Confirmed current working state:
+- the Phase 4 content schema has been applied successfully in the active preview environment
+- the smoke-test `content_sources` seed has been applied
+- readiness checks have passed
+- preview read policies have been applied
+- the `phase4-dry-run` Edge Function has deployed successfully
+- live RSS dry-run and write-mode smoke tests have succeeded
+- Supabase content tables now contain real rows in the active preview environment
+- duplicate reruns do not duplicate `raw_source_items` or `intelligence_signals`
+- Today real-content preview works when:
+  - `VITE_USE_REAL_CONTENT_FEED=true`
+  - `VITE_SUPABASE_URL` is set
+  - `VITE_SUPABASE_ANON_KEY` is set
+  - preview read policies are applied
+- clicking a real content card opens Detail safely
+- Detail shows source provenance and safe source links when available
+- Radar remains mock
+- no AI summary or translation exists yet
 
-## Vercel / Environment Requirements
+## Environment And Deployment
 
-Current public client env:
+Client env:
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_USE_REAL_CONTENT_FEED=false` by default
 
-If these env vars are missing:
-- the app must still boot
-- the app must stay in local-only mode
-- Settings should reflect that sync is not configured
-
-Future server-side Phase 4 env should remain server-only:
+Server-side Phase 4 env concepts:
+- `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- AI provider keys
-- paid-source API keys
+- `PHASE4_ENABLE_CONTENT_WRITES`
+- `PHASE4_WRITE_AUTH_TOKEN`
+- `PHASE4_ENABLE_LIVE_FETCH`
 
-These must never be exposed in the client bundle.
+Manual SQL assets:
+- `supabase/migrations/202605170001_phase4_content_foundation.sql`
+- `supabase/manual/phase4_content_sources_smoke_seed.sql`
+- `supabase/manual/phase4_content_readiness_checks.sql`
+- `supabase/manual/phase4_preview_read_policies.sql`
 
-## What Comes Next
+## Do Not Accidentally Break
 
-The next major phase is Phase 4:
-- real content ingestion
-- raw source storage
-- deduplication
-- structured intelligence signal generation
-- bilingual summarization and translation
-- eventual Today feed integration backed by real signals
+- preserve local-first behavior
+- preserve working Phase 3 user-state sync
+- preserve mock fallback when preview reads fail or are disabled
+- preserve the preview read-only boundary for Phase 4 content from the frontend
+- do not switch default Today to real content yet
+- do not touch Radar real-data integration yet
+- do not add AI calls yet
+- do not add secrets or commit `.env`
+- do not fabricate full article bodies in Detail
 
-Phase 4 should begin with RSS-first, server-side ingestion. It must preserve:
-- the current SignalDesk visual style
-- local-first user-state behavior
-- working Supabase user-state sync
+## Next Recommended Task
+
+Phase 4 Task 12:
+- enrichment-ready schema adjustments and non-AI enrichment placeholders
+- keep Today mock-by-default
+- keep Radar, Watchlist, and Library on current behavior
+- keep AI design and implementation gated until the real-content preview path is more stable operationally
