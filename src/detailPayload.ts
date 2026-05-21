@@ -5,6 +5,7 @@ import {
   Topic,
   WatchlistItem,
 } from './types';
+import type { EnrichmentStatus } from './lib/content/types';
 
 export interface DetailPayload {
   id: string;
@@ -34,6 +35,11 @@ export interface DetailPayload {
   provenanceSources?: SignalProvenanceSource[];
   provenanceSourceCount?: number;
   previewMode?: 'real_content';
+  enrichmentStatus?: EnrichmentStatus | null;
+  summaryStatus?: EnrichmentStatus | null;
+  translationStatus?: EnrichmentStatus | null;
+  hasEnrichedSummary?: boolean;
+  usesEnrichedSummary?: boolean;
 }
 
 const normalizeText = (value: string) => value.trim().toLowerCase();
@@ -104,6 +110,11 @@ export function toDetailPayloadFromSignal(signal: Signal): DetailPayload {
     provenanceSources: signal.realContentPreview?.provenanceSources,
     provenanceSourceCount: signal.realContentPreview?.sourceItemCount,
     previewMode: signal.realContentPreview?.previewKind,
+    enrichmentStatus: signal.realContentPreview?.enrichmentStatus,
+    summaryStatus: signal.realContentPreview?.summaryStatus,
+    translationStatus: signal.realContentPreview?.translationStatus,
+    hasEnrichedSummary: signal.realContentPreview?.hasEnrichedSummary,
+    usesEnrichedSummary: signal.realContentPreview?.usesEnrichedSummary,
   };
 }
 

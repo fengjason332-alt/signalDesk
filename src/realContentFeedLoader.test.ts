@@ -45,6 +45,42 @@ class FakeRealContentFeedLoaderClient implements RealContentFeedLoaderClient {
   }
 }
 
+class SequencedRealContentFeedLoaderClient implements RealContentFeedLoaderClient {
+  public selectCalls = 0;
+
+  constructor(
+    private readonly responses: Array<{
+      data: unknown[] | null;
+      error: { message?: string; code?: string | null } | null;
+    }>,
+  ) {}
+
+  from() {
+    const self = this;
+    return {
+      select: () => ({
+        in() {
+          return this;
+        },
+        or() {
+          return this;
+        },
+        order() {
+          return this;
+        },
+        limit: async () => {
+          const response = self.responses[self.selectCalls] ?? self.responses.at(-1) ?? {
+            data: [],
+            error: null,
+          };
+          self.selectCalls += 1;
+          return response;
+        },
+      }),
+    };
+  }
+}
+
 test('loadRealContentFeedPreview returns mapped signals from Supabase rows', async () => {
   const signals = await loadRealContentFeedPreview(
     new FakeRealContentFeedLoaderClient([
@@ -71,6 +107,86 @@ test('loadRealContentFeedPreview returns mapped signals from Supabase rows', asy
   assert.equal(signals.length, 1);
   assert.equal(signals[0].titleZh, '电网级核电重启加速');
   assert.equal(signals[0].importance, 9.1);
+});
+
+test('loadRealContentFeedPreview falls back to the legacy select when enrichment columns are unavailable', async () => {
+  const client = new SequencedRealContentFeedLoaderClient([
+    {
+      data: null,
+      error: {
+        message: 'column intelligence_signals.enrichment_status does not exist',
+        code: '42703',
+      },
+    },
+    {
+      data: [
+        {
+          id: 'signal-real-legacy-compatible',
+          primary_category: 'energy',
+          categories: ['energy'],
+          headline_en: 'Legacy preview row',
+          headline_zh: null,
+          summary_en: 'Legacy summary still works.',
+          summary_zh: null,
+          why_it_matters_en: [],
+          why_it_matters_zh: [],
+          primary_source_name: 'Reuters',
+          published_at: '2026-05-21T08:00:00.000Z',
+          overall_score: 79,
+          signal_topics: [],
+          signal_entities: [],
+          signal_source_items: [],
+        },
+      ],
+      error: null,
+    },
+  ]);
+
+  const signals = await loadRealContentFeedPreview(client as never);
+
+  assert.equal(client.selectCalls, 2);
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].summaryZh, 'Legacy summary still works.');
+});
+
+test('loadRealContentFeedPreview treats any missing optional enrichment column as a legacy-schema fallback signal', async () => {
+  const client = new SequencedRealContentFeedLoaderClient([
+    {
+      data: null,
+      error: {
+        message: "Could not find the 'target_languages' column of 'intelligence_signals' in the schema cache",
+        code: 'PGRST204',
+      },
+    },
+    {
+      data: [
+        {
+          id: 'signal-real-legacy-target-languages',
+          primary_category: 'ai',
+          categories: ['ai'],
+          headline_en: 'Legacy target language fallback',
+          headline_zh: null,
+          summary_en: 'Preview still loads against an older schema.',
+          summary_zh: null,
+          why_it_matters_en: [],
+          why_it_matters_zh: [],
+          primary_source_name: 'OpenAI',
+          published_at: '2026-05-21T09:00:00.000Z',
+          overall_score: 82,
+          signal_topics: [],
+          signal_entities: [],
+          signal_source_items: [],
+        },
+      ],
+      error: null,
+    },
+  ]);
+
+  const signals = await loadRealContentFeedPreview(client as never);
+
+  assert.equal(client.selectCalls, 2);
+  assert.equal(signals.length, 1);
+  assert.equal(signals[0].titleZh, 'Legacy target language fallback');
 });
 
 test('loadRealContentFeedPreview sorts mapped signals deterministically by score then recency', async () => {

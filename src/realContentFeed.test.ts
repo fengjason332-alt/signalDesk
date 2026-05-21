@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 import {
   mapRealContentSignalRowToSignal,
@@ -100,6 +102,7 @@ test('mapRealContentSignalRowToSignal applies safe fallbacks for sparse Supabase
   assert.deepEqual(signal.entities, ['OpenAI', 'Microsoft']);
   assert.equal(signal.importance, 8.7);
   assert.deepEqual(signal.tags, ['AI Data Center Power Demand', 'OpenAI', 'Microsoft']);
+  assert.equal(signal.realContentPreview?.usesEnrichedSummary, false);
 });
 
 test('mapRealContentSignalRowToSignal prefers headline_zh, then headline_en, then linked raw source title', () => {
@@ -272,6 +275,89 @@ test('mapRealContentSignalRowToSignal uses primary_source_item_id to choose the 
       isPrimary: false,
     },
   ]);
+});
+
+test('mapRealContentSignalRowToSignal prefers completed enriched summary and why-it-matters fields when present', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-enriched',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'Deterministic headline',
+    headline_zh: null,
+    summary_en: 'Deterministic summary.',
+    summary_zh: '确定性摘要。',
+    enriched_summary_en: 'Enriched English summary.',
+    enriched_summary_zh: '增强后的中文摘要。',
+    why_it_matters_en: ['Deterministic bullet.'],
+    why_it_matters_zh: ['确定性要点。'],
+    enriched_why_it_matters_en: ['Enriched English bullet.'],
+    enriched_why_it_matters_zh: ['增强后的中文要点。', '第二条增强要点。'],
+    summary_status: 'completed',
+    translation_status: 'completed',
+    enrichment_status: 'completed',
+    enrichment_source: 'deterministic',
+    enrichment_version: 1,
+    source_language: 'en',
+    target_languages: ['zh'],
+    primary_source_name: 'OpenAI',
+    published_at: '2026-05-21T08:00:00.000Z',
+    overall_score: 93,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [],
+  });
+
+  assert.equal(signal.summaryZh, '增强后的中文摘要。');
+  assert.deepEqual(signal.whyItMatters, ['增强后的中文要点。', '第二条增强要点。']);
+  assert.equal(signal.realContentPreview?.summaryStatus, 'completed');
+  assert.equal(signal.realContentPreview?.translationStatus, 'completed');
+  assert.equal(signal.realContentPreview?.enrichmentStatus, 'completed');
+  assert.equal(signal.realContentPreview?.enrichmentSource, 'deterministic');
+  assert.equal(signal.realContentPreview?.hasEnrichedSummary, true);
+  assert.equal(signal.realContentPreview?.usesEnrichedSummary, true);
+});
+
+test('mapRealContentSignalRowToSignal falls back when enrichment is missing or incomplete', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-enrichment-pending',
+    primary_category: 'macro',
+    categories: ['macro'],
+    headline_en: 'Policy update',
+    headline_zh: null,
+    summary_en: 'Deterministic policy summary.',
+    summary_zh: null,
+    enriched_summary_en: 'Pending enriched summary should not be used.',
+    enriched_summary_zh: '待处理中摘要不应被使用。',
+    why_it_matters_en: ['Deterministic policy bullet.'],
+    why_it_matters_zh: [],
+    enriched_why_it_matters_zh: ['待处理中要点不应被使用。'],
+    summary_status: 'pending',
+    translation_status: 'pending',
+    enrichment_status: 'pending',
+    primary_source_name: 'White House',
+    published_at: '2026-05-21T07:00:00.000Z',
+    overall_score: 64,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [],
+  });
+
+  assert.equal(signal.summaryZh, 'Deterministic policy summary.');
+  assert.deepEqual(signal.whyItMatters, ['Deterministic policy bullet.']);
+  assert.equal(signal.realContentPreview?.hasEnrichedSummary, true);
+  assert.equal(signal.realContentPreview?.usesEnrichedSummary, false);
+});
+
+test('realContentFeed adapter remains read-only and contains no frontend write path', () => {
+  const source = readFileSync(
+    resolve(process.cwd(), 'src/lib/content/realContentFeed.ts'),
+    'utf8',
+  );
+
+  assert.doesNotMatch(source, /\.insert\(/i);
+  assert.doesNotMatch(source, /\.update\(/i);
+  assert.doesNotMatch(source, /\.upsert\(/i);
+  assert.doesNotMatch(source, /\.delete\(/i);
 });
 
 test('mapRealContentSignalRowToSignal preserves preview provenance metadata across multiple linked sources', () => {

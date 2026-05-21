@@ -17,6 +17,36 @@ const TRANSLATION_STYLES: TranslationStyle[] = [
   'Student-Friendly Explanation'
 ];
 
+export function getRealContentSummarySupportMessage(
+  detail: Pick<
+    DetailPayload,
+    'previewMode' | 'usesEnrichedSummary' | 'summaryStatus' | 'enrichmentStatus'
+  >,
+) {
+  if (detail.previewMode !== 'real_content' || detail.usesEnrichedSummary) {
+    return null;
+  }
+
+  const effectiveStatus =
+    detail.summaryStatus && detail.summaryStatus !== 'not_requested'
+      ? detail.summaryStatus
+      : detail.enrichmentStatus ?? detail.summaryStatus ?? 'not_requested';
+
+  switch (effectiveStatus) {
+    case 'pending':
+      return 'Enrichment pending. Showing the available preview summary for now.';
+    case 'failed':
+      return 'Enrichment failed. Showing the available preview summary for now.';
+    case 'skipped':
+      return 'Enrichment skipped. Showing the available preview summary for now.';
+    case 'completed':
+      return 'Enrichment completed without a richer summary. Showing the available preview summary for now.';
+    case 'not_requested':
+    default:
+      return 'Enrichment not generated yet. Showing the available preview summary for now.';
+  }
+}
+
 export default function DetailView({ detail, onBack }: DetailViewProps) {
   const {
     settings,
@@ -45,6 +75,7 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
     detail.previewMode === 'real_content'
       ? Math.max(detail.provenanceSourceCount ?? 0, detail.provenanceSources?.length ?? 0)
       : detail.provenanceSources?.length ?? 0;
+  const realContentSummarySupportMessage = getRealContentSummarySupportMessage(detail);
 
   const handleSaveNote = () => {
     saveNote(detail.id, localNote);
@@ -135,6 +166,11 @@ export default function DetailView({ detail, onBack }: DetailViewProps) {
           <p className="text-xl text-on-surface font-medium leading-relaxed">
             {detail.summaryZh}
           </p>
+          {realContentSummarySupportMessage && (
+            <p className="text-xs text-on-surface-variant/70">
+              {realContentSummarySupportMessage}
+            </p>
+          )}
         </div>
 
         {/* Why it matters */}

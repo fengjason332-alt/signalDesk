@@ -10,6 +10,7 @@ Important boundaries:
 - Watchlist and Library remain on current behavior
 - the frontend real-content path is read-only
 - no AI summary or translation exists yet
+- Task 12 enrichment fields are optional and may be absent in an older preview environment
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -30,11 +31,13 @@ The active preview environment has already proven:
 
 Manual migration file:
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
+- `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
 
 Verify conceptually:
 - required Phase 4 content tables exist
 - indexes referenced by the adapters exist
 - the schema matches the current server-side write/read adapters
+- if the Task 12 enrichment migration is not applied yet, the preview adapter should still work through its legacy read fallback
 
 Do not apply this automatically from the app.
 
@@ -177,6 +180,8 @@ Verify:
 - AI/OpenAI content can match the AI filter
 - nonmatching filters show a normal empty state
 - preview read failures fall back safely to mock
+- preview still works even before applying the Task 12 enrichment migration
+- after applying the Task 12 migration, completed enrichment fields should override deterministic summary / why-it-matters fields when present
 
 ## 10. Detail Provenance
 
@@ -185,6 +190,7 @@ Click a real-content card and verify:
 - headline/title renders
 - source/date/category render or safely fallback
 - summary renders or safely fallback
+- when enrichment is missing, a subtle placeholder explains that deterministic preview summary is still being shown
 - score renders when available
 - source provenance is visible
 - safe source links render when valid
@@ -205,13 +211,14 @@ Verify:
 ## Suggested Manual Order
 
 1. Apply `supabase/migrations/202605170001_phase4_content_foundation.sql`
-2. Apply `supabase/manual/phase4_content_sources_smoke_seed.sql`
-3. Run `supabase/manual/phase4_content_readiness_checks.sql`
-4. Apply `supabase/manual/phase4_preview_read_policies.sql`
-5. Deploy `phase4-dry-run`
-6. Run dry-run smoke test
-7. Run guarded write-mode smoke test
-8. Verify row-count behavior conceptually
-9. Enable frontend preview with `VITE_USE_REAL_CONTENT_FEED=true`
-10. Verify Today preview and Detail provenance
-11. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
+2. Optionally apply `supabase/migrations/202605210001_phase4_enrichment_ready.sql` when validating Task 12 enrichment fields
+3. Apply `supabase/manual/phase4_content_sources_smoke_seed.sql`
+4. Run `supabase/manual/phase4_content_readiness_checks.sql`
+5. Apply `supabase/manual/phase4_preview_read_policies.sql`
+6. Deploy `phase4-dry-run`
+7. Run dry-run smoke test
+8. Run guarded write-mode smoke test
+9. Verify row-count behavior conceptually
+10. Enable frontend preview with `VITE_USE_REAL_CONTENT_FEED=true`
+11. Verify Today preview and Detail provenance
+12. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds

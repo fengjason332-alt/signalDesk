@@ -6,6 +6,8 @@ import {
   CONTENT_ENTITY_TYPES,
   CONTENT_LANGUAGES,
   CONTENT_SOURCE_TYPES,
+  ENRICHMENT_SOURCES,
+  ENRICHMENT_STATUSES,
   INGESTION_RUN_STATUSES,
   INGESTION_STATUSES,
   SIGNAL_GENERATION_STATUSES,
@@ -77,6 +79,18 @@ test('phase 4 content constants cover the approved Task 0 foundation surface', (
     'analysis',
     'bullet',
     'quote',
+  ]);
+  assert.deepEqual(ENRICHMENT_STATUSES, [
+    'not_requested',
+    'pending',
+    'completed',
+    'failed',
+    'skipped',
+  ]);
+  assert.deepEqual(ENRICHMENT_SOURCES, [
+    'deterministic',
+    'manual',
+    'unknown',
   ]);
 });
 
@@ -176,6 +190,19 @@ test('representative phase 4 records are type-safe for future ingestion work', (
     published_at: '2026-05-17T00:10:00.000Z',
     generated_at: '2026-05-17T00:20:00.000Z',
     generation_status: 'generated',
+    enrichment_status: 'not_requested',
+    enrichment_version: null,
+    enrichment_source: 'unknown',
+    summary_status: 'not_requested',
+    translation_status: 'not_requested',
+    source_language: 'en',
+    target_languages: ['zh'],
+    enriched_summary_en: null,
+    enriched_summary_zh: null,
+    enriched_why_it_matters_en: null,
+    enriched_why_it_matters_zh: null,
+    enrichment_error: null,
+    last_enriched_at: null,
     topic_ids: ['topic_ai_data_center_power', 'topic_nuclear_energy'],
     entity_names: ['Microsoft', 'Constellation Energy'],
     tags: ['MSFT', 'Energy'],

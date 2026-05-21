@@ -1,3 +1,8 @@
+import type {
+  EnrichmentSource,
+  EnrichmentStatus,
+} from './lib/content/types';
+
 export type CategoryKey =
   | 'ai'
   | 'crypto'
@@ -60,6 +65,15 @@ export interface RealContentPreviewMeta {
   generationStatus?: string | null;
   primarySourceItemId?: string | null;
   sourceItemCount?: number;
+  enrichmentStatus?: EnrichmentStatus | null;
+  enrichmentVersion?: number | null;
+  enrichmentSource?: EnrichmentSource | null;
+  summaryStatus?: EnrichmentStatus | null;
+  translationStatus?: EnrichmentStatus | null;
+  sourceLanguage?: string | null;
+  targetLanguages?: string[];
+  hasEnrichedSummary?: boolean;
+  usesEnrichedSummary?: boolean;
   provenanceSources: SignalProvenanceSource[];
 }
 

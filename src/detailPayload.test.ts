@@ -117,6 +117,8 @@ test('maps a real-content preview signal into a safe detail payload without full
   assert.equal(payload.source, 'OpenAI');
   assert.equal(payload.timestamp, '2026-05-20');
   assert.equal(payload.content, undefined);
+  assert.equal(payload.enrichmentStatus, 'not_requested');
+  assert.equal(payload.usesEnrichedSummary, false);
 });
 
 test('maps real-content preview provenance sources into detail payload', () => {
@@ -192,6 +194,36 @@ test('maps real-content preview provenance sources into detail payload', () => {
       isPrimary: false,
     },
   ]);
+});
+
+test('maps missing enrichment preview signals into a safe detail payload without crashing', () => {
+  const payload = toDetailPayloadFromSignal(
+    mapRealContentSignalRowToSignal({
+      id: 'signal-real-no-enrichment-yet',
+      primary_category: 'ai',
+      categories: ['ai'],
+      headline_en: 'No enrichment yet',
+      headline_zh: null,
+      summary_en: 'Deterministic summary remains visible.',
+      summary_zh: null,
+      why_it_matters_en: ['Deterministic why-it-matters bullet.'],
+      why_it_matters_zh: [],
+      enrichment_status: 'not_requested',
+      summary_status: 'not_requested',
+      translation_status: 'not_requested',
+      primary_source_name: 'OpenAI',
+      published_at: '2026-05-21T09:00:00.000Z',
+      overall_score: 73,
+      signal_topics: [],
+      signal_entities: [],
+      signal_source_items: [],
+    }),
+  );
+
+  assert.equal(payload.previewMode, 'real_content');
+  assert.equal(payload.summaryZh, 'Deterministic summary remains visible.');
+  assert.deepEqual(payload.whyItMatters, ['Deterministic why-it-matters bullet.']);
+  assert.equal(payload.usesEnrichedSummary, false);
 });
 
 test('maps a library item to a safe detail payload with complete arrays', () => {

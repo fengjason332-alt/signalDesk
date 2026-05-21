@@ -1,6 +1,6 @@
 # SignalDesk Codex Handoff
 
-## Latest Handoff: 2026-05-20
+## Latest Handoff: 2026-05-21
 
 This handoff supersedes older Phase 4 notes. Use this section first before touching code.
 
@@ -75,6 +75,7 @@ Do not commit any of these secrets or real values.
 ### Supabase SQL Files To Know
 
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
+- `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
 - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 - `supabase/manual/phase4_content_readiness_checks.sql`
 - `supabase/manual/phase4_preview_read_policies.sql`
@@ -106,11 +107,24 @@ Do not commit any of these secrets or real values.
 - Do not weaken write-mode guardrails for the Edge Function.
 - Do not fabricate full article bodies in Detail.
 
+### Latest Task 12 Status
+
+- additive migration now exists for optional enrichment-ready `intelligence_signals` fields:
+  - `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
+- frontend and shared TS contracts now understand optional enrichment status/source fields
+- the Today preview adapter now prefers enriched summary / why-it-matters fields only when present and marked completed
+- the Today preview adapter falls back to the legacy pre-Task-12 query if the active preview environment has not applied the new migration yet
+- Detail can show a subtle non-AI enrichment placeholder when richer summary text has not been generated yet
+- the client real-content path remains read-only
+- Today still remains mock by default
+- Radar still remains mock
+- no AI provider calls, SDKs, keys, or frontend writes were added
+
 ### Exact Next Recommended Task
 
-Phase 4 Task 12:
-- enrichment-ready schema / non-AI enrichment placeholders
+Phase 4 Task 13:
+- guarded AI summary / translation design or implementation
 - keep the real-content path read-only on the client
 - keep Today mock by default
 - keep Radar on mock
-- keep AI integration deferred until the preview path is more stable
+- require explicit server-side controls before any AI integration

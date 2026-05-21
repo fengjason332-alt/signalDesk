@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-11: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, and preview hardening
+- Phase 4 Tasks 0-12: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, and enrichment-ready schema/read contracts
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -43,6 +43,7 @@ Detail:
 - mock detail behavior still works
 - real-content preview cards can open safely
 - detail shows available title, summary, score, categories, source provenance, and safe source links
+- detail can show a subtle non-AI enrichment placeholder when richer summary fields have not been generated yet
 - no fake full article body is generated when full body content is unavailable
 
 State and sync:
@@ -64,6 +65,7 @@ Server-side content pipeline:
 - Watchlist fixture catalog / existing non-real-content behavior
 - Library fixture content / existing non-real-content behavior
 - AI summaries and AI translations do not exist yet
+- Task 12 only prepares optional enrichment-ready schema and read-path support without introducing AI calls
 
 ## Local Development
 
@@ -122,6 +124,7 @@ Safety model:
 
 Current manual SQL and migration assets:
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
+- `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
 - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 - `supabase/manual/phase4_content_readiness_checks.sql`
 - `supabase/manual/phase4_preview_read_policies.sql`
@@ -133,16 +136,17 @@ Use them manually in a non-production Supabase project. Do not automate their ap
 Use this order for a new non-production environment:
 
 1. Apply `supabase/migrations/202605170001_phase4_content_foundation.sql`
-2. Seed `content_sources` with `supabase/manual/phase4_content_sources_smoke_seed.sql`
-3. Run `supabase/manual/phase4_content_readiness_checks.sql`
-4. Deploy the `phase4-dry-run` Edge Function
-5. Run a `liveFetch: true` plus `dryRun: true` smoke test
-6. Run a guarded write-mode smoke test with `dryRun: false`
-7. Verify content-table row counts conceptually:
+2. Apply `supabase/migrations/202605210001_phase4_enrichment_ready.sql` when validating Task 12 enrichment-ready fields
+3. Seed `content_sources` with `supabase/manual/phase4_content_sources_smoke_seed.sql`
+4. Run `supabase/manual/phase4_content_readiness_checks.sql`
+5. Deploy the `phase4-dry-run` Edge Function
+6. Run a `liveFetch: true` plus `dryRun: true` smoke test
+7. Run a guarded write-mode smoke test with `dryRun: false`
+8. Verify content-table row counts conceptually:
    - ingestion runs should increment
    - duplicate reruns should not duplicate raw items or deterministic candidate signals
-8. Apply `supabase/manual/phase4_preview_read_policies.sql`
-9. Enable frontend preview locally with `VITE_USE_REAL_CONTENT_FEED=true`
+9. Apply `supabase/manual/phase4_preview_read_policies.sql`
+10. Enable frontend preview locally with `VITE_USE_REAL_CONTENT_FEED=true`
 
 ## Current Safety Model
 

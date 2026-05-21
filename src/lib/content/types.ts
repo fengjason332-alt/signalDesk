@@ -72,6 +72,22 @@ export type SignalTranslationBlockKind =
 export const TRANSLATION_STATUSES = ['pending', 'completed', 'failed'] as const;
 export type TranslationStatus = (typeof TRANSLATION_STATUSES)[number];
 
+export const ENRICHMENT_STATUSES = [
+  'not_requested',
+  'pending',
+  'completed',
+  'failed',
+  'skipped',
+] as const;
+export type EnrichmentStatus = (typeof ENRICHMENT_STATUSES)[number];
+
+export const ENRICHMENT_SOURCES = [
+  'deterministic',
+  'manual',
+  'unknown',
+] as const;
+export type EnrichmentSource = (typeof ENRICHMENT_SOURCES)[number];
+
 export const RAW_ITEM_DEDUPE_CONFIDENCES = [
   'exact',
   'high',
@@ -233,6 +249,19 @@ export interface GeneratedSignalRecord {
   published_at: string;
   generated_at: string;
   generation_status: SignalGenerationStatus;
+  enrichment_status?: EnrichmentStatus;
+  enrichment_version?: number | null;
+  enrichment_source?: EnrichmentSource;
+  summary_status?: EnrichmentStatus;
+  translation_status?: EnrichmentStatus;
+  source_language?: ContentLanguage | null;
+  target_languages?: ContentLanguage[] | null;
+  enriched_summary_en?: string | null;
+  enriched_summary_zh?: string | null;
+  enriched_why_it_matters_en?: string[] | null;
+  enriched_why_it_matters_zh?: string[] | null;
+  enrichment_error?: string | null;
+  last_enriched_at?: string | null;
   topic_ids?: string[];
   entity_names?: string[];
   tags?: string[];

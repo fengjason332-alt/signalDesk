@@ -1,5 +1,11 @@
 import type { CategoryKey, Signal, SignalProvenanceSource } from '../../types';
 import { CATEGORY_KEYS } from '../../types';
+import {
+  resolveEnrichmentState,
+  type EnrichmentStatus,
+  type EnrichmentSource,
+} from './enrichment';
+import type { ContentLanguage } from './types';
 
 const REAL_CONTENT_FEED_LIMIT = 24;
 const DEFAULT_WHY_IT_MATTERS = 'Why this matters is still being prepared.';
@@ -12,6 +18,20 @@ const PREVIEW_ELIGIBLE_LIFECYCLE_STAGES = new Set([
   'candidate',
   'draft',
 ]);
+const OPTIONAL_ENRICHMENT_PREVIEW_COLUMNS = [
+  'enrichment_status',
+  'enrichment_version',
+  'enrichment_source',
+  'summary_status',
+  'translation_status',
+  'source_language',
+  'target_languages',
+  'enriched_summary_en',
+  'enriched_summary_zh',
+  'enriched_why_it_matters_en',
+  'enriched_why_it_matters_zh',
+  'last_enriched_at',
+] as const;
 
 export const REAL_CONTENT_FEED_FALLBACK_MESSAGE =
   'Prototype: real content preview is unavailable here, showing the mock feed.';
@@ -77,6 +97,18 @@ export interface RealContentSignalRow {
   source_item_count?: number | null;
   overall_score: number | null;
   tags?: string[] | null;
+  enrichment_status?: EnrichmentStatus | string | null;
+  enrichment_version?: number | null;
+  enrichment_source?: EnrichmentSource | string | null;
+  summary_status?: EnrichmentStatus | string | null;
+  translation_status?: EnrichmentStatus | string | null;
+  source_language?: ContentLanguage | string | null;
+  target_languages?: Array<ContentLanguage | string> | null;
+  enriched_summary_en?: string | null;
+  enriched_summary_zh?: string | null;
+  enriched_why_it_matters_en?: string[] | null;
+  enriched_why_it_matters_zh?: string[] | null;
+  last_enriched_at?: string | null;
   signal_topics?: RealContentFeedTopicRow[] | null;
   signal_entities?: RealContentFeedEntityRow[] | null;
   signal_source_items?: RealContentFeedSourceItemRow[] | null;
@@ -118,6 +150,118 @@ interface PreviewReadDiagnostics {
   skippedRows: number;
   fallbackReason: string | null;
 }
+
+const LEGACY_REAL_CONTENT_SELECT = `
+  id,
+  primary_category,
+  categories,
+  headline_en,
+  headline_zh,
+  summary_en,
+  summary_zh,
+  why_it_matters_en,
+  why_it_matters_zh,
+  primary_source_name,
+  published_at,
+  created_at,
+  lifecycle_stage,
+  generation_status,
+  primary_source_item_id,
+  source_item_count,
+  overall_score,
+  tags,
+  signal_topics (
+    relevance_score,
+    topic_id,
+    canonical_topic:canonical_topics (
+      id,
+      name
+    )
+  ),
+  signal_entities (
+    relevance_score,
+    entity_id,
+    content_entity:content_entities (
+      canonical_name
+    )
+  ),
+  signal_source_items (
+    is_primary,
+    raw_source_item:raw_source_items (
+      id,
+      source_id,
+      title,
+      dek,
+      canonical_url,
+      published_at,
+      created_at,
+      normalized_text,
+      metadata
+    )
+  )
+`;
+
+const ENRICHED_REAL_CONTENT_SELECT = `
+  id,
+  primary_category,
+  categories,
+  headline_en,
+  headline_zh,
+  summary_en,
+  summary_zh,
+  why_it_matters_en,
+  why_it_matters_zh,
+  primary_source_name,
+  published_at,
+  created_at,
+  lifecycle_stage,
+  generation_status,
+  primary_source_item_id,
+  source_item_count,
+  overall_score,
+  tags,
+  enrichment_status,
+  enrichment_version,
+  enrichment_source,
+  summary_status,
+  translation_status,
+  source_language,
+  target_languages,
+  enriched_summary_en,
+  enriched_summary_zh,
+  enriched_why_it_matters_en,
+  enriched_why_it_matters_zh,
+  last_enriched_at,
+  signal_topics (
+    relevance_score,
+    topic_id,
+    canonical_topic:canonical_topics (
+      id,
+      name
+    )
+  ),
+  signal_entities (
+    relevance_score,
+    entity_id,
+    content_entity:content_entities (
+      canonical_name
+    )
+  ),
+  signal_source_items (
+    is_primary,
+    raw_source_item:raw_source_items (
+      id,
+      source_id,
+      title,
+      dek,
+      canonical_url,
+      published_at,
+      created_at,
+      normalized_text,
+      metadata
+    )
+  )
+`;
 
 const CATEGORY_KEY_SET = new Set<CategoryKey>(CATEGORY_KEYS);
 
@@ -589,6 +733,20 @@ const buildPreviewWhyItMatters = (
   topics: string[],
   entities: string[],
 ) => {
+  const enrichment = resolveEnrichmentState(row);
+
+  if (enrichment.usesEnrichedWhyItMatters) {
+    const preferredZhBullets = uniqueStrings(row.enriched_why_it_matters_zh ?? []);
+    if (preferredZhBullets.length > 0) {
+      return preferredZhBullets;
+    }
+
+    const fallbackEnBullets = uniqueStrings(row.enriched_why_it_matters_en ?? []);
+    if (fallbackEnBullets.length > 0) {
+      return fallbackEnBullets;
+    }
+  }
+
   const preferredBullets = uniqueStrings(row.why_it_matters_en ?? []);
   if (preferredBullets.length > 0) {
     return preferredBullets;
@@ -647,6 +805,27 @@ const parseRealContentSignalRow = (row: unknown): RealContentSignalRow => {
   return row as unknown as RealContentSignalRow;
 };
 
+const isMissingEnrichmentSchemaError = (error: SupabaseErrorLike) => {
+  const message = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
+  return (
+    message.includes('schema cache') ||
+    OPTIONAL_ENRICHMENT_PREVIEW_COLUMNS.some(column => message.includes(column))
+  );
+};
+
+async function runPreviewQuery(
+  client: RealContentFeedLoaderClient,
+  columns: string,
+) {
+  return client
+    .from('intelligence_signals')
+    .select(columns)
+    .in('lifecycle_stage', ['candidate_preview', 'candidate', 'draft'])
+    .or('generation_status.is.null,generation_status.neq.failed')
+    .order('published_at', { ascending: false })
+    .limit(REAL_CONTENT_FEED_LIMIT);
+}
+
 export function resolveRealContentFeedEnabled(value: string | undefined) {
   return value?.trim().toLowerCase() === 'true';
 }
@@ -656,14 +835,16 @@ export const isRealContentFeedEnabled = resolveRealContentFeedEnabled(
 );
 
 // Phase 4 preview only: this adapter is intentionally deterministic and
-// read-only. It maps persisted candidate signals into the current frontend
-// card/detail shape before any later AI summary/translation enrichment exists.
+// read-only. It can prefer future enriched summary fields when they exist, but
+// it must keep working against older preview environments that still only have
+// the pre-enrichment signal schema.
 export function mapRealContentSignalRowToSignal(row: RealContentSignalRow): Signal {
   const primaryCategory = resolvePrimaryCategory(row);
   if (!primaryCategory) {
     throw new Error('row must include at least one supported category');
   }
 
+  const enrichment = resolveEnrichmentState(row);
   const primarySourceItem = getPrimarySourceItem(row);
   const topics = coerceTopics(row);
   const entities = coerceEntities(row);
@@ -686,8 +867,8 @@ export function mapRealContentSignalRowToSignal(row: RealContentSignalRow): Sign
       primarySourceItem?.raw_source_item?.title,
     ),
     summaryZh: coerceSummary(
-      row.summary_zh,
-      row.summary_en,
+      enrichment.usesEnrichedSummary ? row.enriched_summary_zh : row.summary_zh,
+      enrichment.usesEnrichedSummary ? row.enriched_summary_en : row.summary_en,
       primarySourceItem?.raw_source_item?.dek,
       primarySourceItem?.raw_source_item?.normalized_text,
     ),
@@ -709,6 +890,15 @@ export function mapRealContentSignalRowToSignal(row: RealContentSignalRow): Sign
       generationStatus: normalizeText(row.generation_status) || null,
       primarySourceItemId: normalizeText(row.primary_source_item_id) || null,
       sourceItemCount: row.source_item_count ?? provenanceSources.length,
+      enrichmentStatus: enrichment.enrichmentStatus,
+      enrichmentVersion: enrichment.enrichmentVersion,
+      enrichmentSource: enrichment.enrichmentSource,
+      summaryStatus: enrichment.summaryStatus,
+      translationStatus: enrichment.translationStatus,
+      sourceLanguage: enrichment.sourceLanguage,
+      targetLanguages: enrichment.targetLanguages,
+      hasEnrichedSummary: enrichment.hasEnrichedSummary,
+      usesEnrichedSummary: enrichment.usesEnrichedSummary,
       provenanceSources,
     },
   };
@@ -717,69 +907,29 @@ export function mapRealContentSignalRowToSignal(row: RealContentSignalRow): Sign
 async function fetchRealContentFeedPreview(
   client: RealContentFeedLoaderClient,
 ): Promise<{ signals: Signal[]; diagnostics: PreviewReadDiagnostics }> {
-  const { data, error } = await client
-    .from('intelligence_signals')
-    .select(
-      `
-        id,
-        primary_category,
-        categories,
-        headline_en,
-        headline_zh,
-        summary_en,
-        summary_zh,
-        why_it_matters_en,
-        why_it_matters_zh,
-        primary_source_name,
-        published_at,
-        created_at,
-        lifecycle_stage,
-        generation_status,
-        primary_source_item_id,
-        source_item_count,
-        overall_score,
-        tags,
-        signal_topics (
-          relevance_score,
-          topic_id,
-          canonical_topic:canonical_topics (
-            id,
-            name
-          )
-        ),
-        signal_entities (
-          relevance_score,
-          entity_id,
-          content_entity:content_entities (
-            canonical_name
-          )
-        ),
-        signal_source_items (
-          is_primary,
-          raw_source_item:raw_source_items (
-            id,
-            source_id,
-            title,
-            dek,
-            canonical_url,
-            published_at,
-            created_at,
-            normalized_text,
-            metadata
-          )
-        )
-      `,
-    )
-    .in('lifecycle_stage', ['candidate_preview', 'candidate', 'draft'])
-    .or('generation_status.is.null,generation_status.neq.failed')
-    .order('published_at', { ascending: false })
-    .limit(REAL_CONTENT_FEED_LIMIT);
+  const enrichedResult = await runPreviewQuery(client, ENRICHED_REAL_CONTENT_SELECT);
 
-  if (error) {
-    throw buildFeedError('read', error);
+  let rows: RealContentSignalRow[];
+
+  if (enrichedResult.error) {
+    if (!isMissingEnrichmentSchemaError(enrichedResult.error)) {
+      throw buildFeedError('read', enrichedResult.error);
+    }
+
+    console.info(
+      '[Phase 4 real content preview] Enrichment columns are unavailable in this Supabase schema yet, retrying the legacy preview query.',
+    );
+
+    const legacyResult = await runPreviewQuery(client, LEGACY_REAL_CONTENT_SELECT);
+    if (legacyResult.error) {
+      throw buildFeedError('read', legacyResult.error);
+    }
+
+    rows = (legacyResult.data ?? []) as RealContentSignalRow[];
+  } else {
+    rows = (enrichedResult.data ?? []) as RealContentSignalRow[];
   }
 
-  const rows = (data ?? []) as RealContentSignalRow[];
   const eligibleRows = rows.filter(isPreviewEligibleRow).sort(compareRealContentRows);
   const signals: Signal[] = [];
   let skippedRows = 0;

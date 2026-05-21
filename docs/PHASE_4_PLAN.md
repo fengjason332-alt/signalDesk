@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 11
+## Completed Through Task 12
 
 ### Tasks 0-4: Foundations
 
@@ -56,6 +56,15 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - multi-source provenance display readiness
 - malformed-row skipping without breaking the whole preview feed
 
+### Task 12: Enrichment-Ready Contract Without AI
+
+- additive `intelligence_signals` enrichment-ready columns for summary/translation state
+- optional TypeScript enrichment contract and helpers
+- preview adapter preference for completed enriched summary / why-it-matters fields
+- legacy-query fallback when the active preview environment has not applied the Task 12 migration yet
+- subtle Detail placeholder when enrichment has not been generated yet
+- no AI calls, no frontend writes, no default Today rollout change
+
 ## Current Known Working State
 
 - the Phase 4 content migration has been applied successfully in the active preview environment
@@ -76,12 +85,6 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - there are still no AI summary or translation calls
 
 ## Remaining Tasks
-
-### Task 12: Enrichment-Ready Schema / Non-AI Enrichment Placeholders
-
-- prepare the next schema/storage layer for richer summaries, detail fragments, or provenance expansions
-- keep implementation deterministic and server-side
-- do not introduce AI yet
 
 ### Task 13: AI Summary / Translation Integration Design Only Or Guarded Implementation
 

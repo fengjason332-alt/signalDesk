@@ -22,8 +22,8 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 - Phase 1.5: topic personalization completed
 - Phase 2: PWA install support completed
 - Phase 3: local-first persistence with optional Supabase account sync for user state completed
-- Phase 4 Tasks 0-11: content pipeline, smoke-tested persistence, and read-only Today preview completed
-- Next recommended task: Phase 4 Task 12, not AI rollout and not default real-feed rollout
+- Phase 4 Tasks 0-12: content pipeline, smoke-tested persistence, read-only Today preview, and enrichment-ready schema/contracts completed
+- Next recommended task: Phase 4 Task 13, not default real-feed rollout
 
 ## Visual Design Rules
 

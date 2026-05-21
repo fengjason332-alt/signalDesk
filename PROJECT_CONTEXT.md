@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-11: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, and preview-detail hardening
+- Phase 4 Tasks 0-12: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, and enrichment-ready schema/read support
 
 ## Current App Architecture
 
@@ -63,6 +63,7 @@ Phase 4 read path:
 - read-only adapter from Supabase content tables into the frontend `Signal` shape
 - feature-flagged Today preview behind `VITE_USE_REAL_CONTENT_FEED=true`
 - safe Detail preview with provenance and limited-preview messaging when full body content is unavailable
+- optional enrichment-aware summary fallback while full body content still remains unstored
 
 Main tabs:
 - Today
@@ -142,6 +143,7 @@ Confirmed current working state:
 - Detail shows source provenance and safe source links when available
 - Radar remains mock
 - no AI summary or translation exists yet
+- Task 12 enrichment-ready columns and read fallbacks are additive only and remain optional
 
 ## Environment And Deployment
 
@@ -159,6 +161,7 @@ Server-side Phase 4 env concepts:
 
 Manual SQL assets:
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
+- `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
 - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 - `supabase/manual/phase4_content_readiness_checks.sql`
 - `supabase/manual/phase4_preview_read_policies.sql`
@@ -177,8 +180,8 @@ Manual SQL assets:
 
 ## Next Recommended Task
 
-Phase 4 Task 12:
-- enrichment-ready schema adjustments and non-AI enrichment placeholders
+Phase 4 Task 13:
+- guarded AI summary / translation design or implementation
 - keep Today mock-by-default
 - keep Radar, Watchlist, and Library on current behavior
 - keep AI design and implementation gated until the real-content preview path is more stable operationally
