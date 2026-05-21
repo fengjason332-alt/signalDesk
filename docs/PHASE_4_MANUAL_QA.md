@@ -11,6 +11,7 @@ Important boundaries:
 - the frontend real-content path is read-only
 - no AI summary or translation exists yet
 - Task 12 enrichment fields are optional and may be absent in an older preview environment
+- Task 13-preflight adds server-only AI planning/contracts only and does not add a live AI QA path yet
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -208,6 +209,21 @@ Verify:
 - Radar remains mock
 - the app does not depend on Phase 4 preview reads for its normal default experience
 
+## 12. Task 13-preflight Boundary Check
+
+Verify conceptually:
+- no AI provider calls have been added
+- no AI SDKs or API keys are required yet
+- frontend runtime files do not import server-only AI enrichment modules
+- future AI env names remain placeholders only:
+  - `PHASE4_ENABLE_AI_ENRICHMENT`
+  - `PHASE4_AI_PROVIDER`
+  - `PHASE4_AI_API_KEY`
+  - `PHASE4_AI_MODEL`
+  - `PHASE4_AI_MAX_SIGNALS_PER_RUN`
+- future `enrichment_error` values must stay sanitized and operator-safe only
+- future AI implementation is still expected to start in guarded server-side dry-run mode, not default write mode
+
 ## Suggested Manual Order
 
 1. Apply `supabase/migrations/202605170001_phase4_content_foundation.sql`
@@ -222,3 +238,4 @@ Verify:
 10. Enable frontend preview with `VITE_USE_REAL_CONTENT_FEED=true`
 11. Verify Today preview and Detail provenance
 12. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
+13. For Task 13-preflight only, verify docs and tests describe future server-side AI boundaries without introducing any live AI path

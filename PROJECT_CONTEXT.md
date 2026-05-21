@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, and enrichment-ready schema/read support
+- Phase 4 Tasks 0-12 plus Task 13-preflight: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, and server-only AI enrichment preflight planning/contracts
 
 ## Current App Architecture
 
@@ -64,6 +64,11 @@ Phase 4 read path:
 - feature-flagged Today preview behind `VITE_USE_REAL_CONTENT_FEED=true`
 - safe Detail preview with provenance and limited-preview messaging when full body content is unavailable
 - optional enrichment-aware summary fallback while full body content still remains unstored
+
+Phase 4 AI enrichment preflight:
+- server-only provider-neutral enrichment interfaces live under `supabase/functions/_shared`
+- no-op provider and deterministic job-planning helpers exist only to define future batch/version/write boundaries
+- no AI SDKs, keys, provider fetches, or scheduled jobs are implemented yet
 
 Main tabs:
 - Today
@@ -144,6 +149,7 @@ Confirmed current working state:
 - Radar remains mock
 - no AI summary or translation exists yet
 - Task 12 enrichment-ready columns and read fallbacks are additive only and remain optional
+- Task 13-preflight defines future AI enrichment flow and cost/write boundaries, but still performs no AI calls
 
 ## Environment And Deployment
 
@@ -175,13 +181,14 @@ Manual SQL assets:
 - do not switch default Today to real content yet
 - do not touch Radar real-data integration yet
 - do not add AI calls yet
+- do not store raw provider errors or prompt text in publicly readable preview tables
 - do not add secrets or commit `.env`
 - do not fabricate full article bodies in Detail
 
 ## Next Recommended Task
 
-Phase 4 Task 13:
-- guarded AI summary / translation design or implementation
+Phase 4 Task 13 actual implementation:
+- guarded AI summary / translation dry-run implementation on the server side
 - keep Today mock-by-default
 - keep Radar, Watchlist, and Library on current behavior
 - keep AI design and implementation gated until the real-content preview path is more stable operationally

@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, and enrichment-ready schema/read contracts
+- Phase 4 Tasks 0-12 plus Task 13-preflight: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, and server-only AI enrichment preflight contracts
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -66,6 +66,7 @@ Server-side content pipeline:
 - Library fixture content / existing non-real-content behavior
 - AI summaries and AI translations do not exist yet
 - Task 12 only prepares optional enrichment-ready schema and read-path support without introducing AI calls
+- Task 13-preflight only prepares server-side AI enrichment boundaries, no-op provider stubs, and planning docs without introducing AI calls
 
 ## Local Development
 
@@ -111,6 +112,11 @@ Do not place these in the client bundle. These are server-side concepts for the 
 - `PHASE4_ENABLE_CONTENT_WRITES`
 - `PHASE4_WRITE_AUTH_TOKEN`
 - `PHASE4_ENABLE_LIVE_FETCH`
+- `PHASE4_ENABLE_AI_ENRICHMENT`
+- `PHASE4_AI_PROVIDER`
+- `PHASE4_AI_API_KEY`
+- `PHASE4_AI_MODEL`
+- `PHASE4_AI_MAX_SIGNALS_PER_RUN`
 
 Safety model:
 - `dryRun: true` is the default
@@ -119,6 +125,7 @@ Safety model:
 - frontend preview is read-only
 - frontend does not write Phase 4 content tables
 - there are no AI provider calls yet
+- future AI enrichment must remain server-side only and manually/dry-run gated first
 
 ## Manual Supabase SQL Assets
 
@@ -163,6 +170,7 @@ Use this order for a new non-production environment:
 - full article body storage is not implemented yet
 - no AI summary exists yet
 - no AI-generated Chinese translation exists yet
+- Task 13-preflight adds no-op provider/planning stubs only, not live AI
 - no scheduled ingestion exists yet
 - the Today real-content path is still preview-only
 - Radar is still mock

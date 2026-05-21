@@ -22,8 +22,8 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 - Phase 1.5: topic personalization completed
 - Phase 2: PWA install support completed
 - Phase 3: local-first persistence with optional Supabase account sync for user state completed
-- Phase 4 Tasks 0-12: content pipeline, smoke-tested persistence, read-only Today preview, and enrichment-ready schema/contracts completed
-- Next recommended task: Phase 4 Task 13, not default real-feed rollout
+- Phase 4 Tasks 0-12 plus Task 13-preflight: content pipeline, smoke-tested persistence, read-only Today preview, enrichment-ready schema/contracts, and server-only AI preflight boundaries completed
+- Next recommended task: Phase 4 Task 13 guarded AI dry-run implementation, not default real-feed rollout
 
 ## Visual Design Rules
 
@@ -55,6 +55,7 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 - preserve working Phase 3 user-state sync unless the current task explicitly changes it
 - Phase 4 content ingestion and persistence are server-side only
 - the frontend real-content path is read-only
+- any future AI enrichment provider boundary must remain server-side only
 - Today real-content preview is optional behind `VITE_USE_REAL_CONTENT_FEED=true`
 - the default Today feed must remain mock until an explicit rollout task changes that
 - Radar must remain mock for now
@@ -63,6 +64,7 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 - do not expose ingestion or AI secrets to the client
 - do not commit `.env` or secrets
 - no AI provider calls should be added unless the task explicitly approves them
+- do not import server-only AI enrichment planner/provider modules into frontend runtime code
 
 ## Do Not Do Without Explicit Approval
 

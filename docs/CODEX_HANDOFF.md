@@ -32,6 +32,7 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - no AI summary exists yet
 - no AI translation exists yet
 - no AI provider calls exist yet
+- Task 13-preflight adds server-only no-op AI enrichment contracts and planning helpers only
 
 ### Current Test Status
 
@@ -69,6 +70,11 @@ Enable preview only when intentionally testing:
 - `PHASE4_ENABLE_CONTENT_WRITES`
 - `PHASE4_WRITE_AUTH_TOKEN`
 - `PHASE4_ENABLE_LIVE_FETCH`
+- `PHASE4_ENABLE_AI_ENRICHMENT`
+- `PHASE4_AI_PROVIDER`
+- `PHASE4_AI_API_KEY`
+- `PHASE4_AI_MODEL`
+- `PHASE4_AI_MAX_SIGNALS_PER_RUN`
 
 Do not commit any of these secrets or real values.
 
@@ -120,11 +126,29 @@ Do not commit any of these secrets or real values.
 - Radar still remains mock
 - no AI provider calls, SDKs, keys, or frontend writes were added
 
+### Latest Task 13-preflight Status
+
+- future AI enrichment has been planned as a server-side-only concern
+- provider-neutral no-op interfaces now exist under `supabase/functions/_shared`:
+  - `enrichmentProvider.ts`
+  - `enrichmentPlanner.ts`
+  - `enrichmentStore.ts`
+- deterministic job-planning helpers now define:
+  - dry-run as the safe default
+  - write gating
+  - manual-vs-scheduled trigger intent
+  - max batch size and input budget defaults
+  - retry backoff and enrichment-version boundaries
+- future `enrichment_error` usage must stay sanitized and operator-safe because preview tables are browser-readable through read-only policies
+- no AI SDKs, provider fetches, API keys, scheduled jobs, or frontend AI imports were added
+- the frontend real-content path remains read-only and unchanged by default
+
 ### Exact Next Recommended Task
 
-Phase 4 Task 13:
-- guarded AI summary / translation design or implementation
+Phase 4 Task 13 actual implementation:
+- guarded AI enrichment dry-run implementation on the server side
 - keep the real-content path read-only on the client
 - keep Today mock by default
 - keep Radar on mock
 - require explicit server-side controls before any AI integration
+- do not jump to scheduled enrichment until retry/lease bookkeeping is designed
