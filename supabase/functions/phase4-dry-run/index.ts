@@ -5,6 +5,8 @@ import {
   createPhase4DryRunHandler,
   createPhase4IngestionHandler,
 } from '../_shared/phase4DryRun.ts';
+import { resolvePhase4AiEnrichmentServerConfig } from '../_shared/phase4AiEnrichment.ts';
+import { createSupabaseAiEnrichmentStore } from '../_shared/enrichmentStore.ts';
 import { createSupabaseContentStore } from '../_shared/supabaseContentStore.ts';
 
 export {
@@ -32,10 +34,19 @@ export function createConfiguredPhase4Handler() {
   const allowLiveFetch = isEnabled('PHASE4_ENABLE_LIVE_FETCH');
   const writeAuthToken = getServerEnv('PHASE4_WRITE_AUTH_TOKEN');
   const canCreateStore = Boolean(supabaseUrl && serviceRoleKey);
+  const aiConfig = resolvePhase4AiEnrichmentServerConfig(getServerEnv);
+  const supabaseClient =
+    canCreateStore
+      ? createClient(supabaseUrl!, serviceRoleKey!)
+      : null;
 
   const contentStore =
-    canCreateStore
-      ? createSupabaseContentStore(createClient(supabaseUrl!, serviceRoleKey!))
+    supabaseClient
+      ? createSupabaseContentStore(supabaseClient)
+      : null;
+  const aiEnrichmentStore =
+    supabaseClient
+      ? createSupabaseAiEnrichmentStore(supabaseClient)
       : null;
 
   return createPhase4IngestionHandler({
@@ -43,6 +54,8 @@ export function createConfiguredPhase4Handler() {
     allowWrites: allowWrites && Boolean(contentStore),
     writeAuthToken: writeAuthToken ?? null,
     contentStore,
+    aiEnrichmentStore,
+    aiConfig,
   });
 }
 

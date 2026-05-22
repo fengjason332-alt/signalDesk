@@ -1,12 +1,12 @@
 # SignalDesk Codex Handoff
 
-## Latest Handoff: 2026-05-21
+## Latest Handoff: 2026-05-22
 
 This handoff supersedes older Phase 4 notes. Use this section first before touching code.
 
 ### Current Working State
 
-- SignalDesk is no longer pure mock-only
+- SignalDesk now includes a real-content preview path, but the default product experience is still mock-first
 - Phase 3 user-state sync works and must be preserved
 - Phase 4 content pipeline exists and has been smoke-tested successfully
 - the active preview environment already has:
@@ -29,10 +29,10 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - Watchlist and Library remain on mock or existing behavior
 - the default Today feed remains mock when `VITE_USE_REAL_CONTENT_FEED=false`
 - the frontend real-content path is read-only
-- no AI summary exists yet
-- no AI translation exists yet
-- no AI provider calls exist yet
-- Task 13-preflight adds server-only no-op AI enrichment contracts and planning helpers only
+- no AI summary exists yet in persisted/frontend-visible form
+- no AI translation exists yet in persisted/frontend-visible form
+- DeepSeek is now wired as the first optional server-side provider for dry-run only
+- Task 13B does not write AI outputs to Supabase
 
 ### Current Test Status
 
@@ -71,10 +71,11 @@ Enable preview only when intentionally testing:
 - `PHASE4_WRITE_AUTH_TOKEN`
 - `PHASE4_ENABLE_LIVE_FETCH`
 - `PHASE4_ENABLE_AI_ENRICHMENT`
-- `PHASE4_AI_PROVIDER`
-- `PHASE4_AI_API_KEY`
-- `PHASE4_AI_MODEL`
-- `PHASE4_AI_MAX_SIGNALS_PER_RUN`
+- `PHASE4_AI_DRY_RUN_ONLY`
+- `AI_PROVIDER`
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_BASE_URL`
+- `DEEPSEEK_MODEL`
 
 Do not commit any of these secrets or real values.
 
@@ -102,12 +103,16 @@ Do not commit any of these secrets or real values.
 9. Enable `VITE_USE_REAL_CONTENT_FEED=true` locally
 10. Verify Today preview and Detail provenance
 11. Set `VITE_USE_REAL_CONTENT_FEED=false` again and confirm Today returns to mock
+12. If intentionally validating Task 13B, configure DeepSeek server env only
+13. Run one-signal AI dry-run against `phase4-dry-run`
+14. Verify the response returns proposed enrichment output only and performs no database writes
 
 ### Boundaries For The Next Session
 
 - Do not switch default Today feed yet.
 - Do not touch Radar real-data integration yet.
-- Do not add AI calls yet.
+- Do not add any new frontend AI calls.
+- Do not write AI output to Supabase until a follow-up task explicitly approves that boundary.
 - Do not commit `.env` or secrets.
 - Do not add frontend writes to Phase 4 content tables.
 - Do not weaken write-mode guardrails for the Edge Function.
@@ -143,12 +148,28 @@ Do not commit any of these secrets or real values.
 - no AI SDKs, provider fetches, API keys, scheduled jobs, or frontend AI imports were added
 - the frontend real-content path remains read-only and unchanged by default
 
+### Latest Task 13B Status
+
+- the first real provider path is now wired server-side only through DeepSeek
+- DeepSeek uses a guarded OpenAI-compatible API call shape with:
+  - `AI_PROVIDER=deepseek`
+  - `DEEPSEEK_API_KEY`
+  - `DEEPSEEK_BASE_URL`
+  - `DEEPSEEK_MODEL`
+  - `PHASE4_ENABLE_AI_ENRICHMENT`
+  - `PHASE4_AI_DRY_RUN_ONLY`
+- AI provider execution remains dry-run only in this task
+- invalid provider JSON is treated as failed output and is not written anywhere
+- the Edge Function can now return proposed enrichment output for one or more persisted candidate signals
+- no AI outputs are written back to Supabase in Task 13B
+- the frontend remains read-only and unchanged by default
+
 ### Exact Next Recommended Task
 
-Phase 4 Task 13 actual implementation:
-- guarded AI enrichment dry-run implementation on the server side
+Phase 4 Task 13C:
+- guarded AI enrichment write-path design and manual-only persistence plan on the server side
 - keep the real-content path read-only on the client
 - keep Today mock by default
 - keep Radar on mock
-- require explicit server-side controls before any AI integration
+- require explicit server-side controls before any AI write mode
 - do not jump to scheduled enrichment until retry/lease bookkeeping is designed

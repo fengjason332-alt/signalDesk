@@ -4,6 +4,12 @@ import {
   mapFeedItemToRawSourceItem,
   normalizeFeedItem,
 } from './rss.ts';
+import {
+  createPhase4AiEnrichmentDryRun,
+  isAiEnrichmentRequest,
+  type Phase4AiEnrichmentRuntimeOptions,
+  type Phase4AiEnrichmentServerConfig,
+} from './phase4AiEnrichment.ts';
 import { generateCandidateSignals } from './signalGeneration.ts';
 import { getActiveEnglishRssSources } from './sourceRegistry.ts';
 import type {
@@ -14,6 +20,7 @@ import type {
   Phase4RawSourceItemWriteInput,
 } from './supabaseContentStore.ts';
 import { CONTENT_ENTITY_CATALOG, mapTopicsAndEntities } from './topicEntityMapping.ts';
+import type { Phase4AiEnrichmentStore } from './enrichmentStore.ts';
 import type {
   CandidateSignalRecord,
   DeterministicEntityMatch,
@@ -42,6 +49,9 @@ export interface Phase4IngestionOptions {
   allowWrites?: boolean;
   writeAuthToken?: string | null;
   contentStore?: Phase4ContentStore | null;
+  aiEnrichmentStore?: Phase4AiEnrichmentStore | null;
+  aiConfig?: Phase4AiEnrichmentServerConfig | null;
+  aiFetchImpl?: Phase4AiEnrichmentRuntimeOptions['fetchImpl'];
 }
 
 const DEFAULT_MAX_ITEMS_PER_SOURCE = 5;
@@ -699,9 +709,9 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
       );
     }
 
-    let body: Phase4DryRunRequest;
+    let body: unknown;
     try {
-      body = (await request.json()) as Phase4DryRunRequest;
+      body = await request.json();
     } catch {
       return jsonResponse(
         {
@@ -711,7 +721,38 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
       );
     }
 
-    if (body.dryRun === false) {
+    if (isAiEnrichmentRequest(body)) {
+      try {
+        const preview = await createPhase4AiEnrichmentDryRun(body, {
+          aiEnrichmentStore: options.aiEnrichmentStore,
+          aiConfig: options.aiConfig,
+          fetchImpl: options.aiFetchImpl,
+          now: options.now,
+        });
+
+        return jsonResponse(
+          preview,
+          preview.code === 'provider_not_configured' ||
+            preview.code === 'ai_enrichment_disabled' ||
+            preview.code === 'ai_store_not_configured'
+            ? 503
+            : preview.code === 'ai_dry_run_only' || preview.code === 'unsupported_provider'
+              ? 403
+              : 200,
+        );
+      } catch (error) {
+        return jsonResponse(
+          {
+            error: toErrorMessage(error),
+          },
+          503,
+        );
+      }
+    }
+
+    const ingestionBody = body as Phase4DryRunRequest;
+
+    if (ingestionBody.dryRun === false) {
       if (!options.allowWrites || !options.contentStore) {
         return jsonResponse(
           buildWriteGuardrailPayload(options, {
@@ -758,7 +799,7 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
     }
 
     try {
-      const preview = await runPhase4Ingestion(body, options);
+      const preview = await runPhase4Ingestion(ingestionBody, options);
 
       return jsonResponse(preview, getWriteResponseStatus(preview));
     } catch (error) {

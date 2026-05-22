@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight
+## Completed Through Task 12 Plus Task 13-preflight And Task 13B
 
 ### Tasks 0-4: Foundations
 
@@ -84,6 +84,19 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
   - bounded batch size and input budgets
 - no AI SDKs, provider fetches, keys, scheduled jobs, or frontend writes
 
+### Task 13B: DeepSeek Provider Dry-Run Implementation
+
+- DeepSeek is now the first optional real provider
+- provider integration is server-side only under `supabase/functions/_shared`
+- base URL defaults to `https://api.deepseek.com`
+- model defaults to `deepseek-chat`
+- both base URL and model are overridable through server-side env
+- provider execution remains dry-run only in this task
+- no AI output is written back to Supabase yet
+- JSON output is parsed and validated before being returned as a proposed enrichment payload
+- invalid JSON or missing required fields produce failed dry-run results instead of writes
+- the existing `phase4-dry-run` endpoint now has an additive optional `aiEnrichment` request block for server-side dry-run only
+
 Proposed future AI enrichment flow:
 - runtime location:
   - server-side only
@@ -146,13 +159,12 @@ Proposed future AI enrichment flow:
 
 ## Remaining Tasks
 
-### Task 13: Guarded AI Enrichment Dry-Run Implementation
+### Task 13C: Guarded AI Enrichment Write-Path Design And Manual Persistence Plan
 
-- implement the first server-side AI enrichment pass in dry-run mode only
-- read deterministic candidate signals from `intelligence_signals` plus linked provenance rows
-- write enrichment fields back to `intelligence_signals` only when explicit server-side AI write controls are enabled
-- keep manual triggering first; scheduled triggering should remain a later task
-- add attempt/lease bookkeeping before any scheduled rollout, either through a dedicated `signal_enrichment_runs` table or equivalent retry/lock fields
+- validate Task 13B dry-run behavior manually before enabling any persistence work
+- decide how provider identity/version should be represented before `enrichment_source` is reused for writes
+- design the first manual-only persistence step for validated AI output into enrichment-ready `intelligence_signals` columns
+- keep scheduled triggering and lease bookkeeping as a later follow-up
 - do not make AI the default path until preview stability is proven
 
 ### Task 14: Scheduled Ingestion
@@ -176,6 +188,7 @@ Proposed future AI enrichment flow:
 - source provenance quality depends on source metadata consistency
 - full article body is not stored yet, so Detail must stay honest about preview limitations
 - AI cost and retry behavior can spiral without strict per-run batch limits and explicit version gating
+- provider identity and persisted `enrichment_source` do not yet line up for future write-mode AI enrichment, so Task 13C should resolve that contract before any AI writes
 
 ## Guardrails
 

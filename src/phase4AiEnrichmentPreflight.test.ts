@@ -58,6 +58,7 @@ test('noop AI enrichment provider exposes provider-neutral server-only methods w
   const provider = createNoopAiEnrichmentProvider();
 
   assert.deepEqual(AI_ENRICHMENT_OPERATION_KINDS, [
+    'enrich',
     'summarize',
     'translate',
     'why_it_matters',
@@ -91,31 +92,55 @@ test('noop AI enrichment provider exposes provider-neutral server-only methods w
         is_primary: true,
       },
     ],
+    source_documents: [
+      {
+        raw_source_item_id: 'raw-openai-1',
+        source_name: 'OpenAI News',
+        source_url: 'https://openai.com/news/example',
+        published_at: '2026-05-21T08:00:00.000Z',
+        title: 'OpenAI education rollout',
+        dek: 'Deterministic preview dek.',
+        normalized_text: 'Deterministic preview body.',
+        is_primary: true,
+      },
+    ],
+    topics: ['OpenAI Education'],
+    entities: ['OpenAI'],
   };
 
-  const [summary, translation, whyItMatters, language] = await Promise.all([
+  const [enrich, summary, translation, whyItMatters, language] = await Promise.all([
+    provider.enrich(input),
     provider.summarize(input),
     provider.translate(input),
     provider.generateWhyItMatters(input),
     provider.detectLanguage(input),
   ]);
 
+  assert.equal(enrich.status, 'skipped');
+  assert.equal(enrich.source, 'noop');
+  assert.equal(enrich.payload?.enriched_summary_en, null);
+  assert.equal(enrich.payload?.source_language, 'en');
+  assert.equal(enrich.error_message, NOOP_ENRICHMENT_REASON);
+
   assert.equal(summary.status, 'skipped');
-  assert.equal(summary.source, 'unknown');
+  assert.equal(summary.source, 'noop');
   assert.equal(summary.payload?.summary_en, null);
   assert.equal(summary.payload?.summary_zh, null);
   assert.equal(summary.error_message, NOOP_ENRICHMENT_REASON);
 
   assert.equal(translation.status, 'skipped');
+  assert.equal(translation.source, 'noop');
   assert.deepEqual(translation.payload?.target_languages, ['zh']);
   assert.equal(translation.payload?.source_language, 'en');
   assert.equal(translation.error_message, NOOP_ENRICHMENT_REASON);
 
   assert.equal(whyItMatters.status, 'skipped');
+  assert.equal(whyItMatters.source, 'noop');
   assert.deepEqual(whyItMatters.payload?.why_it_matters_en, []);
   assert.deepEqual(whyItMatters.payload?.why_it_matters_zh, []);
 
   assert.equal(language.status, 'skipped');
+  assert.equal(language.source, 'noop');
   assert.equal(language.payload?.source_language, 'en');
 });
 
@@ -266,6 +291,7 @@ test('AI enrichment preflight store contract keeps reads/writes server-side and 
     'intelligence_signals',
     'signal_source_items',
     'raw_source_items',
+    'content_entities',
     'signal_entities',
     'signal_topics',
     'canonical_topics',

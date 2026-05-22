@@ -9,9 +9,9 @@ Important boundaries:
 - Radar remains mock
 - Watchlist and Library remain on current behavior
 - the frontend real-content path is read-only
-- no AI summary or translation exists yet
+- no AI summary or translation exists yet in persisted/frontend-visible form
 - Task 12 enrichment fields are optional and may be absent in an older preview environment
-- Task 13-preflight adds server-only AI planning/contracts only and does not add a live AI QA path yet
+- Task 13B adds an optional DeepSeek dry-run path on the server side only and does not add AI writes
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -90,6 +90,12 @@ Required server-side env concepts:
 - `PHASE4_ENABLE_CONTENT_WRITES`
 - `PHASE4_WRITE_AUTH_TOKEN`
 - `PHASE4_ENABLE_LIVE_FETCH`
+- `PHASE4_ENABLE_AI_ENRICHMENT`
+- `PHASE4_AI_DRY_RUN_ONLY`
+- `AI_PROVIDER`
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_BASE_URL`
+- `DEEPSEEK_MODEL`
 
 Do not put real values in repo files.
 
@@ -209,20 +215,56 @@ Verify:
 - Radar remains mock
 - the app does not depend on Phase 4 preview reads for its normal default experience
 
-## 12. Task 13-preflight Boundary Check
+## 12. Task 13B DeepSeek Dry-Run
+
+Required server-side env:
+- `PHASE4_ENABLE_AI_ENRICHMENT=true`
+- `PHASE4_AI_DRY_RUN_ONLY=true`
+- `AI_PROVIDER=deepseek`
+- `DEEPSEEK_API_KEY=<server-only secret>`
+- `DEEPSEEK_BASE_URL=https://api.deepseek.com`
+- `DEEPSEEK_MODEL=deepseek-chat`
+
+Example one-signal dry-run:
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --data '{
+    "dryRun": true,
+    "aiEnrichment": {
+      "provider": "deepseek",
+      "maxSignals": 1,
+      "signalIds": ["<existing-intelligence-signal-id>"]
+    }
+  }'
+```
+
+Expected conceptually:
+- response returns `dry_run: true`
+- response identifies `provider: deepseek`
+- response includes proposed enrichment output only
+- response includes per-signal status and token estimates
+- no database writes are performed
+- if `DEEPSEEK_API_KEY` is missing, response fails clearly with `provider_not_configured`
+
+## 13. Task 13 Boundary Check
 
 Verify conceptually:
-- no AI provider calls have been added
-- no AI SDKs or API keys are required yet
+- DeepSeek is server-side only
+- no AI SDKs are imported into frontend runtime code
 - frontend runtime files do not import server-only AI enrichment modules
-- future AI env names remain placeholders only:
+- required server-side AI env names are:
   - `PHASE4_ENABLE_AI_ENRICHMENT`
-  - `PHASE4_AI_PROVIDER`
-  - `PHASE4_AI_API_KEY`
-  - `PHASE4_AI_MODEL`
-  - `PHASE4_AI_MAX_SIGNALS_PER_RUN`
+  - `PHASE4_AI_DRY_RUN_ONLY`
+  - `AI_PROVIDER`
+  - `DEEPSEEK_API_KEY`
+  - `DEEPSEEK_BASE_URL`
+  - `DEEPSEEK_MODEL`
 - future `enrichment_error` values must stay sanitized and operator-safe only
-- future AI implementation is still expected to start in guarded server-side dry-run mode, not default write mode
+- Task 13B still performs no AI writes and no scheduled AI jobs
+- future AI implementation is still expected to stay guarded and server-side only
 
 ## Suggested Manual Order
 
@@ -238,4 +280,6 @@ Verify conceptually:
 10. Enable frontend preview with `VITE_USE_REAL_CONTENT_FEED=true`
 11. Verify Today preview and Detail provenance
 12. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
-13. For Task 13-preflight only, verify docs and tests describe future server-side AI boundaries without introducing any live AI path
+13. If validating Task 13B, configure DeepSeek server-side env only
+14. Run one-signal DeepSeek dry-run against `phase4-dry-run`
+15. Confirm the response returns proposed enrichment output only and performs no writes

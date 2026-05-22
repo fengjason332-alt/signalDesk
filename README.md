@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, and server-only AI enrichment preflight contracts
+- Phase 4 Tasks 0-12 plus Task 13-preflight and Task 13B: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, and a guarded DeepSeek dry-run provider path
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -32,6 +32,7 @@ Current confirmed project state:
 - live RSS dry-run and write-mode smoke tests have succeeded
 - Supabase content tables now contain real rows in the active preview environment
 - Today can preview real Supabase content when explicitly enabled
+- an optional server-side DeepSeek dry-run enrichment path now exists behind explicit env gating
 
 ## What SignalDesk Currently Does
 
@@ -64,9 +65,9 @@ Server-side content pipeline:
 - Radar
 - Watchlist fixture catalog / existing non-real-content behavior
 - Library fixture content / existing non-real-content behavior
-- AI summaries and AI translations do not exist yet
+- AI-enriched summaries and AI translations are not persisted or shown in the frontend yet
 - Task 12 only prepares optional enrichment-ready schema and read-path support without introducing AI calls
-- Task 13-preflight only prepares server-side AI enrichment boundaries, no-op provider stubs, and planning docs without introducing AI calls
+- Task 13B adds the first optional real provider path as a server-side DeepSeek dry-run only
 
 ## Local Development
 
@@ -113,10 +114,11 @@ Do not place these in the client bundle. These are server-side concepts for the 
 - `PHASE4_WRITE_AUTH_TOKEN`
 - `PHASE4_ENABLE_LIVE_FETCH`
 - `PHASE4_ENABLE_AI_ENRICHMENT`
-- `PHASE4_AI_PROVIDER`
-- `PHASE4_AI_API_KEY`
-- `PHASE4_AI_MODEL`
-- `PHASE4_AI_MAX_SIGNALS_PER_RUN`
+- `PHASE4_AI_DRY_RUN_ONLY`
+- `AI_PROVIDER`
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_BASE_URL`
+- `DEEPSEEK_MODEL`
 
 Safety model:
 - `dryRun: true` is the default
@@ -124,7 +126,8 @@ Safety model:
 - write mode also requires server-side enablement plus a matching write token
 - frontend preview is read-only
 - frontend does not write Phase 4 content tables
-- there are no AI provider calls yet
+- DeepSeek enrichment calls exist only on the server and only in dry-run mode when explicitly enabled
+- Task 13B does not write AI output back to Supabase
 - future AI enrichment must remain server-side only and manually/dry-run gated first
 
 ## Manual Supabase SQL Assets
@@ -154,6 +157,15 @@ Use this order for a new non-production environment:
    - duplicate reruns should not duplicate raw items or deterministic candidate signals
 9. Apply `supabase/manual/phase4_preview_read_policies.sql`
 10. Enable frontend preview locally with `VITE_USE_REAL_CONTENT_FEED=true`
+11. Optionally configure DeepSeek dry-run env on the Edge Function:
+   - `PHASE4_ENABLE_AI_ENRICHMENT=true`
+   - `PHASE4_AI_DRY_RUN_ONLY=true`
+   - `AI_PROVIDER=deepseek`
+   - `DEEPSEEK_API_KEY=<server-only secret>`
+   - `DEEPSEEK_BASE_URL=https://api.deepseek.com`
+   - `DEEPSEEK_MODEL=deepseek-chat`
+12. Run a one-signal AI dry-run request against `phase4-dry-run`
+13. Verify the response returns proposed enrichment output only and performs no database writes
 
 ## Current Safety Model
 
@@ -162,15 +174,17 @@ Use this order for a new non-production environment:
 - Today does not switch to real content by default
 - Radar remains mock
 - Watchlist and Library remain mock or existing behavior
-- no AI calls exist yet
 - no AI keys or secrets should be committed
+- DeepSeek is the first optional provider and remains server-side only
+- AI dry-run remains the only supported AI mode in Task 13B
+- no frontend or client-side Phase 4 content writes have been added
 
 ## Known Limitations
 
 - full article body storage is not implemented yet
 - no AI summary exists yet
 - no AI-generated Chinese translation exists yet
-- Task 13-preflight adds no-op provider/planning stubs only, not live AI
+- Task 13B DeepSeek dry-run does not write enrichment results to Supabase yet
 - no scheduled ingestion exists yet
 - the Today real-content path is still preview-only
 - Radar is still mock

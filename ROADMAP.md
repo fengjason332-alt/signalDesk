@@ -22,7 +22,7 @@ Phase 3 did not move content cards or feed data into Supabase.
 
 Phase 4 is the real-content phase. Its purpose is to ingest real information, store raw source items, deduplicate them, generate structured intelligence signals, and eventually feed those results into the Today experience without breaking the mock-first default rollout.
 
-### Phase 4 Tasks 0-12 Plus Task 13-preflight Complete
+### Phase 4 Tasks 0-12 Plus Task 13-preflight And Task 13B Complete
 
 1. Task 0: content-domain foundation types, additive mappers, and Phase 4 schema draft
 2. Task 1: source registry and RSS ingestion skeleton
@@ -38,6 +38,7 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 12. Task 11: preview quality hardening for deterministic ranking, multi-source provenance display readiness, safe row skipping, and filter parity
 13. Task 12: enrichment-ready schema, optional enrichment contract/types, preview read fallback compatibility, and non-AI detail placeholders
 14. Task 13-preflight: guarded AI enrichment architecture plan, server-only provider-neutral no-op interfaces, cost/write guardrails, and dry-run-first boundaries without any AI calls
+15. Task 13B: server-side DeepSeek dry-run provider integration, guarded prompt/input validation, structured JSON-only proposed outputs, and no-write dry-run endpoint support
 
 ### Current Phase 4 Status
 
@@ -53,15 +54,15 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 - Radar remains mock
 - AI summary and translation are still not implemented
 - enrichment-ready columns and read helpers now exist, but they remain optional and do not introduce AI or client writes
-- AI preflight contracts now exist server-side, but live provider integration is still intentionally unimplemented
+- DeepSeek dry-run provider integration now exists server-side, but no AI output persistence has been enabled yet
 
 ## Next Recommended Tasks
 
-### Task 13: Guarded AI Enrichment Dry-Run Implementation
+### Task 13C: Guarded AI Enrichment Write-Path Design And Manual Persistence Plan
 
-- implement the first server-side AI enrichment path in dry-run mode only
-- keep AI behind explicit server-side controls and no-op fallback behavior
-- add retry/lease bookkeeping before any scheduled rollout
+- keep AI behind explicit server-side controls and dry-run-first behavior
+- design the first manual-only persistence step for validated AI output into enrichment-ready `intelligence_signals` columns
+- add sanitized failure handling, provider/version recording strategy, and explicit non-production validation steps before any write-mode AI task
 - do not broaden rollout beyond guarded dry-run until preview stability is proven
 
 ### Task 14: Scheduled Ingestion
