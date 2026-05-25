@@ -1,6 +1,6 @@
 # SignalDesk Codex Handoff
 
-## Latest Handoff: 2026-05-22
+## Latest Handoff: 2026-05-23
 
 This handoff supersedes older Phase 4 notes. Use this section first before touching code.
 
@@ -31,8 +31,9 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - the frontend real-content path is read-only
 - no AI summary exists yet in persisted/frontend-visible form
 - no AI translation exists yet in persisted/frontend-visible form
-- DeepSeek is now wired as the first optional server-side provider for dry-run only
-- Task 13B does not write AI outputs to Supabase
+- DeepSeek is now wired as the first optional server-side provider
+- Task 13C adds a guarded manual-only AI write mode
+- AI writes are limited to enrichment-ready columns on `public.intelligence_signals`
 
 ### Current Test Status
 
@@ -83,6 +84,7 @@ Do not commit any of these secrets or real values.
 
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
 - `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
+- `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
 - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 - `supabase/manual/phase4_content_readiness_checks.sql`
 - `supabase/manual/phase4_preview_read_policies.sql`
@@ -103,16 +105,17 @@ Do not commit any of these secrets or real values.
 9. Enable `VITE_USE_REAL_CONTENT_FEED=true` locally
 10. Verify Today preview and Detail provenance
 11. Set `VITE_USE_REAL_CONTENT_FEED=false` again and confirm Today returns to mock
-12. If intentionally validating Task 13B, configure DeepSeek server env only
+12. If intentionally validating Task 13B or Task 13C, configure DeepSeek server env only
 13. Run one-signal AI dry-run against `phase4-dry-run`
-14. Verify the response returns proposed enrichment output only and performs no database writes
+14. For Task 13C, set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
+15. Verify only enrichment-ready `intelligence_signals` fields changed and that Today preview prefers enriched text when present
 
 ### Boundaries For The Next Session
 
 - Do not switch default Today feed yet.
 - Do not touch Radar real-data integration yet.
 - Do not add any new frontend AI calls.
-- Do not write AI output to Supabase until a follow-up task explicitly approves that boundary.
+- Do not broaden AI writes beyond the guarded manual `intelligence_signals` enrichment-field scope.
 - Do not commit `.env` or secrets.
 - Do not add frontend writes to Phase 4 content tables.
 - Do not weaken write-mode guardrails for the Edge Function.
@@ -166,10 +169,41 @@ Do not commit any of these secrets or real values.
 
 ### Exact Next Recommended Task
 
-Phase 4 Task 13C:
-- guarded AI enrichment write-path design and manual-only persistence plan on the server side
+### Latest Task 13C Status
+
+- AI write mode remains manual-only and off by default
+- writes require:
+  - `dryRun: false`
+  - `aiEnrichment.writeMode: true`
+  - `PHASE4_ENABLE_AI_ENRICHMENT=true`
+  - `PHASE4_AI_DRY_RUN_ONLY=false`
+  - `AI_PROVIDER=deepseek`
+  - `DEEPSEEK_API_KEY`
+  - matching `x-phase4-write-token`
+- write mode is capped at three signals and defaults to one signal when `signalIds` are omitted
+- only these `public.intelligence_signals` fields are written:
+  - `enrichment_status`
+  - `enrichment_version`
+  - `enrichment_source`
+  - `summary_status`
+  - `translation_status`
+  - `source_language`
+  - `target_languages`
+  - `enriched_summary_en`
+  - `enriched_summary_zh`
+  - `enriched_why_it_matters_en`
+  - `enriched_why_it_matters_zh`
+  - `enrichment_error`
+  - `last_enriched_at`
+  - `updated_at`
+- deterministic headline/summary/category/score/provenance fields are not overwritten
+- invalid provider output is not written
+
+### Exact Next Recommended Task
+
+Phase 4 Task 13D:
+- manual non-production AI write validation plus lease/retry hardening on the server side
 - keep the real-content path read-only on the client
 - keep Today mock by default
 - keep Radar on mock
-- require explicit server-side controls before any AI write mode
 - do not jump to scheduled enrichment until retry/lease bookkeeping is designed

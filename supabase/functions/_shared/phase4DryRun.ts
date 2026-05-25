@@ -5,7 +5,7 @@ import {
   normalizeFeedItem,
 } from './rss.ts';
 import {
-  createPhase4AiEnrichmentDryRun,
+  runPhase4AiEnrichment,
   isAiEnrichmentRequest,
   type Phase4AiEnrichmentRuntimeOptions,
   type Phase4AiEnrichmentServerConfig,
@@ -130,6 +130,56 @@ const getWriteResponseStatus = (result: Phase4IngestionResult) => {
   }
 
   if (result.overall_status === 'partial_success') {
+    return 207;
+  }
+
+  return 200;
+};
+
+const getAiEnrichmentResponseStatus = (
+  result: Awaited<ReturnType<typeof runPhase4AiEnrichment>>,
+) => {
+  if (result.code === 'provider_not_configured' || result.code === 'ai_enrichment_disabled') {
+    return 503;
+  }
+
+  if (result.code === 'ai_store_not_configured') {
+    return 503;
+  }
+
+  if (
+    result.code === 'ai_dry_run_only' ||
+    result.code === 'unsupported_provider' ||
+    result.code === 'ai_write_requires_dry_run_false' ||
+    result.code === 'ai_write_mode_required' ||
+    result.code === 'ai_write_token_missing' ||
+    result.code === 'ai_write_token_mismatch'
+  ) {
+    return 403;
+  }
+
+  if (result.code === 'ai_write_token_not_configured') {
+    return 503;
+  }
+
+  if (result.code === 'ai_write_signal_limit_exceeded') {
+    return 400;
+  }
+
+  if (result.dry_run) {
+    return 200;
+  }
+
+  if (
+    'written_count' in result &&
+    result.failed_count > 0 &&
+    result.written_count === 0 &&
+    result.skipped_count === 0
+  ) {
+    return 500;
+  }
+
+  if ('written_count' in result && result.failed_count > 0) {
     return 207;
   }
 
@@ -723,23 +773,16 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
 
     if (isAiEnrichmentRequest(body)) {
       try {
-        const preview = await createPhase4AiEnrichmentDryRun(body, {
+        const preview = await runPhase4AiEnrichment(body, {
           aiEnrichmentStore: options.aiEnrichmentStore,
           aiConfig: options.aiConfig,
           fetchImpl: options.aiFetchImpl,
           now: options.now,
+          writeAuthToken: options.writeAuthToken ?? null,
+          requestWriteToken: request.headers.get('x-phase4-write-token'),
         });
 
-        return jsonResponse(
-          preview,
-          preview.code === 'provider_not_configured' ||
-            preview.code === 'ai_enrichment_disabled' ||
-            preview.code === 'ai_store_not_configured'
-            ? 503
-            : preview.code === 'ai_dry_run_only' || preview.code === 'unsupported_provider'
-              ? 403
-              : 200,
-        );
+        return jsonResponse(preview, getAiEnrichmentResponseStatus(preview));
       } catch (error) {
         return jsonResponse(
           {

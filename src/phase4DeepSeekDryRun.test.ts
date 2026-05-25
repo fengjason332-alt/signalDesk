@@ -172,6 +172,10 @@ class FakeAiEnrichmentStore implements Phase4AiEnrichmentStore {
   async writeEnrichmentResult() {
     this.writeCalls += 1;
   }
+
+  async readEnrichmentResult() {
+    return null;
+  }
 }
 
 test('resolvePhase4AiEnrichmentServerConfig reads only server-side DeepSeek env names with safe defaults', () => {

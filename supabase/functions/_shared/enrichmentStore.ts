@@ -33,6 +33,7 @@ export const PHASE4_AI_ENRICHMENT_WRITE_COLUMNS = [
   'enriched_why_it_matters_zh',
   'enrichment_error',
   'last_enriched_at',
+  'updated_at',
 ] as const;
 
 export interface Phase4AiEnrichmentTopicRow {
@@ -111,6 +112,20 @@ export interface Phase4AiEnrichmentWritePatch {
   enriched_why_it_matters_zh: string[];
   enrichment_error: string | null;
   last_enriched_at: string;
+  updated_at?: string;
+}
+
+export interface Phase4AiEnrichmentReadbackRecord {
+  signal_id: string;
+  enrichment_status: EnrichmentStatus;
+  enrichment_version: number | null;
+  enrichment_source: EnrichmentSource | null;
+  summary_status: EnrichmentStatus;
+  translation_status: EnrichmentStatus;
+  source_language: ContentLanguage | null;
+  target_languages: ContentLanguage[];
+  enrichment_error: string | null;
+  last_enriched_at: string | null;
 }
 
 export interface Phase4AiEnrichmentStore {
@@ -120,6 +135,9 @@ export interface Phase4AiEnrichmentStore {
     signalId: string,
     patch: Phase4AiEnrichmentWritePatch,
   ): Promise<void>;
+  readEnrichmentResult(
+    signalId: string,
+  ): Promise<Phase4AiEnrichmentReadbackRecord | null>;
 }
 
 type SupabaseRuntimeClient = {
@@ -271,6 +289,19 @@ type SupabaseAiEnrichmentRow = {
     | null;
 };
 
+type SupabaseAiEnrichmentReadbackRow = {
+  id: string;
+  enrichment_status: EnrichmentStatus | null;
+  enrichment_version: number | null;
+  enrichment_source: EnrichmentSource | null;
+  summary_status: EnrichmentStatus | null;
+  translation_status: EnrichmentStatus | null;
+  source_language: ContentLanguage | null;
+  target_languages: ContentLanguage[] | null;
+  enrichment_error: string | null;
+  last_enriched_at: string | null;
+};
+
 const normalizeText = (value: string | null | undefined) => value?.trim() ?? '';
 
 export function createSupabaseAiEnrichmentStore(
@@ -386,15 +417,75 @@ export function createSupabaseAiEnrichmentStore(
     },
 
     async claimSignalForEnrichment(_input) {
-      throw new Error(
-        'Task 13B does not enable AI enrichment claim/write mode. Keep dryRun: true.',
+      // Task 13C uses direct validated writes after provider completion.
+      // A lease/claim mechanism can be added later for scheduled execution.
+      return false;
+    },
+
+    async writeEnrichmentResult(signalId, patch) {
+      await runSupabaseQuery(
+        client
+          .from('intelligence_signals')
+          .update({
+            enrichment_status: patch.enrichment_status,
+            enrichment_version: patch.enrichment_version,
+            enrichment_source: patch.enrichment_source,
+            summary_status: patch.summary_status,
+            translation_status: patch.translation_status,
+            source_language: patch.source_language,
+            target_languages: [...patch.target_languages],
+            enriched_summary_en: patch.enriched_summary_en,
+            enriched_summary_zh: patch.enriched_summary_zh,
+            enriched_why_it_matters_en: [...patch.enriched_why_it_matters_en],
+            enriched_why_it_matters_zh: [...patch.enriched_why_it_matters_zh],
+            enrichment_error: patch.enrichment_error,
+            last_enriched_at: patch.last_enriched_at,
+            ...(patch.updated_at ? { updated_at: patch.updated_at } : {}),
+          })
+          .eq('id', signalId),
+        'update intelligence_signals enrichment fields',
       );
     },
 
-    async writeEnrichmentResult(_signalId, _patch) {
-      throw new Error(
-        'Task 13B does not enable AI enrichment writes. Proposed outputs stay in dry-run responses only.',
+    async readEnrichmentResult(signalId) {
+      const rows = await runSupabaseQuery(
+        client
+          .from('intelligence_signals')
+          .select(
+            [
+              'id',
+              'enrichment_status',
+              'enrichment_version',
+              'enrichment_source',
+              'summary_status',
+              'translation_status',
+              'source_language',
+              'target_languages',
+              'enrichment_error',
+              'last_enriched_at',
+            ].join(','),
+          )
+          .eq('id', signalId),
+        'read intelligence_signals enrichment fields',
       );
+
+      const row = ((rows ?? []) as SupabaseAiEnrichmentReadbackRow[])[0] ?? null;
+      if (!row) {
+        return null;
+      }
+
+      return {
+        signal_id: row.id,
+        enrichment_status: row.enrichment_status ?? 'not_requested',
+        enrichment_version: row.enrichment_version,
+        enrichment_source: row.enrichment_source,
+        summary_status: row.summary_status ?? 'not_requested',
+        translation_status: row.translation_status ?? 'not_requested',
+        source_language: row.source_language,
+        target_languages: [...(row.target_languages ?? [])],
+        enrichment_error: row.enrichment_error,
+        last_enriched_at: row.last_enriched_at,
+      };
     },
   };
 }

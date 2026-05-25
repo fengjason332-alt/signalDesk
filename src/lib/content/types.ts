@@ -83,6 +83,7 @@ export type EnrichmentStatus = (typeof ENRICHMENT_STATUSES)[number];
 
 export const ENRICHMENT_SOURCES = [
   'deterministic',
+  'deepseek',
   'manual',
   'unknown',
 ] as const;

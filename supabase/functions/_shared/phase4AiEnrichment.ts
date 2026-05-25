@@ -5,6 +5,7 @@ import {
   type AiEnrichmentProviderName,
   type AiEnrichmentSignalInput,
   type AiEnrichmentTargetLanguage,
+  type AiEnrichmentTokenUsage,
 } from './enrichmentProvider.ts';
 import {
   createAiEnrichmentJobPlan,
@@ -13,7 +14,9 @@ import {
 } from './enrichmentPlanner.ts';
 import {
   type Phase4AiEnrichmentCandidateRecord,
+  type Phase4AiEnrichmentReadbackRecord,
   type Phase4AiEnrichmentStore,
+  type Phase4AiEnrichmentWritePatch,
 } from './enrichmentStore.ts';
 import { createDeepSeekAiEnrichmentProvider } from './deepseekProvider.ts';
 import type { ContentLanguage } from './types.ts';
@@ -36,6 +39,7 @@ export interface Phase4AiEnrichmentRequest {
   maxSignals?: number;
   targetLanguages?: ContentLanguage[];
   force?: boolean;
+  writeMode?: boolean;
 }
 
 export interface Phase4AiEnrichmentRequestEnvelope {
@@ -44,7 +48,7 @@ export interface Phase4AiEnrichmentRequestEnvelope {
 }
 
 export interface Phase4AiEnrichmentServerConfig {
-  provider: AiEnrichmentProviderName | 'deepseek';
+  provider: AiEnrichmentProviderName;
   enabled: boolean;
   dryRunOnly: boolean;
   deepseekApiKey?: string;
@@ -52,45 +56,50 @@ export interface Phase4AiEnrichmentServerConfig {
   deepseekModel: string;
 }
 
+type Phase4AiEnrichmentErrorCode =
+  | 'provider_not_configured'
+  | 'ai_enrichment_disabled'
+  | 'ai_dry_run_only'
+  | 'ai_store_not_configured'
+  | 'unsupported_provider'
+  | 'ai_write_requires_dry_run_false'
+  | 'ai_write_mode_required'
+  | 'ai_write_token_not_configured'
+  | 'ai_write_token_missing'
+  | 'ai_write_token_mismatch'
+  | 'ai_write_signal_limit_exceeded';
+
+type Phase4AiEnrichmentSkippedReason =
+  | 'proposed'
+  | 'written'
+  | 'provider_not_configured'
+  | 'provider_disabled'
+  | 'unsupported_provider'
+  | 'already_pending'
+  | 'already_completed_for_version'
+  | 'retry_backoff_active'
+  | 'not_preview_lifecycle'
+  | 'generation_failed'
+  | 'invalid_output'
+  | 'provider_failed'
+  | 'skipped_existing_enrichment';
+
 export interface Phase4AiEnrichmentDryRunSignalResult {
   signal_id: string;
   status: 'completed' | 'skipped' | 'failed';
-  reason:
-    | 'proposed'
-    | 'provider_not_configured'
-    | 'provider_disabled'
-    | 'unsupported_provider'
-    | 'already_pending'
-    | 'already_completed_for_version'
-    | 'retry_backoff_active'
-    | 'not_preview_lifecycle'
-    | 'generation_failed'
-    | 'invalid_output'
-    | 'provider_failed';
-  provider: AiEnrichmentProviderName | 'deepseek';
+  reason: Phase4AiEnrichmentSkippedReason;
+  provider: AiEnrichmentProviderName;
   model: string | null;
   proposed_output: AiCombinedEnrichmentPayload | null;
-  token_usage: {
-    prompt_tokens: number | null;
-    completion_tokens: number | null;
-    total_tokens: number | null;
-    approximate_prompt_tokens: number;
-    approximate_completion_tokens: number | null;
-    approximate_total_tokens: number | null;
-  } | null;
+  token_usage: AiEnrichmentTokenUsage | null;
   error_message: string | null;
 }
 
 export interface Phase4AiEnrichmentDryRunResponse {
   dry_run: true;
-  provider: AiEnrichmentProviderName | 'deepseek';
+  provider: AiEnrichmentProviderName;
   model: string | null;
-  code?:
-    | 'provider_not_configured'
-    | 'ai_enrichment_disabled'
-    | 'ai_dry_run_only'
-    | 'ai_store_not_configured'
-    | 'unsupported_provider';
+  code?: Phase4AiEnrichmentErrorCode;
   error?: string;
   no_writes_performed: true;
   write_mode_enabled: false;
@@ -105,15 +114,68 @@ export interface Phase4AiEnrichmentDryRunResponse {
   approximate_total_tokens: number;
 }
 
+type Phase4AiValidationStatus = 'passed' | 'failed' | 'not_attempted';
+type Phase4AiWriteStatus =
+  | 'written'
+  | 'skipped_existing_enrichment'
+  | 'not_attempted'
+  | 'failed';
+type Phase4AiReadbackStatus = 'loaded' | 'missing' | 'not_attempted' | 'failed';
+
+export interface Phase4AiEnrichmentWriteSignalResult {
+  signal_id: string;
+  status: 'completed' | 'skipped' | 'failed';
+  reason: Phase4AiEnrichmentSkippedReason;
+  provider: AiEnrichmentProviderName;
+  model: string | null;
+  provider_status: 'completed' | 'failed' | 'skipped' | 'not_called';
+  validation_status: Phase4AiValidationStatus;
+  write_status: Phase4AiWriteStatus;
+  readback_status: Phase4AiReadbackStatus;
+  enrichment_status_after_write: string | null;
+  last_enriched_at_after_write: string | null;
+  readback: Phase4AiEnrichmentReadbackRecord | null;
+  proposed_output: AiCombinedEnrichmentPayload | null;
+  token_usage: AiEnrichmentTokenUsage | null;
+  error_message: string | null;
+}
+
+export interface Phase4AiEnrichmentWriteResponse {
+  dry_run: false;
+  provider: AiEnrichmentProviderName;
+  model: string | null;
+  code?: Phase4AiEnrichmentErrorCode;
+  error?: string;
+  no_writes_performed: boolean;
+  write_mode_enabled: true;
+  requested_signal_ids: string[];
+  selected_signal_count: number;
+  proposed_outputs: Phase4AiEnrichmentWriteSignalResult[];
+  proposed_count: number;
+  written_count: number;
+  skipped_count: number;
+  failed_count: number;
+  approximate_prompt_tokens: number;
+  approximate_completion_tokens: number;
+  approximate_total_tokens: number;
+}
+
+export type Phase4AiEnrichmentResponse =
+  | Phase4AiEnrichmentDryRunResponse
+  | Phase4AiEnrichmentWriteResponse;
+
 export interface Phase4AiEnrichmentRuntimeOptions {
   aiEnrichmentStore?: Phase4AiEnrichmentStore | null;
   aiConfig?: Phase4AiEnrichmentServerConfig | null;
   fetchImpl?: FetchLike;
   now?: () => string;
+  writeAuthToken?: string | null;
+  requestWriteToken?: string | null;
 }
 
 const DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 const DEFAULT_DEEPSEEK_MODEL = 'deepseek-chat';
+const MAX_AI_WRITE_MODE_SIGNALS = 3;
 
 const normalizeText = (value: string | null | undefined) => value?.trim() ?? '';
 
@@ -139,24 +201,24 @@ const normalizeTargetLanguages = (
 
 const isAiEnrichmentProvider = (
   value: string | null | undefined,
-): value is AiEnrichmentProviderName | 'deepseek' =>
-  value === 'noop' || value === 'deepseek';
+): value is AiEnrichmentProviderName => value === 'noop' || value === 'deepseek';
 
 const getRequestConfig = (request: Phase4AiEnrichmentRequestEnvelope) => ({
   provider:
     isAiEnrichmentProvider(request.aiEnrichment?.provider)
-      ? request.aiEnrichment?.provider
+      ? request.aiEnrichment.provider
       : 'noop',
   signalIds: [...(request.aiEnrichment?.signalIds ?? [])],
   maxSignals: request.aiEnrichment?.maxSignals,
   targetLanguages: normalizeTargetLanguages(request.aiEnrichment?.targetLanguages),
   force: request.aiEnrichment?.force === true,
+  writeMode: request.aiEnrichment?.writeMode === true,
 });
 
-const buildErrorResponse = (
-  provider: AiEnrichmentProviderName | 'deepseek',
+const buildDryRunErrorResponse = (
+  provider: AiEnrichmentProviderName,
   model: string | null,
-  code: NonNullable<Phase4AiEnrichmentDryRunResponse['code']>,
+  code: Phase4AiEnrichmentErrorCode,
   error: string,
   requestedSignalIds: string[],
 ): Phase4AiEnrichmentDryRunResponse => ({
@@ -171,6 +233,32 @@ const buildErrorResponse = (
   selected_signal_count: 0,
   proposed_outputs: [],
   proposed_count: 0,
+  skipped_count: 0,
+  failed_count: 1,
+  approximate_prompt_tokens: 0,
+  approximate_completion_tokens: 0,
+  approximate_total_tokens: 0,
+});
+
+const buildWriteErrorResponse = (
+  provider: AiEnrichmentProviderName,
+  model: string | null,
+  code: Phase4AiEnrichmentErrorCode,
+  error: string,
+  requestedSignalIds: string[],
+): Phase4AiEnrichmentWriteResponse => ({
+  dry_run: false,
+  provider,
+  model,
+  code,
+  error,
+  no_writes_performed: true,
+  write_mode_enabled: true,
+  requested_signal_ids: requestedSignalIds,
+  selected_signal_count: 0,
+  proposed_outputs: [],
+  proposed_count: 0,
+  written_count: 0,
   skipped_count: 0,
   failed_count: 1,
   approximate_prompt_tokens: 0,
@@ -251,7 +339,7 @@ const toSkippedReason = (
     | 'already_completed_for_version'
     | 'translation_complete_for_targets'
     | 'retry_backoff_active',
-): Phase4AiEnrichmentDryRunSignalResult['reason'] => {
+): Phase4AiEnrichmentSkippedReason => {
   switch (reason) {
     case 'not_preview_lifecycle':
       return 'not_preview_lifecycle';
@@ -272,7 +360,7 @@ const toSkippedReason = (
 };
 
 const selectProvider = (
-  requestProvider: AiEnrichmentProviderName | 'deepseek',
+  requestProvider: AiEnrichmentProviderName,
   config: Phase4AiEnrichmentServerConfig,
   fetchImpl?: FetchLike,
   maxInputChars?: number,
@@ -297,6 +385,111 @@ const selectProvider = (
     maxInputChars,
   });
 };
+
+const getTotals = (
+  results: Array<{
+    token_usage: AiEnrichmentTokenUsage | null;
+  }>,
+) => ({
+  approximate_prompt_tokens: results.reduce(
+    (sum, result) => sum + (result.token_usage?.approximate_prompt_tokens ?? 0),
+    0,
+  ),
+  approximate_completion_tokens: results.reduce(
+    (sum, result) => sum + (result.token_usage?.approximate_completion_tokens ?? 0),
+    0,
+  ),
+  approximate_total_tokens: results.reduce(
+    (sum, result) => sum + (result.token_usage?.approximate_total_tokens ?? 0),
+    0,
+  ),
+});
+
+const isNonEmptyString = (value: string | null | undefined) =>
+  normalizeText(value).length > 0;
+
+const validateCombinedEnrichmentPayload = (
+  payload: AiCombinedEnrichmentPayload | null,
+): { valid: boolean; error: string | null } => {
+  if (!payload) {
+    return {
+      valid: false,
+      error: 'Provider returned no enrichment payload.',
+    };
+  }
+
+  if (
+    !isNonEmptyString(payload.enriched_summary_en) ||
+    !isNonEmptyString(payload.enriched_summary_zh) ||
+    !Array.isArray(payload.enriched_why_it_matters_en) ||
+    payload.enriched_why_it_matters_en.every(value => !isNonEmptyString(value)) ||
+    !Array.isArray(payload.enriched_why_it_matters_zh) ||
+    payload.enriched_why_it_matters_zh.every(value => !isNonEmptyString(value)) ||
+    !payload.source_language ||
+    !Array.isArray(payload.target_languages) ||
+    payload.target_languages.length === 0
+  ) {
+    return {
+      valid: false,
+      error: 'Provider payload is missing required enrichment fields.',
+    };
+  }
+
+  return {
+    valid: true,
+    error: null,
+  };
+};
+
+const buildWritePatch = (
+  payload: AiCombinedEnrichmentPayload,
+  plan: AiEnrichmentJobPlan,
+  timestamp: string,
+): Phase4AiEnrichmentWritePatch => ({
+  enrichment_status: 'completed',
+  enrichment_version: plan.targetEnrichmentVersion,
+  enrichment_source: 'deepseek',
+  summary_status: 'completed',
+  translation_status: 'completed',
+  source_language: payload.source_language,
+  target_languages: [...payload.target_languages],
+  enriched_summary_en: normalizeText(payload.enriched_summary_en) || null,
+  enriched_summary_zh: normalizeText(payload.enriched_summary_zh) || null,
+  enriched_why_it_matters_en: normalizeStringArray(payload.enriched_why_it_matters_en),
+  enriched_why_it_matters_zh: normalizeStringArray(payload.enriched_why_it_matters_zh),
+  enrichment_error: null,
+  last_enriched_at: timestamp,
+  updated_at: timestamp,
+});
+
+const getWriteModeMaxSignals = (
+  signalIds: string[],
+  maxSignals: number | undefined,
+): number => {
+  if (signalIds.length === 0) {
+    return 1;
+  }
+
+  if (typeof maxSignals !== 'number' || Number.isNaN(maxSignals)) {
+    return Math.min(signalIds.length, MAX_AI_WRITE_MODE_SIGNALS);
+  }
+
+  return Math.min(Math.max(1, Math.trunc(maxSignals)), MAX_AI_WRITE_MODE_SIGNALS);
+};
+
+const getWriteErrorModel = (
+  requestProvider: AiEnrichmentProviderName,
+  config: Phase4AiEnrichmentServerConfig | null,
+) => (requestProvider === 'deepseek' ? config?.deepseekModel ?? null : null);
+
+const resolveEligibleCandidates = (
+  candidates: Phase4AiEnrichmentCandidateRecord[],
+  plan: AiEnrichmentJobPlan,
+) =>
+  candidates.map(candidate => ({
+    candidate,
+    decision: shouldEnrichCandidateSignal(toPlannerCandidateRow(candidate), plan),
+  }));
 
 export const isAiEnrichmentRequest = (
   request: unknown,
@@ -334,9 +527,9 @@ export async function createPhase4AiEnrichmentDryRun(
   const config = options.aiConfig ?? null;
 
   if (request.dryRun === false) {
-    return buildErrorResponse(
+    return buildDryRunErrorResponse(
       requestConfig.provider,
-      requestConfig.provider === 'deepseek' ? config?.deepseekModel ?? null : null,
+      getWriteErrorModel(requestConfig.provider, config),
       'ai_dry_run_only',
       'Task 13B only supports AI enrichment dry-run mode. Keep dryRun: true.',
       requestConfig.signalIds,
@@ -344,9 +537,9 @@ export async function createPhase4AiEnrichmentDryRun(
   }
 
   if (!options.aiEnrichmentStore) {
-    return buildErrorResponse(
+    return buildDryRunErrorResponse(
       requestConfig.provider,
-      requestConfig.provider === 'deepseek' ? config?.deepseekModel ?? null : null,
+      getWriteErrorModel(requestConfig.provider, config),
       'ai_store_not_configured',
       'AI enrichment dry-run requires a server-side Supabase enrichment store.',
       requestConfig.signalIds,
@@ -354,9 +547,9 @@ export async function createPhase4AiEnrichmentDryRun(
   }
 
   if (!config || !config.enabled) {
-    return buildErrorResponse(
+    return buildDryRunErrorResponse(
       requestConfig.provider,
-      requestConfig.provider === 'deepseek' ? config?.deepseekModel ?? null : null,
+      getWriteErrorModel(requestConfig.provider, config),
       'ai_enrichment_disabled',
       'AI enrichment dry-run is disabled on this server.',
       requestConfig.signalIds,
@@ -364,7 +557,7 @@ export async function createPhase4AiEnrichmentDryRun(
   }
 
   if (requestConfig.provider === 'deepseek' && !config.deepseekApiKey) {
-    return buildErrorResponse(
+    return buildDryRunErrorResponse(
       'deepseek',
       config.deepseekModel,
       'provider_not_configured',
@@ -394,9 +587,9 @@ export async function createPhase4AiEnrichmentDryRun(
   );
 
   if (!provider) {
-    return buildErrorResponse(
+    return buildDryRunErrorResponse(
       requestConfig.provider,
-      requestConfig.provider === 'deepseek' ? config.deepseekModel : null,
+      getWriteErrorModel(requestConfig.provider, config),
       'unsupported_provider',
       `Provider ${requestConfig.provider} is not available in this server configuration.`,
       requestConfig.signalIds,
@@ -406,10 +599,7 @@ export async function createPhase4AiEnrichmentDryRun(
   const candidates = await options.aiEnrichmentStore.listCandidateSignals(
     requestConfig.signalIds,
   );
-  const candidateDecisions = candidates.map(candidate => ({
-    candidate,
-    decision: shouldEnrichCandidateSignal(toPlannerCandidateRow(candidate), plan),
-  }));
+  const candidateDecisions = resolveEligibleCandidates(candidates, plan);
   const selectedSignalIds = new Set(
     candidateDecisions
       .filter(entry => entry.decision.shouldEnrich)
@@ -463,6 +653,7 @@ export async function createPhase4AiEnrichmentDryRun(
     });
   }
 
+  const totals = getTotals(results);
   const proposedCount = results.filter(result => result.status === 'completed').length;
   const skippedCount = results.filter(result => result.status === 'skipped').length;
   const failedCount = results.filter(result => result.status === 'failed').length;
@@ -479,17 +670,351 @@ export async function createPhase4AiEnrichmentDryRun(
     proposed_count: proposedCount,
     skipped_count: skippedCount,
     failed_count: failedCount,
-    approximate_prompt_tokens: results.reduce(
-      (sum, result) => sum + (result.token_usage?.approximate_prompt_tokens ?? 0),
-      0,
-    ),
-    approximate_completion_tokens: results.reduce(
-      (sum, result) => sum + (result.token_usage?.approximate_completion_tokens ?? 0),
-      0,
-    ),
-    approximate_total_tokens: results.reduce(
-      (sum, result) => sum + (result.token_usage?.approximate_total_tokens ?? 0),
-      0,
-    ),
+    ...totals,
+  };
+}
+
+export async function runPhase4AiEnrichment(
+  request: Phase4AiEnrichmentRequestEnvelope,
+  options: Phase4AiEnrichmentRuntimeOptions = {},
+): Promise<Phase4AiEnrichmentResponse> {
+  const requestConfig = getRequestConfig(request);
+  const config = options.aiConfig ?? null;
+  const writeModeRequested =
+    requestConfig.writeMode || request.dryRun === false;
+
+  if (!writeModeRequested) {
+    return createPhase4AiEnrichmentDryRun(request, options);
+  }
+
+  if (request.dryRun !== false) {
+    return buildWriteErrorResponse(
+      requestConfig.provider,
+      getWriteErrorModel(requestConfig.provider, config),
+      'ai_write_requires_dry_run_false',
+      'AI enrichment write mode requires dryRun: false.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (!requestConfig.writeMode) {
+    return buildWriteErrorResponse(
+      requestConfig.provider,
+      getWriteErrorModel(requestConfig.provider, config),
+      'ai_write_mode_required',
+      'AI enrichment write mode requires aiEnrichment.writeMode: true.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (!options.aiEnrichmentStore) {
+    return buildWriteErrorResponse(
+      requestConfig.provider,
+      getWriteErrorModel(requestConfig.provider, config),
+      'ai_store_not_configured',
+      'AI enrichment write mode requires a server-side Supabase enrichment store.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (!config || !config.enabled) {
+    return buildWriteErrorResponse(
+      requestConfig.provider,
+      getWriteErrorModel(requestConfig.provider, config),
+      'ai_enrichment_disabled',
+      'AI enrichment write mode is disabled on this server.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (config.dryRunOnly) {
+    return buildWriteErrorResponse(
+      requestConfig.provider,
+      getWriteErrorModel(requestConfig.provider, config),
+      'ai_dry_run_only',
+      'AI enrichment write mode is disabled while PHASE4_AI_DRY_RUN_ONLY remains true.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (requestConfig.provider !== 'deepseek' || config.provider !== 'deepseek') {
+    return buildWriteErrorResponse(
+      requestConfig.provider,
+      getWriteErrorModel(requestConfig.provider, config),
+      'unsupported_provider',
+      'AI enrichment write mode currently supports DeepSeek only.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (!config.deepseekApiKey) {
+    return buildWriteErrorResponse(
+      'deepseek',
+      config.deepseekModel,
+      'provider_not_configured',
+      'DeepSeek write mode requested, but DEEPSEEK_API_KEY is not configured on the server.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (!options.writeAuthToken) {
+    return buildWriteErrorResponse(
+      'deepseek',
+      config.deepseekModel,
+      'ai_write_token_not_configured',
+      'AI enrichment write mode requires PHASE4_WRITE_AUTH_TOKEN on the server.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (!options.requestWriteToken) {
+    return buildWriteErrorResponse(
+      'deepseek',
+      config.deepseekModel,
+      'ai_write_token_missing',
+      'AI enrichment write mode requires the x-phase4-write-token header.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (options.requestWriteToken !== options.writeAuthToken) {
+    return buildWriteErrorResponse(
+      'deepseek',
+      config.deepseekModel,
+      'ai_write_token_mismatch',
+      'Provided AI enrichment write token does not match server configuration.',
+      requestConfig.signalIds,
+    );
+  }
+
+  if (
+    typeof requestConfig.maxSignals === 'number' &&
+    Number.isFinite(requestConfig.maxSignals) &&
+    Math.trunc(requestConfig.maxSignals) > MAX_AI_WRITE_MODE_SIGNALS
+  ) {
+    return buildWriteErrorResponse(
+      'deepseek',
+      config.deepseekModel,
+      'ai_write_signal_limit_exceeded',
+      `AI enrichment write mode is capped at ${MAX_AI_WRITE_MODE_SIGNALS} signals per request.`,
+      requestConfig.signalIds,
+    );
+  }
+
+  const effectiveMaxSignals = getWriteModeMaxSignals(
+    requestConfig.signalIds,
+    requestConfig.maxSignals,
+  );
+
+  const plan = createAiEnrichmentJobPlan({
+    dryRun: false,
+    allowWrites: true,
+    targetLanguages:
+      requestConfig.targetLanguages.length > 0
+        ? requestConfig.targetLanguages
+        : ['zh'],
+    requestedSignalIds: requestConfig.signalIds,
+    maxSignalsPerRun: effectiveMaxSignals,
+    force: requestConfig.force,
+    now: options.now?.(),
+  });
+
+  const provider = selectProvider(
+    'deepseek',
+    config,
+    options.fetchImpl,
+    plan.costControls.maxInputChars,
+  );
+
+  if (!provider) {
+    return buildWriteErrorResponse(
+      'deepseek',
+      config.deepseekModel,
+      'provider_not_configured',
+      'DeepSeek provider is not available in this server configuration.',
+      requestConfig.signalIds,
+    );
+  }
+
+  const candidates = await options.aiEnrichmentStore.listCandidateSignals(
+    requestConfig.signalIds.length > 0 ? requestConfig.signalIds : undefined,
+  );
+  const candidateDecisions = resolveEligibleCandidates(candidates, plan);
+  const selectedCandidates = candidateDecisions
+    .filter(entry => entry.decision.shouldEnrich)
+    .slice(0, effectiveMaxSignals);
+
+  const results: Phase4AiEnrichmentWriteSignalResult[] = [];
+  const now = options.now?.() ?? new Date().toISOString();
+
+  for (const entry of candidateDecisions) {
+    if (!entry.decision.shouldEnrich) {
+      const skippedExisting =
+        entry.decision.reason === 'already_completed_for_version';
+
+      results.push({
+        signal_id: entry.candidate.signal_id,
+        status: 'skipped',
+        reason: skippedExisting
+          ? 'skipped_existing_enrichment'
+          : toSkippedReason(entry.decision.reason),
+        provider: provider.providerName,
+        model: provider.modelName,
+        provider_status: 'not_called',
+        validation_status: 'not_attempted',
+        write_status: skippedExisting ? 'skipped_existing_enrichment' : 'not_attempted',
+        readback_status: 'not_attempted',
+        enrichment_status_after_write: entry.candidate.enrichment_status,
+        last_enriched_at_after_write: entry.candidate.last_enriched_at,
+        readback: null,
+        proposed_output: null,
+        token_usage: null,
+        error_message: null,
+      });
+      continue;
+    }
+
+    if (!selectedCandidates.some(candidate => candidate.candidate.signal_id === entry.candidate.signal_id)) {
+      continue;
+    }
+
+    const input = buildSignalInput(entry.candidate, plan);
+    const providerResult = await provider.enrich(input);
+
+    if (providerResult.status !== 'completed') {
+      results.push({
+        signal_id: entry.candidate.signal_id,
+        status: 'failed',
+        reason:
+          providerResult.error_message?.match(/invalid json|required enrichment fields/i)
+            ? 'invalid_output'
+            : 'provider_failed',
+        provider: provider.providerName,
+        model: provider.modelName,
+        provider_status:
+          providerResult.status === 'failed'
+            ? 'failed'
+            : providerResult.status === 'skipped'
+              ? 'skipped'
+              : 'not_called',
+        validation_status:
+          providerResult.error_message?.match(/invalid json|required enrichment fields/i)
+            ? 'failed'
+            : 'not_attempted',
+        write_status: 'not_attempted',
+        readback_status: 'not_attempted',
+        enrichment_status_after_write: entry.candidate.enrichment_status,
+        last_enriched_at_after_write: entry.candidate.last_enriched_at,
+        readback: null,
+        proposed_output: null,
+        token_usage: providerResult.token_usage,
+        error_message: providerResult.error_message,
+      });
+      continue;
+    }
+
+    const validation = validateCombinedEnrichmentPayload(providerResult.payload);
+    if (!validation.valid || !providerResult.payload) {
+      results.push({
+        signal_id: entry.candidate.signal_id,
+        status: 'failed',
+        reason: 'invalid_output',
+        provider: provider.providerName,
+        model: provider.modelName,
+        provider_status: 'completed',
+        validation_status: 'failed',
+        write_status: 'not_attempted',
+        readback_status: 'not_attempted',
+        enrichment_status_after_write: entry.candidate.enrichment_status,
+        last_enriched_at_after_write: entry.candidate.last_enriched_at,
+        readback: null,
+        proposed_output: null,
+        token_usage: providerResult.token_usage,
+        error_message: validation.error,
+      });
+      continue;
+    }
+
+    const patch = buildWritePatch(providerResult.payload, plan, now);
+
+    try {
+      await options.aiEnrichmentStore.writeEnrichmentResult(
+        entry.candidate.signal_id,
+        patch,
+      );
+    } catch (error) {
+      results.push({
+        signal_id: entry.candidate.signal_id,
+        status: 'failed',
+        reason: 'provider_failed',
+        provider: provider.providerName,
+        model: provider.modelName,
+        provider_status: 'completed',
+        validation_status: 'passed',
+        write_status: 'failed',
+        readback_status: 'not_attempted',
+        enrichment_status_after_write: null,
+        last_enriched_at_after_write: null,
+        readback: null,
+        proposed_output: providerResult.payload,
+        token_usage: providerResult.token_usage,
+        error_message: error instanceof Error ? error.message : 'AI enrichment write failed.',
+      });
+      continue;
+    }
+
+    let readback: Phase4AiEnrichmentReadbackRecord | null = null;
+    let readbackStatus: Phase4AiReadbackStatus = 'loaded';
+    let readbackError: string | null = null;
+    try {
+      readback = await options.aiEnrichmentStore.readEnrichmentResult(
+        entry.candidate.signal_id,
+      );
+      readbackStatus = readback ? 'loaded' : 'missing';
+    } catch (error) {
+      readbackStatus = 'failed';
+      readbackError =
+        error instanceof Error ? error.message : 'AI enrichment readback failed.';
+    }
+
+    results.push({
+      signal_id: entry.candidate.signal_id,
+      status: readbackStatus === 'failed' ? 'failed' : 'completed',
+      reason: 'written',
+      provider: provider.providerName,
+      model: provider.modelName,
+      provider_status: 'completed',
+      validation_status: 'passed',
+      write_status: 'written',
+      readback_status: readbackStatus,
+      enrichment_status_after_write: readback?.enrichment_status ?? patch.enrichment_status,
+      last_enriched_at_after_write: readback?.last_enriched_at ?? patch.last_enriched_at,
+      readback,
+      proposed_output: providerResult.payload,
+      token_usage: providerResult.token_usage,
+      error_message: readbackError,
+    });
+  }
+
+  const totals = getTotals(results);
+  const proposedCount = results.filter(result => result.provider_status === 'completed').length;
+  const writtenCount = results.filter(result => result.write_status === 'written').length;
+  const skippedCount = results.filter(result => result.status === 'skipped').length;
+  const failedCount = results.filter(result => result.status === 'failed').length;
+
+  return {
+    dry_run: false,
+    provider: provider.providerName,
+    model: provider.modelName,
+    no_writes_performed: writtenCount === 0,
+    write_mode_enabled: true,
+    requested_signal_ids: requestConfig.signalIds,
+    selected_signal_count: selectedCandidates.length,
+    proposed_outputs: results,
+    proposed_count: proposedCount,
+    written_count: writtenCount,
+    skipped_count: skippedCount,
+    failed_count: failedCount,
+    ...totals,
   };
 }

@@ -89,6 +89,7 @@ test('phase 4 content constants cover the approved Task 0 foundation surface', (
   ]);
   assert.deepEqual(ENRICHMENT_SOURCES, [
     'deterministic',
+    'deepseek',
     'manual',
     'unknown',
   ]);

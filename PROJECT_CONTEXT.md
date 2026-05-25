@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight and Task 13B: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, and guarded DeepSeek dry-run integration
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Task 13B, and Task 13C: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, and a manual-only guarded DeepSeek enrichment write path
 
 ## Current App Architecture
 
@@ -65,11 +65,12 @@ Phase 4 read path:
 - safe Detail preview with provenance and limited-preview messaging when full body content is unavailable
 - optional enrichment-aware summary fallback while full body content still remains unstored
 
-Phase 4 AI enrichment dry-run path:
+Phase 4 AI enrichment path:
 - server-only provider-neutral enrichment interfaces live under `supabase/functions/_shared`
 - a guarded DeepSeek provider implementation now exists only in the Edge Function/shared server path
-- AI enrichment remains dry-run only in Task 13B
-- AI output is not written back to Supabase yet
+- dry-run remains the default AI path
+- Task 13C adds a manual-only guarded write mode for one-to-three signals at a time
+- AI writes are limited to enrichment-ready columns on `public.intelligence_signals`
 - no AI SDKs are installed in the frontend, and no client env/provider calls exist
 
 Main tabs:
@@ -152,6 +153,7 @@ Confirmed current working state:
 - no AI summary or translation exists yet
 - Task 12 enrichment-ready columns and read fallbacks are additive only and remain optional
 - Task 13B adds the first optional DeepSeek dry-run path on the server side only
+- Task 13C adds a guarded manual AI write mode that can persist validated DeepSeek output into enrichment-ready `intelligence_signals` columns only
 
 ## Environment And Deployment
 
@@ -176,6 +178,7 @@ Server-side Phase 4 env concepts:
 Manual SQL assets:
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
 - `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
+- `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
 - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 - `supabase/manual/phase4_content_readiness_checks.sql`
 - `supabase/manual/phase4_preview_read_policies.sql`
@@ -189,15 +192,15 @@ Manual SQL assets:
 - do not switch default Today to real content yet
 - do not touch Radar real-data integration yet
 - do not expose DeepSeek or future AI keys to the frontend
-- do not add AI enrichment writes yet without explicit future approval
+- do not broaden AI enrichment writes beyond the guarded manual Task 13C path without explicit future approval
 - do not store raw provider errors or prompt text in publicly readable preview tables
 - do not add secrets or commit `.env`
 - do not fabricate full article bodies in Detail
 
 ## Next Recommended Task
 
-Phase 4 Task 13C:
-- guarded AI enrichment write-path design and manual-only persistence plan after Task 13B dry-run validation
+Phase 4 Task 13D:
+- manual non-production AI enrichment validation plus lease/retry hardening after Task 13C
 - keep Today mock-by-default
 - keep Radar, Watchlist, and Library on current behavior
-- keep AI design and implementation gated until the real-content preview path is more stable operationally
+- keep scheduled AI enrichment out of scope until manual write mode is operationally stable

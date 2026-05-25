@@ -16,6 +16,10 @@ const migrationPath = resolve(
   process.cwd(),
   'supabase/migrations/202605210001_phase4_enrichment_ready.sql',
 );
+const deepseekMigrationPath = resolve(
+  process.cwd(),
+  'supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql',
+);
 
 test('phase 4 enrichment constants and helpers cover the approved Task 12 status contract', () => {
   assert.deepEqual(ENRICHMENT_STATUSES, [
@@ -27,6 +31,7 @@ test('phase 4 enrichment constants and helpers cover the approved Task 12 status
   ]);
   assert.deepEqual(ENRICHMENT_SOURCES, [
     'deterministic',
+    'deepseek',
     'manual',
     'unknown',
   ]);
@@ -65,4 +70,11 @@ test('phase 4 enrichment migration adds optional enrichment-ready columns and in
   assert.match(sql, /add column if not exists last_enriched_at/i);
   assert.match(sql, /create index if not exists intelligence_signals_enrichment_status_idx/i);
   assert.match(sql, /create index if not exists intelligence_signals_last_enriched_at_idx/i);
+});
+
+test('phase 4 deepseek enrichment migration extends enrichment_source additively', () => {
+  const sql = readFileSync(deepseekMigrationPath, 'utf8');
+
+  assert.match(sql, /alter type public\.enrichment_source_enum add value if not exists 'deepseek'/i);
+  assert.doesNotMatch(sql, /drop type/i);
 });

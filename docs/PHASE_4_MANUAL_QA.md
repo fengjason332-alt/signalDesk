@@ -11,7 +11,8 @@ Important boundaries:
 - the frontend real-content path is read-only
 - no AI summary or translation exists yet in persisted/frontend-visible form
 - Task 12 enrichment fields are optional and may be absent in an older preview environment
-- Task 13B adds an optional DeepSeek dry-run path on the server side only and does not add AI writes
+- Task 13B adds an optional DeepSeek dry-run path on the server side only
+- Task 13C adds a guarded manual-only AI write mode for enrichment-ready `intelligence_signals` fields only
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -33,6 +34,7 @@ The active preview environment has already proven:
 Manual migration file:
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
 - `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
+- `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
 
 Verify conceptually:
 - required Phase 4 content tables exist
@@ -263,8 +265,71 @@ Verify conceptually:
   - `DEEPSEEK_BASE_URL`
   - `DEEPSEEK_MODEL`
 - future `enrichment_error` values must stay sanitized and operator-safe only
-- Task 13B still performs no AI writes and no scheduled AI jobs
+- Task 13B dry-run still performs no AI writes
+- Task 13C writes only enrichment-ready fields on `public.intelligence_signals`
+- no scheduled AI jobs exist
 - future AI implementation is still expected to stay guarded and server-side only
+
+## 14. Task 13C DeepSeek Write Mode
+
+Required server-side env:
+- `PHASE4_ENABLE_AI_ENRICHMENT=true`
+- `PHASE4_AI_DRY_RUN_ONLY=false`
+- `AI_PROVIDER=deepseek`
+- `DEEPSEEK_API_KEY=<server-only secret>`
+- `DEEPSEEK_BASE_URL=https://api.deepseek.com`
+- `DEEPSEEK_MODEL=deepseek-chat`
+- `PHASE4_WRITE_AUTH_TOKEN=<server-only secret>`
+
+Example one-signal write mode:
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --header 'x-phase4-write-token: <phase4-write-auth-token>' \
+  --data '{
+    "dryRun": false,
+    "aiEnrichment": {
+      "provider": "deepseek",
+      "writeMode": true,
+      "maxSignals": 1,
+      "signalIds": ["<existing-intelligence-signal-id>"]
+    }
+  }'
+```
+
+Expected conceptually:
+- response returns `dry_run: false`
+- response identifies `provider: deepseek`
+- response shows `write_mode_enabled: true`
+- response includes per-signal provider status, validation status, write status, and readback status
+- response includes `written_count`
+- only enrichment-ready fields on `public.intelligence_signals` change
+- deterministic headline/summary/category/score/provenance fields do not change
+
+SQL verification example:
+
+```sql
+select
+  id,
+  enrichment_status,
+  enrichment_version,
+  enrichment_source,
+  summary_status,
+  translation_status,
+  source_language,
+  target_languages,
+  enriched_summary_en,
+  enriched_summary_zh,
+  enriched_why_it_matters_en,
+  enriched_why_it_matters_zh,
+  enrichment_error,
+  last_enriched_at,
+  updated_at
+from public.intelligence_signals
+where id = '<existing-intelligence-signal-id>';
+```
 
 ## Suggested Manual Order
 
@@ -282,4 +347,8 @@ Verify conceptually:
 12. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
 13. If validating Task 13B, configure DeepSeek server-side env only
 14. Run one-signal DeepSeek dry-run against `phase4-dry-run`
-15. Confirm the response returns proposed enrichment output only and performs no writes
+15. If validating Task 13C, set `PHASE4_AI_DRY_RUN_ONLY=false`
+16. Run one-signal guarded DeepSeek write mode with `x-phase4-write-token`
+17. Query `public.intelligence_signals` and confirm only enrichment-ready fields changed
+18. Open Today with `VITE_USE_REAL_CONTENT_FEED=true` and confirm enriched text is preferred when present
+19. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds

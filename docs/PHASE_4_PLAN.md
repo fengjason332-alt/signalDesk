@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight And Task 13B
+## Completed Through Task 12 Plus Task 13-preflight, Task 13B, And Task 13C
 
 ### Tasks 0-4: Foundations
 
@@ -97,6 +97,23 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - invalid JSON or missing required fields produce failed dry-run results instead of writes
 - the existing `phase4-dry-run` endpoint now has an additive optional `aiEnrichment` request block for server-side dry-run only
 
+### Task 13C: Guarded DeepSeek Write Mode
+
+- manual-only guarded AI enrichment writes now exist for one-to-three signals at a time
+- write mode requires:
+  - `dryRun: false`
+  - `aiEnrichment.writeMode: true`
+  - `PHASE4_ENABLE_AI_ENRICHMENT=true`
+  - `PHASE4_AI_DRY_RUN_ONLY=false`
+  - `AI_PROVIDER=deepseek`
+  - `DEEPSEEK_API_KEY`
+  - matching `x-phase4-write-token`
+- valid DeepSeek JSON can now update enrichment-ready fields on `public.intelligence_signals` only
+- dry-run behavior is unchanged and still performs no writes
+- invalid provider output is rejected without writes
+- current-version completed enrichment is skipped unless `force=true`
+- write responses include readback summaries and do not expose raw article bodies or secrets
+
 Proposed future AI enrichment flow:
 - runtime location:
   - server-side only
@@ -159,13 +176,12 @@ Proposed future AI enrichment flow:
 
 ## Remaining Tasks
 
-### Task 13C: Guarded AI Enrichment Write-Path Design And Manual Persistence Plan
+### Task 13D: Lease / Retry Hardening Before Scheduled AI
 
-- validate Task 13B dry-run behavior manually before enabling any persistence work
-- decide how provider identity/version should be represented before `enrichment_source` is reused for writes
-- design the first manual-only persistence step for validated AI output into enrichment-ready `intelligence_signals` columns
-- keep scheduled triggering and lease bookkeeping as a later follow-up
-- do not make AI the default path until preview stability is proven
+- add stronger lease or claim bookkeeping for concurrent/manual reruns
+- harden retry/backoff behavior and operator-safe failure recording
+- validate the manual write-mode flow repeatedly in non-production before any scheduled trigger exists
+- keep AI write scope limited to enrichment-ready `intelligence_signals` fields only
 
 ### Task 14: Scheduled Ingestion
 
@@ -188,7 +204,7 @@ Proposed future AI enrichment flow:
 - source provenance quality depends on source metadata consistency
 - full article body is not stored yet, so Detail must stay honest about preview limitations
 - AI cost and retry behavior can spiral without strict per-run batch limits and explicit version gating
-- provider identity and persisted `enrichment_source` do not yet line up for future write-mode AI enrichment, so Task 13C should resolve that contract before any AI writes
+- preview-read policies expose enrichment-ready rows, so AI write copy must stay sanitized and operator-safe
 
 ## Guardrails
 

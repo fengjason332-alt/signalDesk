@@ -311,6 +311,7 @@ test('AI enrichment preflight store contract keeps reads/writes server-side and 
     'enriched_why_it_matters_zh',
     'enrichment_error',
     'last_enriched_at',
+    'updated_at',
   ]);
 });
 
@@ -337,7 +338,7 @@ test('frontend runtime files do not import AI SDKs or server-only enrichment pla
   }
 });
 
-test('server-only AI preflight modules remain inert and contain no SDK imports, provider fetches, or direct writes', () => {
+test('server-only AI planner/provider modules remain SDK-free and provider-neutral before runtime wiring', () => {
   const preflightFiles = [
     resolve(
       repoRoot,
@@ -347,10 +348,6 @@ test('server-only AI preflight modules remain inert and contain no SDK imports, 
       repoRoot,
       'supabase/functions/_shared/enrichmentPlanner.ts',
     ),
-    resolve(
-      repoRoot,
-      'supabase/functions/_shared/enrichmentStore.ts',
-    ),
   ];
 
   const forbiddenPatterns = [
@@ -358,10 +355,6 @@ test('server-only AI preflight modules remain inert and contain no SDK imports, 
     /from\s+['"]openai['"]/,
     /from\s+['"]@anthropic-ai\/sdk['"]/,
     /\bfetch\s*\(/,
-    /\.insert\(/,
-    /\.update\(/,
-    /\.upsert\(/,
-    /\.delete\(/,
   ];
 
   for (const filePath of preflightFiles) {
