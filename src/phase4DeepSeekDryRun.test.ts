@@ -17,7 +17,11 @@ import {
 import { createPhase4IngestionHandler } from '../supabase/functions/_shared/phase4DryRun.ts';
 import type {
   Phase4AiEnrichmentCandidateRecord,
+  Phase4AiEnrichmentClaimInput,
+  Phase4AiEnrichmentClaimResult,
+  Phase4AiEnrichmentFailurePatch,
   Phase4AiEnrichmentStore,
+  Phase4AiEnrichmentWritePatch,
 } from '../supabase/functions/_shared/enrichmentStore.ts';
 
 const repoRoot = process.cwd();
@@ -115,6 +119,13 @@ const makeCandidateRecord = (
   source_language: 'en',
   target_languages: ['zh'],
   last_enriched_at: null,
+  enrichment_claim_id: null,
+  enrichment_claimed_at: null,
+  enrichment_claim_expires_at: null,
+  enrichment_attempt_count: 0,
+  enrichment_last_attempt_at: null,
+  enrichment_next_retry_at: null,
+  enrichment_last_run_id: null,
   source_rows: [
     {
       raw_source_item_id: `${signalId}-raw-1`,
@@ -164,12 +175,37 @@ class FakeAiEnrichmentStore implements Phase4AiEnrichmentStore {
     return this.rows.filter(row => requested.has(row.signal_id)).map(row => ({ ...row }));
   }
 
-  async claimSignalForEnrichment() {
+  async claimSignalForEnrichment(
+    _input: Phase4AiEnrichmentClaimInput,
+  ): Promise<Phase4AiEnrichmentClaimResult> {
     this.claimCalls += 1;
-    return false;
+    return {
+      signal_id: 'unused-dry-run-claim',
+      claim_status: 'claimed',
+      claim_token: 'unused-dry-run-claim-token',
+      enrichment_status: 'pending',
+      enrichment_version: null,
+      summary_status: 'pending',
+      translation_status: 'pending',
+      last_enriched_at: null,
+      next_retry_at: null,
+      attempt_count: 1,
+    };
   }
 
-  async writeEnrichmentResult() {
+  async writeEnrichmentResult(
+    _signalId: string,
+    _claimToken: string,
+    _patch: Phase4AiEnrichmentWritePatch,
+  ) {
+    this.writeCalls += 1;
+  }
+
+  async recordEnrichmentFailure(
+    _signalId: string,
+    _claimToken: string,
+    _patch: Phase4AiEnrichmentFailurePatch,
+  ) {
     this.writeCalls += 1;
   }
 

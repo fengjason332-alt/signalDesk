@@ -33,6 +33,13 @@ export const PHASE4_AI_ENRICHMENT_WRITE_COLUMNS = [
   'enriched_why_it_matters_zh',
   'enrichment_error',
   'last_enriched_at',
+  'enrichment_claim_id',
+  'enrichment_claimed_at',
+  'enrichment_claim_expires_at',
+  'enrichment_attempt_count',
+  'enrichment_last_attempt_at',
+  'enrichment_next_retry_at',
+  'enrichment_last_run_id',
   'updated_at',
 ] as const;
 
@@ -86,16 +93,50 @@ export interface Phase4AiEnrichmentCandidateRecord {
   source_language: ContentLanguage | null;
   target_languages: ContentLanguage[];
   last_enriched_at: string | null;
+  enrichment_claim_id: string | null;
+  enrichment_claimed_at: string | null;
+  enrichment_claim_expires_at: string | null;
+  enrichment_attempt_count: number;
+  enrichment_last_attempt_at: string | null;
+  enrichment_next_retry_at: string | null;
+  enrichment_last_run_id: string | null;
   source_rows: Phase4AiEnrichmentSourceRow[];
   topic_rows: Phase4AiEnrichmentTopicRow[];
   entity_rows: Phase4AiEnrichmentEntityRow[];
 }
+
+export type Phase4AiEnrichmentClaimStatus =
+  | 'claimed'
+  | 'skipped_claimed'
+  | 'skipped_existing_enrichment'
+  | 'retry_backoff_active'
+  | 'retry_attempt_limit_reached'
+  | 'not_preview_lifecycle'
+  | 'generation_failed'
+  | 'not_found';
 
 export interface Phase4AiEnrichmentClaimInput {
   signal_id: string;
   target_enrichment_version: number;
   claim_token: string;
   started_at: string;
+  claim_ttl_seconds: number;
+  max_retry_attempts: number;
+  retry_backoff_minutes: number;
+  force: boolean;
+}
+
+export interface Phase4AiEnrichmentClaimResult {
+  signal_id: string;
+  claim_status: Phase4AiEnrichmentClaimStatus;
+  claim_token: string | null;
+  enrichment_status: EnrichmentStatus;
+  enrichment_version: number | null;
+  summary_status: EnrichmentStatus;
+  translation_status: EnrichmentStatus;
+  last_enriched_at: string | null;
+  next_retry_at: string | null;
+  attempt_count: number;
 }
 
 export interface Phase4AiEnrichmentWritePatch {
@@ -115,6 +156,19 @@ export interface Phase4AiEnrichmentWritePatch {
   updated_at?: string;
 }
 
+export interface Phase4AiEnrichmentFailurePatch {
+  enrichment_status: Extract<EnrichmentStatus, 'failed' | 'skipped'>;
+  enrichment_version: number;
+  enrichment_source: EnrichmentSource;
+  summary_status: EnrichmentStatus;
+  translation_status: EnrichmentStatus;
+  source_language: ContentLanguage | null;
+  target_languages: ContentLanguage[];
+  enrichment_error: string | null;
+  next_retry_at: string | null;
+  updated_at?: string;
+}
+
 export interface Phase4AiEnrichmentReadbackRecord {
   signal_id: string;
   enrichment_status: EnrichmentStatus;
@@ -126,14 +180,29 @@ export interface Phase4AiEnrichmentReadbackRecord {
   target_languages: ContentLanguage[];
   enrichment_error: string | null;
   last_enriched_at: string | null;
+  enrichment_claim_id: string | null;
+  enrichment_claimed_at: string | null;
+  enrichment_claim_expires_at: string | null;
+  enrichment_attempt_count: number;
+  enrichment_last_attempt_at: string | null;
+  enrichment_next_retry_at: string | null;
+  enrichment_last_run_id: string | null;
 }
 
 export interface Phase4AiEnrichmentStore {
   listCandidateSignals(signalIds?: string[]): Promise<Phase4AiEnrichmentCandidateRecord[]>;
-  claimSignalForEnrichment(input: Phase4AiEnrichmentClaimInput): Promise<boolean>;
+  claimSignalForEnrichment(
+    input: Phase4AiEnrichmentClaimInput,
+  ): Promise<Phase4AiEnrichmentClaimResult>;
   writeEnrichmentResult(
     signalId: string,
+    claimToken: string,
     patch: Phase4AiEnrichmentWritePatch,
+  ): Promise<void>;
+  recordEnrichmentFailure(
+    signalId: string,
+    claimToken: string,
+    patch: Phase4AiEnrichmentFailurePatch,
   ): Promise<void>;
   readEnrichmentResult(
     signalId: string,
@@ -142,6 +211,7 @@ export interface Phase4AiEnrichmentStore {
 
 type SupabaseRuntimeClient = {
   from: (table: string) => any;
+  rpc: (fn: string, args?: Record<string, unknown>) => any;
 };
 
 type SupabaseErrorLike = {
@@ -198,6 +268,13 @@ const ENRICHMENT_SIGNAL_SELECT = `
   source_language,
   target_languages,
   last_enriched_at,
+  enrichment_claim_id,
+  enrichment_claimed_at,
+  enrichment_claim_expires_at,
+  enrichment_attempt_count,
+  enrichment_last_attempt_at,
+  enrichment_next_retry_at,
+  enrichment_last_run_id,
   signal_source_items(
     is_primary,
     raw_source_item:raw_source_items(
@@ -253,6 +330,13 @@ type SupabaseAiEnrichmentRow = {
   source_language: ContentLanguage | null;
   target_languages: ContentLanguage[] | null;
   last_enriched_at: string | null;
+  enrichment_claim_id: string | null;
+  enrichment_claimed_at: string | null;
+  enrichment_claim_expires_at: string | null;
+  enrichment_attempt_count: number | null;
+  enrichment_last_attempt_at: string | null;
+  enrichment_next_retry_at: string | null;
+  enrichment_last_run_id: string | null;
   signal_source_items:
     | Array<{
         is_primary: boolean;
@@ -300,6 +384,26 @@ type SupabaseAiEnrichmentReadbackRow = {
   target_languages: ContentLanguage[] | null;
   enrichment_error: string | null;
   last_enriched_at: string | null;
+  enrichment_claim_id: string | null;
+  enrichment_claimed_at: string | null;
+  enrichment_claim_expires_at: string | null;
+  enrichment_attempt_count: number | null;
+  enrichment_last_attempt_at: string | null;
+  enrichment_next_retry_at: string | null;
+  enrichment_last_run_id: string | null;
+};
+
+type SupabaseAiEnrichmentClaimRow = {
+  signal_id: string | null;
+  claim_status: Phase4AiEnrichmentClaimStatus | null;
+  claim_token: string | null;
+  enrichment_status: EnrichmentStatus | null;
+  enrichment_version: number | null;
+  summary_status: EnrichmentStatus | null;
+  translation_status: EnrichmentStatus | null;
+  last_enriched_at: string | null;
+  next_retry_at: string | null;
+  attempt_count: number | null;
 };
 
 const normalizeText = (value: string | null | undefined) => value?.trim() ?? '';
@@ -348,6 +452,13 @@ export function createSupabaseAiEnrichmentStore(
         source_language: row.source_language,
         target_languages: [...(row.target_languages ?? [])],
         last_enriched_at: row.last_enriched_at,
+        enrichment_claim_id: row.enrichment_claim_id,
+        enrichment_claimed_at: row.enrichment_claimed_at,
+        enrichment_claim_expires_at: row.enrichment_claim_expires_at,
+        enrichment_attempt_count: row.enrichment_attempt_count ?? 0,
+        enrichment_last_attempt_at: row.enrichment_last_attempt_at,
+        enrichment_next_retry_at: row.enrichment_next_retry_at,
+        enrichment_last_run_id: row.enrichment_last_run_id,
         source_rows: (row.signal_source_items ?? [])
           .map(link => {
             const sourceItem = link.raw_source_item;
@@ -416,14 +527,47 @@ export function createSupabaseAiEnrichmentStore(
       }));
     },
 
-    async claimSignalForEnrichment(_input) {
-      // Task 13C uses direct validated writes after provider completion.
-      // A lease/claim mechanism can be added later for scheduled execution.
-      return false;
+    async claimSignalForEnrichment(input) {
+      const result = await runSupabaseQuery(
+        client.rpc('claim_intelligence_signal_enrichment', {
+          p_signal_id: input.signal_id,
+          p_claim_id: input.claim_token,
+          p_target_enrichment_version: input.target_enrichment_version,
+          p_started_at: input.started_at,
+          p_claim_ttl_seconds: input.claim_ttl_seconds,
+          p_force: input.force,
+          p_max_retry_attempts: input.max_retry_attempts,
+          p_retry_backoff_minutes: input.retry_backoff_minutes,
+        }),
+        'claim intelligence_signals enrichment row',
+      );
+
+      const row = (
+        Array.isArray(result) ? result[0] : result
+      ) as SupabaseAiEnrichmentClaimRow | null;
+
+      if (!row) {
+        throw new Error(
+          '[Phase 4 AI enrichment] claim intelligence_signals enrichment row returned no result.',
+        );
+      }
+
+      return {
+        signal_id: row.signal_id ?? input.signal_id,
+        claim_status: row.claim_status ?? 'not_found',
+        claim_token: row.claim_token,
+        enrichment_status: row.enrichment_status ?? 'not_requested',
+        enrichment_version: row.enrichment_version,
+        summary_status: row.summary_status ?? 'not_requested',
+        translation_status: row.translation_status ?? 'not_requested',
+        last_enriched_at: row.last_enriched_at,
+        next_retry_at: row.next_retry_at,
+        attempt_count: row.attempt_count ?? 0,
+      };
     },
 
-    async writeEnrichmentResult(signalId, patch) {
-      await runSupabaseQuery(
+    async writeEnrichmentResult(signalId, claimToken, patch) {
+      const rows = await runSupabaseQuery(
         client
           .from('intelligence_signals')
           .update({
@@ -440,11 +584,55 @@ export function createSupabaseAiEnrichmentStore(
             enriched_why_it_matters_zh: [...patch.enriched_why_it_matters_zh],
             enrichment_error: patch.enrichment_error,
             last_enriched_at: patch.last_enriched_at,
+            enrichment_claim_id: null,
+            enrichment_claimed_at: null,
+            enrichment_claim_expires_at: null,
+            enrichment_next_retry_at: null,
             ...(patch.updated_at ? { updated_at: patch.updated_at } : {}),
           })
-          .eq('id', signalId),
+          .eq('id', signalId)
+          .eq('enrichment_claim_id', claimToken)
+          .select('id'),
         'update intelligence_signals enrichment fields',
       );
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new Error(
+          `[Phase 4 AI enrichment] update intelligence_signals enrichment fields lost claim ownership for signal ${signalId}.`,
+        );
+      }
+    },
+
+    async recordEnrichmentFailure(signalId, claimToken, patch) {
+      const rows = await runSupabaseQuery(
+        client
+          .from('intelligence_signals')
+          .update({
+            enrichment_status: patch.enrichment_status,
+            enrichment_version: patch.enrichment_version,
+            enrichment_source: patch.enrichment_source,
+            summary_status: patch.summary_status,
+            translation_status: patch.translation_status,
+            source_language: patch.source_language,
+            target_languages: [...patch.target_languages],
+            enrichment_error: patch.enrichment_error,
+            enrichment_claim_id: null,
+            enrichment_claimed_at: null,
+            enrichment_claim_expires_at: null,
+            enrichment_next_retry_at: patch.next_retry_at,
+            ...(patch.updated_at ? { updated_at: patch.updated_at } : {}),
+          })
+          .eq('id', signalId)
+          .eq('enrichment_claim_id', claimToken)
+          .select('id'),
+        'record intelligence_signals enrichment failure',
+      );
+
+      if (!Array.isArray(rows) || rows.length === 0) {
+        throw new Error(
+          `[Phase 4 AI enrichment] record intelligence_signals enrichment failure lost claim ownership for signal ${signalId}.`,
+        );
+      }
     },
 
     async readEnrichmentResult(signalId) {
@@ -463,6 +651,13 @@ export function createSupabaseAiEnrichmentStore(
               'target_languages',
               'enrichment_error',
               'last_enriched_at',
+              'enrichment_claim_id',
+              'enrichment_claimed_at',
+              'enrichment_claim_expires_at',
+              'enrichment_attempt_count',
+              'enrichment_last_attempt_at',
+              'enrichment_next_retry_at',
+              'enrichment_last_run_id',
             ].join(','),
           )
           .eq('id', signalId),
@@ -485,6 +680,13 @@ export function createSupabaseAiEnrichmentStore(
         target_languages: [...(row.target_languages ?? [])],
         enrichment_error: row.enrichment_error,
         last_enriched_at: row.last_enriched_at,
+        enrichment_claim_id: row.enrichment_claim_id,
+        enrichment_claimed_at: row.enrichment_claimed_at,
+        enrichment_claim_expires_at: row.enrichment_claim_expires_at,
+        enrichment_attempt_count: row.enrichment_attempt_count ?? 0,
+        enrichment_last_attempt_at: row.enrichment_last_attempt_at,
+        enrichment_next_retry_at: row.enrichment_next_retry_at,
+        enrichment_last_run_id: row.enrichment_last_run_id,
       };
     },
   };

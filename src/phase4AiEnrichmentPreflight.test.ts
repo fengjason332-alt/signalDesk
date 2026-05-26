@@ -225,6 +225,22 @@ test('AI enrichment candidate selection stays deterministic and avoids repeat wo
   assert.deepEqual(
     shouldEnrichCandidateSignal(
       {
+        id: 'signal-claimed',
+        lifecycle_stage: 'candidate',
+        generation_status: 'generated',
+        enrichment_status: 'pending',
+        summary_status: 'pending',
+        translation_status: 'pending',
+        enrichment_claim_expires_at: '2026-05-21T10:30:00.000Z',
+      },
+      plan,
+    ),
+    { shouldEnrich: false, reason: 'already_claimed' },
+  );
+
+  assert.deepEqual(
+    shouldEnrichCandidateSignal(
+      {
         id: 'signal-pending',
         lifecycle_stage: 'candidate',
         generation_status: 'generated',
@@ -263,11 +279,27 @@ test('AI enrichment candidate selection stays deterministic and avoids repeat wo
         enrichment_status: 'failed',
         summary_status: 'failed',
         translation_status: 'failed',
-        last_enriched_at: '2026-05-21T09:45:00.000Z',
+        enrichment_next_retry_at: '2026-05-21T10:15:00.000Z',
       },
       plan,
     ),
     { shouldEnrich: false, reason: 'retry_backoff_active' },
+  );
+
+  assert.deepEqual(
+    shouldEnrichCandidateSignal(
+      {
+        id: 'signal-attempt-cap',
+        lifecycle_stage: 'draft',
+        generation_status: 'generated',
+        enrichment_status: 'failed',
+        summary_status: 'failed',
+        translation_status: 'failed',
+        enrichment_attempt_count: 2,
+      },
+      plan,
+    ),
+    { shouldEnrich: false, reason: 'retry_attempt_limit_reached' },
   );
 
   assert.deepEqual(
@@ -311,6 +343,13 @@ test('AI enrichment preflight store contract keeps reads/writes server-side and 
     'enriched_why_it_matters_zh',
     'enrichment_error',
     'last_enriched_at',
+    'enrichment_claim_id',
+    'enrichment_claimed_at',
+    'enrichment_claim_expires_at',
+    'enrichment_attempt_count',
+    'enrichment_last_attempt_at',
+    'enrichment_next_retry_at',
+    'enrichment_last_run_id',
     'updated_at',
   ]);
 });

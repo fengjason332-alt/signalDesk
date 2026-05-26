@@ -166,20 +166,23 @@ const getAiEnrichmentResponseStatus = (
     return 400;
   }
 
+  if (result.code === 'ai_write_signal_ids_limit_exceeded') {
+    return 400;
+  }
+
   if (result.dry_run) {
     return 200;
   }
 
-  if (
-    'written_count' in result &&
-    result.failed_count > 0 &&
-    result.written_count === 0 &&
-    result.skipped_count === 0
-  ) {
+  if (!result.dry_run && 'overall_status' in result && result.overall_status === 'failed') {
     return 500;
   }
 
-  if ('written_count' in result && result.failed_count > 0) {
+  if (
+    !result.dry_run &&
+    'overall_status' in result &&
+    result.overall_status === 'partial_success'
+  ) {
     return 207;
   }
 

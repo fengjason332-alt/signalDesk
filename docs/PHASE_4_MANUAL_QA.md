@@ -13,6 +13,7 @@ Important boundaries:
 - Task 12 enrichment fields are optional and may be absent in an older preview environment
 - Task 13B adds an optional DeepSeek dry-run path on the server side only
 - Task 13C adds a guarded manual-only AI write mode for enrichment-ready `intelligence_signals` fields only
+- Task 13D and Task 13E add additive claim / retry bookkeeping and sequential batch handling for one-to-three manual AI writes
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -35,6 +36,7 @@ Manual migration file:
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
 - `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
 - `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
+- `supabase/migrations/202605250001_phase4_ai_enrichment_leases.sql`
 
 Verify conceptually:
 - required Phase 4 content tables exist
@@ -250,6 +252,7 @@ Expected conceptually:
 - response includes per-signal status and token estimates
 - no database writes are performed
 - if `DEEPSEEK_API_KEY` is missing, response fails clearly with `provider_not_configured`
+- if using `--no-verify-jwt`, treat AI dry-run as operator-only and keep `maxSignals` intentionally small
 
 ## 13. Task 13 Boundary Check
 
@@ -270,7 +273,7 @@ Verify conceptually:
 - no scheduled AI jobs exist
 - future AI implementation is still expected to stay guarded and server-side only
 
-## 14. Task 13C DeepSeek Write Mode
+## 14. Task 13C-13E DeepSeek Write Mode
 
 Required server-side env:
 - `PHASE4_ENABLE_AI_ENRICHMENT=true`
@@ -280,6 +283,9 @@ Required server-side env:
 - `DEEPSEEK_BASE_URL=https://api.deepseek.com`
 - `DEEPSEEK_MODEL=deepseek-chat`
 - `PHASE4_WRITE_AUTH_TOKEN=<server-only secret>`
+
+Apply this migration first:
+- `supabase/migrations/202605250001_phase4_ai_enrichment_leases.sql`
 
 Example one-signal write mode:
 
@@ -301,11 +307,13 @@ curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-r
 
 Expected conceptually:
 - response returns `dry_run: false`
+- response returns a `run_id`
+- response returns `overall_status`
 - response identifies `provider: deepseek`
 - response shows `write_mode_enabled: true`
-- response includes per-signal provider status, validation status, write status, and readback status
+- response includes per-signal claim status, provider status, validation status, write status, and readback status
 - response includes `written_count`
-- only enrichment-ready fields on `public.intelligence_signals` change
+- only enrichment-ready fields plus additive claim/retry bookkeeping fields on `public.intelligence_signals` change
 - deterministic headline/summary/category/score/provenance fields do not change
 
 SQL verification example:
@@ -326,29 +334,116 @@ select
   enriched_why_it_matters_zh,
   enrichment_error,
   last_enriched_at,
+  enrichment_claim_id,
+  enrichment_claimed_at,
+  enrichment_claim_expires_at,
+  enrichment_attempt_count,
+  enrichment_last_attempt_at,
+  enrichment_next_retry_at,
+  enrichment_last_run_id,
   updated_at
 from public.intelligence_signals
+where id = '<existing-intelligence-signal-id>';
+```
+
+Example three-signal manual batch:
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --header 'x-phase4-write-token: <phase4-write-auth-token>' \
+  --data '{
+    "dryRun": false,
+    "aiEnrichment": {
+      "provider": "deepseek",
+      "writeMode": true,
+      "maxSignals": 3,
+      "signalIds": [
+        "<signal-id-1>",
+        "<signal-id-2>",
+        "<signal-id-3>"
+      ]
+    }
+  }'
+```
+
+Expected conceptually:
+- processing is sequential
+- at most 3 signals are attempted
+- one failure does not collapse the whole batch
+- `overall_status` can be `completed`, `partial_success`, `failed`, or `skipped`
+- per-signal rows show `claim_status`, `provider_status`, `validation_status`, `write_status`, and `readback_status`
+
+Retry / claim verification SQL:
+
+```sql
+select
+  id,
+  enrichment_status,
+  enrichment_version,
+  enrichment_error,
+  enrichment_claim_id,
+  enrichment_claimed_at,
+  enrichment_claim_expires_at,
+  enrichment_attempt_count,
+  enrichment_last_attempt_at,
+  enrichment_next_retry_at,
+  enrichment_last_run_id
+from public.intelligence_signals
+where id in ('<signal-id-1>', '<signal-id-2>', '<signal-id-3>');
+```
+
+Safe reset for one manual re-test:
+
+```sql
+update public.intelligence_signals
+set
+  enrichment_status = 'not_requested',
+  enrichment_version = null,
+  enrichment_source = 'unknown',
+  summary_status = 'not_requested',
+  translation_status = 'not_requested',
+  enriched_summary_en = null,
+  enriched_summary_zh = null,
+  enriched_why_it_matters_en = null,
+  enriched_why_it_matters_zh = null,
+  enrichment_error = null,
+  last_enriched_at = null,
+  enrichment_claim_id = null,
+  enrichment_claimed_at = null,
+  enrichment_claim_expires_at = null,
+  enrichment_attempt_count = 0,
+  enrichment_last_attempt_at = null,
+  enrichment_next_retry_at = null,
+  enrichment_last_run_id = null,
+  updated_at = now()
 where id = '<existing-intelligence-signal-id>';
 ```
 
 ## Suggested Manual Order
 
 1. Apply `supabase/migrations/202605170001_phase4_content_foundation.sql`
-2. Optionally apply `supabase/migrations/202605210001_phase4_enrichment_ready.sql` when validating Task 12 enrichment fields
-3. Apply `supabase/manual/phase4_content_sources_smoke_seed.sql`
-4. Run `supabase/manual/phase4_content_readiness_checks.sql`
-5. Apply `supabase/manual/phase4_preview_read_policies.sql`
-6. Deploy `phase4-dry-run`
-7. Run dry-run smoke test
-8. Run guarded write-mode smoke test
-9. Verify row-count behavior conceptually
-10. Enable frontend preview with `VITE_USE_REAL_CONTENT_FEED=true`
-11. Verify Today preview and Detail provenance
-12. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
-13. If validating Task 13B, configure DeepSeek server-side env only
-14. Run one-signal DeepSeek dry-run against `phase4-dry-run`
-15. If validating Task 13C, set `PHASE4_AI_DRY_RUN_ONLY=false`
-16. Run one-signal guarded DeepSeek write mode with `x-phase4-write-token`
-17. Query `public.intelligence_signals` and confirm only enrichment-ready fields changed
-18. Open Today with `VITE_USE_REAL_CONTENT_FEED=true` and confirm enriched text is preferred when present
-19. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
+2. Apply `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
+3. Apply `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
+4. Apply `supabase/migrations/202605250001_phase4_ai_enrichment_leases.sql`
+5. Apply `supabase/manual/phase4_content_sources_smoke_seed.sql`
+6. Run `supabase/manual/phase4_content_readiness_checks.sql`
+7. Apply `supabase/manual/phase4_preview_read_policies.sql`
+8. Deploy `phase4-dry-run` with:
+   `supabase functions deploy phase4-dry-run --no-verify-jwt`
+9. Run dry-run smoke test
+10. Run guarded content write-mode smoke test
+11. Verify row-count behavior conceptually
+12. Enable frontend preview with `VITE_USE_REAL_CONTENT_FEED=true`
+13. Verify Today preview and Detail provenance
+14. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
+15. If validating Task 13B-13E, configure DeepSeek server-side env only
+16. Run one-signal DeepSeek dry-run against `phase4-dry-run`
+17. Set `PHASE4_AI_DRY_RUN_ONLY=false`
+18. Run one-signal guarded DeepSeek write mode with `x-phase4-write-token`
+19. Optionally run a three-signal manual batch write
+20. Query `public.intelligence_signals` and confirm only enrichment-ready plus claim/retry fields changed
+21. Open Today with `VITE_USE_REAL_CONTENT_FEED=true` and confirm enriched text is preferred when present
+22. Verify Radar, Watchlist, and Library remain untouched
+23. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds

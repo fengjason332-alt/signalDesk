@@ -30,6 +30,9 @@ export interface AiEnrichmentCandidateSignalRow {
   source_language?: ContentLanguage | null;
   target_languages?: ContentLanguage[] | null;
   last_enriched_at?: string | null;
+  enrichment_claim_expires_at?: string | null;
+  enrichment_attempt_count?: number | null;
+  enrichment_next_retry_at?: string | null;
 }
 
 export interface AiEnrichmentJobPlanOptions {
@@ -88,10 +91,12 @@ export interface AiEnrichmentCandidateDecision {
     | 'eligible'
     | 'not_preview_lifecycle'
     | 'generation_failed'
+    | 'already_claimed'
     | 'already_pending'
     | 'already_completed_for_version'
     | 'translation_complete_for_targets'
-    | 'retry_backoff_active';
+    | 'retry_backoff_active'
+    | 'retry_attempt_limit_reached';
 }
 
 export interface AiEnrichmentWriteGateResult {
@@ -230,6 +235,14 @@ export function shouldEnrichCandidateSignal(
     return { shouldEnrich: false, reason: 'generation_failed' };
   }
 
+  if (!plan.force) {
+    const claimExpiresAt = parseTimestamp(row.enrichment_claim_expires_at);
+    const now = parseTimestamp(plan.currentTimeIso);
+    if (claimExpiresAt !== null && now !== null && claimExpiresAt > now) {
+      return { shouldEnrich: false, reason: 'already_claimed' };
+    }
+  }
+
   if (!plan.force && row.enrichment_status === 'pending') {
     return { shouldEnrich: false, reason: 'already_pending' };
   }
@@ -244,8 +257,21 @@ export function shouldEnrichCandidateSignal(
   }
 
   if (!plan.force && row.enrichment_status === 'failed') {
-    const lastEnrichedAt = parseTimestamp(row.last_enriched_at);
     const now = parseTimestamp(plan.currentTimeIso);
+    const nextRetryAt = parseTimestamp(row.enrichment_next_retry_at);
+    if (nextRetryAt !== null && now !== null && nextRetryAt > now) {
+      return { shouldEnrich: false, reason: 'retry_backoff_active' };
+    }
+
+    const attemptCount =
+      typeof row.enrichment_attempt_count === 'number'
+        ? row.enrichment_attempt_count
+        : 0;
+    if (attemptCount >= plan.retryPolicy.maxAttemptsPerSignal) {
+      return { shouldEnrich: false, reason: 'retry_attempt_limit_reached' };
+    }
+
+    const lastEnrichedAt = parseTimestamp(row.last_enriched_at);
     if (lastEnrichedAt !== null && now !== null) {
       const backoffWindowMs = plan.retryPolicy.backoffMinutes * 60 * 1000;
       if (now - lastEnrichedAt < backoffWindowMs) {

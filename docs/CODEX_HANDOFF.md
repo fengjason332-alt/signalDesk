@@ -1,6 +1,6 @@
 # SignalDesk Codex Handoff
 
-## Latest Handoff: 2026-05-23
+## Latest Handoff: 2026-05-25
 
 This handoff supersedes older Phase 4 notes. Use this section first before touching code.
 
@@ -29,11 +29,11 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - Watchlist and Library remain on mock or existing behavior
 - the default Today feed remains mock when `VITE_USE_REAL_CONTENT_FEED=false`
 - the frontend real-content path is read-only
-- no AI summary exists yet in persisted/frontend-visible form
-- no AI translation exists yet in persisted/frontend-visible form
+- AI enrichment can now populate summary and translation fields server-side, but it is still optional and not part of the default product experience
 - DeepSeek is now wired as the first optional server-side provider
 - Task 13C adds a guarded manual-only AI write mode
-- AI writes are limited to enrichment-ready columns on `public.intelligence_signals`
+- Task 13D and Task 13E add additive claim / retry hardening plus sequential one-to-three signal manual batch support
+- AI writes remain limited to enrichment-ready columns plus additive claim/retry bookkeeping columns on `public.intelligence_signals`
 
 ### Current Test Status
 
@@ -85,6 +85,7 @@ Do not commit any of these secrets or real values.
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
 - `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
 - `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
+- `supabase/migrations/202605250001_phase4_ai_enrichment_leases.sql`
 - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 - `supabase/manual/phase4_content_readiness_checks.sql`
 - `supabase/manual/phase4_preview_read_policies.sql`
@@ -105,10 +106,12 @@ Do not commit any of these secrets or real values.
 9. Enable `VITE_USE_REAL_CONTENT_FEED=true` locally
 10. Verify Today preview and Detail provenance
 11. Set `VITE_USE_REAL_CONTENT_FEED=false` again and confirm Today returns to mock
-12. If intentionally validating Task 13B or Task 13C, configure DeepSeek server env only
+12. If intentionally validating Task 13B-13E, configure DeepSeek server env only
 13. Run one-signal AI dry-run against `phase4-dry-run`
-14. For Task 13C, set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
-15. Verify only enrichment-ready `intelligence_signals` fields changed and that Today preview prefers enriched text when present
+14. For Task 13D/13E, apply `202605250001_phase4_ai_enrichment_leases.sql`
+15. Set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
+16. Optionally run a three-signal manual batch request and confirm sequential per-signal statuses
+17. Verify only enrichment-ready plus additive claim/retry fields changed and that Today preview prefers enriched text when present
 
 ### Boundaries For The Next Session
 
@@ -120,6 +123,7 @@ Do not commit any of these secrets or real values.
 - Do not add frontend writes to Phase 4 content tables.
 - Do not weaken write-mode guardrails for the Edge Function.
 - Do not fabricate full article bodies in Detail.
+- Do not implement Capacitor or `ios/` runtime work in Phase 4.
 
 ### Latest Task 12 Status
 
@@ -167,9 +171,7 @@ Do not commit any of these secrets or real values.
 - no AI outputs are written back to Supabase in Task 13B
 - the frontend remains read-only and unchanged by default
 
-### Exact Next Recommended Task
-
-### Latest Task 13C Status
+### Latest Task 13C-13E Status
 
 - AI write mode remains manual-only and off by default
 - writes require:
@@ -196,14 +198,26 @@ Do not commit any of these secrets or real values.
   - `enrichment_error`
   - `last_enriched_at`
   - `updated_at`
+- additive claim/retry bookkeeping now also exists on `public.intelligence_signals`:
+  - `enrichment_claim_id`
+  - `enrichment_claimed_at`
+  - `enrichment_claim_expires_at`
+  - `enrichment_attempt_count`
+  - `enrichment_last_attempt_at`
+  - `enrichment_next_retry_at`
+  - `enrichment_last_run_id`
 - deterministic headline/summary/category/score/provenance fields are not overwritten
 - invalid provider output is not written
+- provider failure or validation failure now records safe failed state and retry timing without writing enriched text
+- one failed signal no longer collapses a 3-signal manual batch
+- there is still no scheduled AI execution
+- deploys using `--no-verify-jwt` should treat AI-enabled requests as operator-only
 
 ### Exact Next Recommended Task
 
-Phase 4 Task 13D:
-- manual non-production AI write validation plus lease/retry hardening on the server side
+Phase 4 Task 14:
+- scheduled ingestion for the non-AI content pipeline only
 - keep the real-content path read-only on the client
 - keep Today mock by default
 - keep Radar on mock
-- do not jump to scheduled enrichment until retry/lease bookkeeping is designed
+- do not jump to scheduled AI enrichment until the manual lease/retry path has more operational validation

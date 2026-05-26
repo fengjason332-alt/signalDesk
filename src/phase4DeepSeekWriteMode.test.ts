@@ -4,6 +4,9 @@ import assert from 'node:assert/strict';
 import { createPhase4IngestionHandler } from '../supabase/functions/_shared/phase4DryRun.ts';
 import type {
   Phase4AiEnrichmentCandidateRecord,
+  Phase4AiEnrichmentClaimInput,
+  Phase4AiEnrichmentClaimResult,
+  Phase4AiEnrichmentFailurePatch,
   Phase4AiEnrichmentReadbackRecord,
   Phase4AiEnrichmentStore,
   Phase4AiEnrichmentWritePatch,
@@ -43,6 +46,13 @@ const makeCandidateRecord = (
   source_language: 'en',
   target_languages: ['zh'],
   last_enriched_at: null,
+  enrichment_claim_id: null,
+  enrichment_claimed_at: null,
+  enrichment_claim_expires_at: null,
+  enrichment_attempt_count: 0,
+  enrichment_last_attempt_at: null,
+  enrichment_next_retry_at: null,
+  enrichment_last_run_id: null,
   source_rows: [
     {
       raw_source_item_id: `${signalId}-raw-1`,
@@ -76,7 +86,10 @@ const makeCandidateRecord = (
 
 class FakeWritableAiEnrichmentStore implements Phase4AiEnrichmentStore {
   public writeCalls = 0;
+  public failureCalls = 0;
+  public claimCalls = 0;
   public patches: Array<{ signalId: string; patch: Phase4AiEnrichmentWritePatch }> = [];
+  public failurePatches: Array<{ signalId: string; patch: Phase4AiEnrichmentFailurePatch }> = [];
   private readonly rows = new Map<string, Phase4AiEnrichmentCandidateRecord>();
   private readonly readbacks = new Map<string, Phase4AiEnrichmentReadbackRecord>();
 
@@ -104,6 +117,13 @@ class FakeWritableAiEnrichmentStore implements Phase4AiEnrichmentStore {
         target_languages: [...row.target_languages],
         enrichment_error: null,
         last_enriched_at: row.last_enriched_at,
+        enrichment_claim_id: row.enrichment_claim_id,
+        enrichment_claimed_at: row.enrichment_claimed_at,
+        enrichment_claim_expires_at: row.enrichment_claim_expires_at,
+        enrichment_attempt_count: row.enrichment_attempt_count,
+        enrichment_last_attempt_at: row.enrichment_last_attempt_at,
+        enrichment_next_retry_at: row.enrichment_next_retry_at,
+        enrichment_last_run_id: row.enrichment_last_run_id,
       });
     }
   }
@@ -129,11 +149,30 @@ class FakeWritableAiEnrichmentStore implements Phase4AiEnrichmentStore {
     }));
   }
 
-  async claimSignalForEnrichment() {
-    return false;
+  async claimSignalForEnrichment(
+    input: Phase4AiEnrichmentClaimInput,
+  ): Promise<Phase4AiEnrichmentClaimResult> {
+    this.claimCalls += 1;
+
+    return {
+      signal_id: input.signal_id,
+      claim_status: 'claimed',
+      claim_token: input.claim_token,
+      enrichment_status: 'pending',
+      enrichment_version: null,
+      summary_status: 'pending',
+      translation_status: 'pending',
+      last_enriched_at: null,
+      next_retry_at: null,
+      attempt_count: 1,
+    };
   }
 
-  async writeEnrichmentResult(signalId: string, patch: Phase4AiEnrichmentWritePatch) {
+  async writeEnrichmentResult(
+    signalId: string,
+    _claimToken: string,
+    patch: Phase4AiEnrichmentWritePatch,
+  ) {
     this.writeCalls += 1;
     this.patches.push({
       signalId,
@@ -168,6 +207,61 @@ class FakeWritableAiEnrichmentStore implements Phase4AiEnrichmentStore {
       target_languages: [...patch.target_languages],
       enrichment_error: patch.enrichment_error,
       last_enriched_at: patch.last_enriched_at,
+      enrichment_claim_id: null,
+      enrichment_claimed_at: null,
+      enrichment_claim_expires_at: null,
+      enrichment_attempt_count: 1,
+      enrichment_last_attempt_at: patch.last_enriched_at,
+      enrichment_next_retry_at: null,
+      enrichment_last_run_id: null,
+    });
+  }
+
+  async recordEnrichmentFailure(
+    signalId: string,
+    _claimToken: string,
+    patch: Phase4AiEnrichmentFailurePatch,
+  ) {
+    this.failureCalls += 1;
+    this.failurePatches.push({
+      signalId,
+      patch: {
+        ...patch,
+        target_languages: [...patch.target_languages],
+      },
+    });
+
+    const row = this.rows.get(signalId);
+    if (row) {
+      row.enrichment_status = patch.enrichment_status;
+      row.enrichment_version = patch.enrichment_version;
+      row.enrichment_source = patch.enrichment_source;
+      row.summary_status = patch.summary_status;
+      row.translation_status = patch.translation_status;
+      row.source_language = patch.source_language;
+      row.target_languages = [...patch.target_languages];
+      row.enrichment_next_retry_at = patch.next_retry_at;
+    }
+
+    const existingReadback = this.readbacks.get(signalId);
+    this.readbacks.set(signalId, {
+      signal_id: signalId,
+      enrichment_status: patch.enrichment_status,
+      enrichment_version: patch.enrichment_version,
+      enrichment_source: patch.enrichment_source,
+      summary_status: patch.summary_status,
+      translation_status: patch.translation_status,
+      source_language: patch.source_language,
+      target_languages: [...patch.target_languages],
+      enrichment_error: patch.enrichment_error,
+      last_enriched_at: existingReadback?.last_enriched_at ?? null,
+      enrichment_claim_id: null,
+      enrichment_claimed_at: null,
+      enrichment_claim_expires_at: null,
+      enrichment_attempt_count: 1,
+      enrichment_last_attempt_at: patch.updated_at ?? null,
+      enrichment_next_retry_at: patch.next_retry_at,
+      enrichment_last_run_id: null,
     });
   }
 
@@ -449,10 +543,12 @@ test('AI enrichment write mode persists only approved enrichment fields and retu
 
   assert.equal(response.status, 200);
   assert.equal(payload.dry_run, false);
+  assert.equal(payload.overall_status, 'completed');
   assert.equal(payload.write_mode_enabled, true);
   assert.equal(payload.written_count, 1);
   assert.equal(payload.failed_count, 0);
   assert.equal(store.writeCalls, 1);
+  assert.equal(store.failureCalls, 0);
   assert.deepEqual(Object.keys(store.patches[0]!.patch).sort(), [
     'enriched_summary_en',
     'enriched_summary_zh',
@@ -474,6 +570,7 @@ test('AI enrichment write mode persists only approved enrichment fields and retu
   assert.equal(candidate.summary_en, 'Deterministic preview summary.');
   assert.equal(candidate.primary_source_name, 'OpenAI News');
   assert.equal(payload.proposed_outputs[0]?.readback_status, 'loaded');
+  assert.equal(payload.proposed_outputs[0]?.claim_status, 'claimed');
   assert.equal(payload.proposed_outputs[0]?.readback?.enrichment_status, 'completed');
   assert.equal(payload.proposed_outputs[0]?.enrichment_status_after_write, 'completed');
   assert.ok(payload.proposed_outputs[0]?.last_enriched_at_after_write);
@@ -498,6 +595,7 @@ test('AI enrichment write mode skips current-version completed enrichment unless
   assert.equal(skippedResponse.status, 200);
   assert.equal(skippedPayload.written_count, 0);
   assert.equal(skippedPayload.skipped_count, 1);
+  assert.equal(skippedPayload.overall_status, 'skipped');
   assert.equal(skippedPayload.proposed_outputs[0]?.reason, 'skipped_existing_enrichment');
   assert.equal(store.writeCalls, 0);
 
@@ -537,8 +635,11 @@ test('AI enrichment write mode does not write when provider output is invalid', 
   assert.equal(payload.written_count, 0);
   assert.equal(payload.failed_count, 1);
   assert.equal(payload.proposed_outputs[0]?.validation_status, 'failed');
-  assert.equal(payload.proposed_outputs[0]?.write_status, 'not_attempted');
+  assert.equal(payload.proposed_outputs[0]?.write_status, 'failed');
+  assert.equal(payload.proposed_outputs[0]?.readback_status, 'loaded');
+  assert.equal(payload.proposed_outputs[0]?.enrichment_status_after_write, 'failed');
   assert.equal(store.writeCalls, 0);
+  assert.equal(store.failureCalls, 1);
 });
 
 test('AI enrichment write mode defaults to a single eligible signal when signalIds are omitted', async () => {

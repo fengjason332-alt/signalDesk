@@ -20,6 +20,10 @@ const deepseekMigrationPath = resolve(
   process.cwd(),
   'supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql',
 );
+const leaseMigrationPath = resolve(
+  process.cwd(),
+  'supabase/migrations/202605250001_phase4_ai_enrichment_leases.sql',
+);
 
 test('phase 4 enrichment constants and helpers cover the approved Task 12 status contract', () => {
   assert.deepEqual(ENRICHMENT_STATUSES, [
@@ -77,4 +81,19 @@ test('phase 4 deepseek enrichment migration extends enrichment_source additively
 
   assert.match(sql, /alter type public\.enrichment_source_enum add value if not exists 'deepseek'/i);
   assert.doesNotMatch(sql, /drop type/i);
+});
+
+test('phase 4 lease/retry migration adds additive manual AI claim bookkeeping only', () => {
+  const sql = readFileSync(leaseMigrationPath, 'utf8');
+
+  assert.match(sql, /add column if not exists enrichment_claim_id/i);
+  assert.match(sql, /add column if not exists enrichment_claimed_at/i);
+  assert.match(sql, /add column if not exists enrichment_claim_expires_at/i);
+  assert.match(sql, /add column if not exists enrichment_attempt_count/i);
+  assert.match(sql, /add column if not exists enrichment_last_attempt_at/i);
+  assert.match(sql, /add column if not exists enrichment_next_retry_at/i);
+  assert.match(sql, /add column if not exists enrichment_last_run_id/i);
+  assert.match(sql, /create index if not exists intelligence_signals_enrichment_claim_expires_at_idx/i);
+  assert.match(sql, /create or replace function public\.claim_intelligence_signal_enrichment/i);
+  assert.doesNotMatch(sql, /drop column/i);
 });

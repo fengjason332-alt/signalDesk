@@ -14,7 +14,9 @@ import {
 } from './enrichmentPlanner.ts';
 import {
   type Phase4AiEnrichmentCandidateRecord,
+  type Phase4AiEnrichmentClaimResult,
   type Phase4AiEnrichmentReadbackRecord,
+  type Phase4AiEnrichmentFailurePatch,
   type Phase4AiEnrichmentStore,
   type Phase4AiEnrichmentWritePatch,
 } from './enrichmentStore.ts';
@@ -67,7 +69,8 @@ type Phase4AiEnrichmentErrorCode =
   | 'ai_write_token_not_configured'
   | 'ai_write_token_missing'
   | 'ai_write_token_mismatch'
-  | 'ai_write_signal_limit_exceeded';
+  | 'ai_write_signal_limit_exceeded'
+  | 'ai_write_signal_ids_limit_exceeded';
 
 type Phase4AiEnrichmentSkippedReason =
   | 'proposed'
@@ -75,14 +78,27 @@ type Phase4AiEnrichmentSkippedReason =
   | 'provider_not_configured'
   | 'provider_disabled'
   | 'unsupported_provider'
+  | 'skipped_claimed'
   | 'already_pending'
   | 'already_completed_for_version'
   | 'retry_backoff_active'
+  | 'retry_attempt_limit_reached'
   | 'not_preview_lifecycle'
   | 'generation_failed'
   | 'invalid_output'
   | 'provider_failed'
   | 'skipped_existing_enrichment';
+
+type Phase4AiClaimStatus =
+  | 'claimed'
+  | 'skipped_claimed'
+  | 'skipped_existing_enrichment'
+  | 'retry_backoff_active'
+  | 'retry_attempt_limit_reached'
+  | 'not_preview_lifecycle'
+  | 'generation_failed'
+  | 'not_attempted'
+  | 'claim_failed';
 
 export interface Phase4AiEnrichmentDryRunSignalResult {
   signal_id: string;
@@ -121,17 +137,26 @@ type Phase4AiWriteStatus =
   | 'not_attempted'
   | 'failed';
 type Phase4AiReadbackStatus = 'loaded' | 'missing' | 'not_attempted' | 'failed';
+type Phase4AiWriteOverallStatus =
+  | 'completed'
+  | 'partial_success'
+  | 'failed'
+  | 'skipped';
+type Phase4AiWriteReason = Phase4AiEnrichmentSkippedReason | 'written';
 
 export interface Phase4AiEnrichmentWriteSignalResult {
   signal_id: string;
   status: 'completed' | 'skipped' | 'failed';
-  reason: Phase4AiEnrichmentSkippedReason;
+  reason: Phase4AiWriteReason;
+  skipped_reason: Phase4AiEnrichmentSkippedReason | null;
   provider: AiEnrichmentProviderName;
   model: string | null;
+  claim_status: Phase4AiClaimStatus;
   provider_status: 'completed' | 'failed' | 'skipped' | 'not_called';
   validation_status: Phase4AiValidationStatus;
   write_status: Phase4AiWriteStatus;
   readback_status: Phase4AiReadbackStatus;
+  error_code: string | null;
   enrichment_status_after_write: string | null;
   last_enriched_at_after_write: string | null;
   readback: Phase4AiEnrichmentReadbackRecord | null;
@@ -142,6 +167,8 @@ export interface Phase4AiEnrichmentWriteSignalResult {
 
 export interface Phase4AiEnrichmentWriteResponse {
   dry_run: false;
+  run_id: string;
+  overall_status: Phase4AiWriteOverallStatus;
   provider: AiEnrichmentProviderName;
   model: string | null;
   code?: Phase4AiEnrichmentErrorCode;
@@ -176,6 +203,7 @@ export interface Phase4AiEnrichmentRuntimeOptions {
 const DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
 const DEFAULT_DEEPSEEK_MODEL = 'deepseek-chat';
 const MAX_AI_WRITE_MODE_SIGNALS = 3;
+const DEFAULT_AI_ENRICHMENT_CLAIM_TTL_SECONDS = 10 * 60;
 
 const normalizeText = (value: string | null | undefined) => value?.trim() ?? '';
 
@@ -241,6 +269,7 @@ const buildDryRunErrorResponse = (
 });
 
 const buildWriteErrorResponse = (
+  runId: string,
   provider: AiEnrichmentProviderName,
   model: string | null,
   code: Phase4AiEnrichmentErrorCode,
@@ -248,6 +277,8 @@ const buildWriteErrorResponse = (
   requestedSignalIds: string[],
 ): Phase4AiEnrichmentWriteResponse => ({
   dry_run: false,
+  run_id: runId,
+  overall_status: 'failed',
   provider,
   model,
   code,
@@ -328,6 +359,9 @@ const toPlannerCandidateRow = (
   source_language: record.source_language,
   target_languages: record.target_languages,
   last_enriched_at: record.last_enriched_at,
+  enrichment_claim_expires_at: record.enrichment_claim_expires_at,
+  enrichment_attempt_count: record.enrichment_attempt_count,
+  enrichment_next_retry_at: record.enrichment_next_retry_at,
 });
 
 const toSkippedReason = (
@@ -335,22 +369,28 @@ const toSkippedReason = (
     | 'eligible'
     | 'not_preview_lifecycle'
     | 'generation_failed'
+    | 'already_claimed'
     | 'already_pending'
     | 'already_completed_for_version'
     | 'translation_complete_for_targets'
-    | 'retry_backoff_active',
+    | 'retry_backoff_active'
+    | 'retry_attempt_limit_reached',
 ): Phase4AiEnrichmentSkippedReason => {
   switch (reason) {
     case 'not_preview_lifecycle':
       return 'not_preview_lifecycle';
     case 'generation_failed':
       return 'generation_failed';
+    case 'already_claimed':
+      return 'skipped_claimed';
     case 'already_pending':
       return 'already_pending';
     case 'already_completed_for_version':
       return 'already_completed_for_version';
     case 'retry_backoff_active':
       return 'retry_backoff_active';
+    case 'retry_attempt_limit_reached':
+      return 'retry_attempt_limit_reached';
     case 'translation_complete_for_targets':
       return 'already_completed_for_version';
     case 'eligible':
@@ -461,6 +501,102 @@ const buildWritePatch = (
   last_enriched_at: timestamp,
   updated_at: timestamp,
 });
+
+const buildClaimToken = (runId: string, signalId: string) =>
+  `${runId}:${signalId}`;
+
+const addMinutes = (timestamp: string, minutes: number) =>
+  new Date(Date.parse(timestamp) + minutes * 60 * 1000).toISOString();
+
+const sanitizeErrorDetail = (value: string | null | undefined) => {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return null;
+  }
+
+  return normalized.replace(/\s+/gu, ' ').slice(0, 160);
+};
+
+const buildStoredEnrichmentError = (
+  errorCode: string,
+  errorMessage: string | null | undefined,
+) => {
+  const detail = sanitizeErrorDetail(errorMessage);
+  return detail ? `${errorCode}:${detail}` : errorCode;
+};
+
+const buildFailurePatch = (
+  record: Phase4AiEnrichmentCandidateRecord,
+  plan: AiEnrichmentJobPlan,
+  errorCode: string,
+  errorMessage: string | null | undefined,
+  timestamp: string,
+): Phase4AiEnrichmentFailurePatch => ({
+  enrichment_status: 'failed',
+  enrichment_version: plan.targetEnrichmentVersion,
+  enrichment_source: 'deepseek',
+  summary_status:
+    record.summary_status === 'completed' ? 'completed' : 'failed',
+  translation_status:
+    record.translation_status === 'completed' ? 'completed' : 'failed',
+  source_language: record.source_language,
+  target_languages:
+    plan.targetLanguages.length > 0
+      ? [...plan.targetLanguages]
+      : [...record.target_languages],
+  enrichment_error: buildStoredEnrichmentError(errorCode, errorMessage),
+  next_retry_at: addMinutes(timestamp, plan.retryPolicy.backoffMinutes),
+  updated_at: timestamp,
+});
+
+const getClaimRejectedSkippedReason = (
+  result: Phase4AiEnrichmentClaimResult,
+): Phase4AiEnrichmentSkippedReason => {
+  switch (result.claim_status) {
+    case 'skipped_claimed':
+      return 'skipped_claimed';
+    case 'skipped_existing_enrichment':
+      return 'skipped_existing_enrichment';
+    case 'retry_backoff_active':
+      return 'retry_backoff_active';
+    case 'retry_attempt_limit_reached':
+      return 'retry_attempt_limit_reached';
+    case 'not_preview_lifecycle':
+      return 'not_preview_lifecycle';
+    case 'generation_failed':
+      return 'generation_failed';
+    case 'claimed':
+    case 'not_found':
+    default:
+      return 'provider_failed';
+  }
+};
+
+const getOverallWriteStatus = (
+  results: Phase4AiEnrichmentWriteSignalResult[],
+): Phase4AiWriteOverallStatus => {
+  const writtenCount = results.filter(result => result.write_status === 'written').length;
+  const failedCount = results.filter(result => result.status === 'failed').length;
+  const skippedCount = results.filter(result => result.status === 'skipped').length;
+
+  if (writtenCount > 0 && failedCount === 0 && skippedCount === 0) {
+    return 'completed';
+  }
+
+  if (writtenCount > 0) {
+    return 'partial_success';
+  }
+
+  if (failedCount > 0 && skippedCount === 0) {
+    return 'failed';
+  }
+
+  if (failedCount > 0 && skippedCount > 0) {
+    return 'partial_success';
+  }
+
+  return 'skipped';
+};
 
 const getWriteModeMaxSignals = (
   signalIds: string[],
@@ -680,6 +816,9 @@ export async function runPhase4AiEnrichment(
 ): Promise<Phase4AiEnrichmentResponse> {
   const requestConfig = getRequestConfig(request);
   const config = options.aiConfig ?? null;
+  const runId =
+    globalThis.crypto?.randomUUID?.() ??
+    `phase4-ai-${Date.now().toString(36)}`;
   const writeModeRequested =
     requestConfig.writeMode || request.dryRun === false;
 
@@ -689,6 +828,7 @@ export async function runPhase4AiEnrichment(
 
   if (request.dryRun !== false) {
     return buildWriteErrorResponse(
+      runId,
       requestConfig.provider,
       getWriteErrorModel(requestConfig.provider, config),
       'ai_write_requires_dry_run_false',
@@ -699,6 +839,7 @@ export async function runPhase4AiEnrichment(
 
   if (!requestConfig.writeMode) {
     return buildWriteErrorResponse(
+      runId,
       requestConfig.provider,
       getWriteErrorModel(requestConfig.provider, config),
       'ai_write_mode_required',
@@ -709,6 +850,7 @@ export async function runPhase4AiEnrichment(
 
   if (!options.aiEnrichmentStore) {
     return buildWriteErrorResponse(
+      runId,
       requestConfig.provider,
       getWriteErrorModel(requestConfig.provider, config),
       'ai_store_not_configured',
@@ -719,6 +861,7 @@ export async function runPhase4AiEnrichment(
 
   if (!config || !config.enabled) {
     return buildWriteErrorResponse(
+      runId,
       requestConfig.provider,
       getWriteErrorModel(requestConfig.provider, config),
       'ai_enrichment_disabled',
@@ -729,6 +872,7 @@ export async function runPhase4AiEnrichment(
 
   if (config.dryRunOnly) {
     return buildWriteErrorResponse(
+      runId,
       requestConfig.provider,
       getWriteErrorModel(requestConfig.provider, config),
       'ai_dry_run_only',
@@ -739,6 +883,7 @@ export async function runPhase4AiEnrichment(
 
   if (requestConfig.provider !== 'deepseek' || config.provider !== 'deepseek') {
     return buildWriteErrorResponse(
+      runId,
       requestConfig.provider,
       getWriteErrorModel(requestConfig.provider, config),
       'unsupported_provider',
@@ -749,6 +894,7 @@ export async function runPhase4AiEnrichment(
 
   if (!config.deepseekApiKey) {
     return buildWriteErrorResponse(
+      runId,
       'deepseek',
       config.deepseekModel,
       'provider_not_configured',
@@ -759,6 +905,7 @@ export async function runPhase4AiEnrichment(
 
   if (!options.writeAuthToken) {
     return buildWriteErrorResponse(
+      runId,
       'deepseek',
       config.deepseekModel,
       'ai_write_token_not_configured',
@@ -769,6 +916,7 @@ export async function runPhase4AiEnrichment(
 
   if (!options.requestWriteToken) {
     return buildWriteErrorResponse(
+      runId,
       'deepseek',
       config.deepseekModel,
       'ai_write_token_missing',
@@ -779,6 +927,7 @@ export async function runPhase4AiEnrichment(
 
   if (options.requestWriteToken !== options.writeAuthToken) {
     return buildWriteErrorResponse(
+      runId,
       'deepseek',
       config.deepseekModel,
       'ai_write_token_mismatch',
@@ -793,10 +942,22 @@ export async function runPhase4AiEnrichment(
     Math.trunc(requestConfig.maxSignals) > MAX_AI_WRITE_MODE_SIGNALS
   ) {
     return buildWriteErrorResponse(
+      runId,
       'deepseek',
       config.deepseekModel,
       'ai_write_signal_limit_exceeded',
       `AI enrichment write mode is capped at ${MAX_AI_WRITE_MODE_SIGNALS} signals per request.`,
+      requestConfig.signalIds,
+    );
+  }
+
+  if (requestConfig.signalIds.length > MAX_AI_WRITE_MODE_SIGNALS) {
+    return buildWriteErrorResponse(
+      runId,
+      'deepseek',
+      config.deepseekModel,
+      'ai_write_signal_ids_limit_exceeded',
+      `AI enrichment write mode accepts at most ${MAX_AI_WRITE_MODE_SIGNALS} explicit signalIds per request.`,
       requestConfig.signalIds,
     );
   }
@@ -828,6 +989,7 @@ export async function runPhase4AiEnrichment(
 
   if (!provider) {
     return buildWriteErrorResponse(
+      runId,
       'deepseek',
       config.deepseekModel,
       'provider_not_configured',
@@ -843,9 +1005,40 @@ export async function runPhase4AiEnrichment(
   const selectedCandidates = candidateDecisions
     .filter(entry => entry.decision.shouldEnrich)
     .slice(0, effectiveMaxSignals);
+  const selectedSignalIds = new Set(
+    selectedCandidates.map(entry => entry.candidate.signal_id),
+  );
 
   const results: Phase4AiEnrichmentWriteSignalResult[] = [];
-  const now = options.now?.() ?? new Date().toISOString();
+  let mutationCount = 0;
+
+  const loadReadback = async (
+    signalId: string,
+  ): Promise<{
+    readback: Phase4AiEnrichmentReadbackRecord | null;
+    readbackStatus: Phase4AiReadbackStatus;
+    readbackError: string | null;
+  }> => {
+    try {
+      const readback = await options.aiEnrichmentStore!.readEnrichmentResult(signalId);
+      return {
+        readback,
+        readbackStatus: readback ? 'loaded' : 'missing',
+        readbackError: null,
+      };
+    } catch (error) {
+      return {
+        readback: null,
+        readbackStatus: 'failed',
+        readbackError:
+          sanitizeErrorDetail(
+            error instanceof Error
+              ? error.message
+              : 'AI enrichment readback failed.',
+          ) ?? 'AI enrichment readback failed.',
+      };
+    }
+  };
 
   for (const entry of candidateDecisions) {
     if (!entry.decision.shouldEnrich) {
@@ -858,12 +1051,17 @@ export async function runPhase4AiEnrichment(
         reason: skippedExisting
           ? 'skipped_existing_enrichment'
           : toSkippedReason(entry.decision.reason),
+        skipped_reason: skippedExisting
+          ? 'skipped_existing_enrichment'
+          : toSkippedReason(entry.decision.reason),
         provider: provider.providerName,
         model: provider.modelName,
+        claim_status: 'not_attempted',
         provider_status: 'not_called',
         validation_status: 'not_attempted',
         write_status: skippedExisting ? 'skipped_existing_enrichment' : 'not_attempted',
         readback_status: 'not_attempted',
+        error_code: null,
         enrichment_status_after_write: entry.candidate.enrichment_status,
         last_enriched_at_after_write: entry.candidate.last_enriched_at,
         readback: null,
@@ -874,7 +1072,80 @@ export async function runPhase4AiEnrichment(
       continue;
     }
 
-    if (!selectedCandidates.some(candidate => candidate.candidate.signal_id === entry.candidate.signal_id)) {
+    if (!selectedSignalIds.has(entry.candidate.signal_id)) {
+      continue;
+    }
+
+    const startedAt = options.now?.() ?? new Date().toISOString();
+    const claimToken = buildClaimToken(runId, entry.candidate.signal_id);
+    let claimResult: Phase4AiEnrichmentClaimResult;
+
+    try {
+      claimResult = await options.aiEnrichmentStore.claimSignalForEnrichment({
+        signal_id: entry.candidate.signal_id,
+        target_enrichment_version: plan.targetEnrichmentVersion,
+        claim_token: claimToken,
+        started_at: startedAt,
+        claim_ttl_seconds: DEFAULT_AI_ENRICHMENT_CLAIM_TTL_SECONDS,
+        max_retry_attempts: plan.retryPolicy.maxAttemptsPerSignal,
+        retry_backoff_minutes: plan.retryPolicy.backoffMinutes,
+        force: requestConfig.force,
+      });
+    } catch (error) {
+      results.push({
+        signal_id: entry.candidate.signal_id,
+        status: 'failed',
+        reason: 'provider_failed',
+        skipped_reason: null,
+        provider: provider.providerName,
+        model: provider.modelName,
+        claim_status: 'claim_failed',
+        provider_status: 'not_called',
+        validation_status: 'not_attempted',
+        write_status: 'failed',
+        readback_status: 'not_attempted',
+        error_code: 'claim_failed',
+        enrichment_status_after_write: entry.candidate.enrichment_status,
+        last_enriched_at_after_write: entry.candidate.last_enriched_at,
+        readback: null,
+        proposed_output: null,
+        token_usage: null,
+        error_message:
+          sanitizeErrorDetail(
+            error instanceof Error ? error.message : 'AI enrichment claim failed.',
+          ) ?? 'AI enrichment claim failed.',
+      });
+      continue;
+    }
+
+    if (claimResult.claim_status !== 'claimed') {
+      const skippedReason = getClaimRejectedSkippedReason(claimResult);
+      const skippedExisting = skippedReason === 'skipped_existing_enrichment';
+
+      results.push({
+        signal_id: entry.candidate.signal_id,
+        status: 'skipped',
+        reason: skippedReason,
+        skipped_reason: skippedReason,
+        provider: provider.providerName,
+        model: provider.modelName,
+        claim_status:
+          claimResult.claim_status === 'not_found'
+            ? 'claim_failed'
+            : claimResult.claim_status,
+        provider_status: 'not_called',
+        validation_status: 'not_attempted',
+        write_status: skippedExisting ? 'skipped_existing_enrichment' : 'not_attempted',
+        readback_status: 'not_attempted',
+        error_code:
+          claimResult.claim_status === 'not_found' ? 'claim_not_found' : null,
+        enrichment_status_after_write: claimResult.enrichment_status,
+        last_enriched_at_after_write: claimResult.last_enriched_at,
+        readback: null,
+        proposed_output: null,
+        token_usage: null,
+        error_message: null,
+      });
       continue;
     }
 
@@ -882,15 +1153,53 @@ export async function runPhase4AiEnrichment(
     const providerResult = await provider.enrich(input);
 
     if (providerResult.status !== 'completed') {
+      const providerFailureCode =
+        providerResult.error_message?.match(/invalid json|required enrichment fields/i)
+          ? 'invalid_output'
+          : 'provider_failed';
+      const failureTimestamp = options.now?.() ?? new Date().toISOString();
+      const failurePatch = buildFailurePatch(
+        entry.candidate,
+        plan,
+        providerFailureCode,
+        providerResult.error_message,
+        failureTimestamp,
+      );
+      let readback: Phase4AiEnrichmentReadbackRecord | null = null;
+      let readbackStatus: Phase4AiReadbackStatus = 'not_attempted';
+      let readbackError: string | null = null;
+      let writeStatus: Phase4AiWriteStatus = 'not_attempted';
+
+      try {
+        await options.aiEnrichmentStore.recordEnrichmentFailure(
+          entry.candidate.signal_id,
+          claimToken,
+          failurePatch,
+        );
+        mutationCount += 1;
+        writeStatus = 'failed';
+        const readbackResult = await loadReadback(entry.candidate.signal_id);
+        readback = readbackResult.readback;
+        readbackStatus = readbackResult.readbackStatus;
+        readbackError = readbackResult.readbackError;
+      } catch (error) {
+        writeStatus = 'failed';
+        readbackError =
+          sanitizeErrorDetail(
+            error instanceof Error
+              ? error.message
+              : 'AI enrichment failure state could not be recorded.',
+          ) ?? 'AI enrichment failure state could not be recorded.';
+      }
+
       results.push({
         signal_id: entry.candidate.signal_id,
         status: 'failed',
-        reason:
-          providerResult.error_message?.match(/invalid json|required enrichment fields/i)
-            ? 'invalid_output'
-            : 'provider_failed',
+        reason: providerFailureCode,
+        skipped_reason: null,
         provider: provider.providerName,
         model: provider.modelName,
+        claim_status: 'claimed',
         provider_status:
           providerResult.status === 'failed'
             ? 'failed'
@@ -898,95 +1207,146 @@ export async function runPhase4AiEnrichment(
               ? 'skipped'
               : 'not_called',
         validation_status:
-          providerResult.error_message?.match(/invalid json|required enrichment fields/i)
-            ? 'failed'
-            : 'not_attempted',
-        write_status: 'not_attempted',
-        readback_status: 'not_attempted',
-        enrichment_status_after_write: entry.candidate.enrichment_status,
-        last_enriched_at_after_write: entry.candidate.last_enriched_at,
-        readback: null,
+          providerFailureCode === 'invalid_output' ? 'failed' : 'not_attempted',
+        write_status: writeStatus,
+        readback_status: readbackStatus,
+        error_code: providerFailureCode,
+        enrichment_status_after_write:
+          readback?.enrichment_status ?? failurePatch.enrichment_status,
+        last_enriched_at_after_write:
+          readback?.last_enriched_at ?? entry.candidate.last_enriched_at,
+        readback,
         proposed_output: null,
         token_usage: providerResult.token_usage,
-        error_message: providerResult.error_message,
+        error_message:
+          readbackError ??
+          sanitizeErrorDetail(providerResult.error_message) ??
+          'AI enrichment provider call failed.',
       });
       continue;
     }
 
     const validation = validateCombinedEnrichmentPayload(providerResult.payload);
     if (!validation.valid || !providerResult.payload) {
+      const failureTimestamp = options.now?.() ?? new Date().toISOString();
+      const failurePatch = buildFailurePatch(
+        entry.candidate,
+        plan,
+        'invalid_output',
+        validation.error,
+        failureTimestamp,
+      );
+      let readback: Phase4AiEnrichmentReadbackRecord | null = null;
+      let readbackStatus: Phase4AiReadbackStatus = 'not_attempted';
+      let readbackError: string | null = null;
+      let writeStatus: Phase4AiWriteStatus = 'not_attempted';
+
+      try {
+        await options.aiEnrichmentStore.recordEnrichmentFailure(
+          entry.candidate.signal_id,
+          claimToken,
+          failurePatch,
+        );
+        mutationCount += 1;
+        writeStatus = 'failed';
+        const readbackResult = await loadReadback(entry.candidate.signal_id);
+        readback = readbackResult.readback;
+        readbackStatus = readbackResult.readbackStatus;
+        readbackError = readbackResult.readbackError;
+      } catch (error) {
+        writeStatus = 'failed';
+        readbackError =
+          sanitizeErrorDetail(
+            error instanceof Error
+              ? error.message
+              : 'AI enrichment validation failure could not be recorded.',
+          ) ?? 'AI enrichment validation failure could not be recorded.';
+      }
+
       results.push({
         signal_id: entry.candidate.signal_id,
         status: 'failed',
         reason: 'invalid_output',
+        skipped_reason: null,
         provider: provider.providerName,
         model: provider.modelName,
+        claim_status: 'claimed',
         provider_status: 'completed',
         validation_status: 'failed',
-        write_status: 'not_attempted',
-        readback_status: 'not_attempted',
-        enrichment_status_after_write: entry.candidate.enrichment_status,
-        last_enriched_at_after_write: entry.candidate.last_enriched_at,
-        readback: null,
+        write_status: writeStatus,
+        readback_status: readbackStatus,
+        error_code: 'invalid_output',
+        enrichment_status_after_write:
+          readback?.enrichment_status ?? failurePatch.enrichment_status,
+        last_enriched_at_after_write:
+          readback?.last_enriched_at ?? entry.candidate.last_enriched_at,
+        readback,
         proposed_output: null,
         token_usage: providerResult.token_usage,
-        error_message: validation.error,
+        error_message:
+          readbackError ??
+          sanitizeErrorDetail(validation.error) ??
+          'Provider payload failed validation.',
       });
       continue;
     }
 
-    const patch = buildWritePatch(providerResult.payload, plan, now);
+    const completedAt = options.now?.() ?? new Date().toISOString();
+    const patch = buildWritePatch(providerResult.payload, plan, completedAt);
 
     try {
       await options.aiEnrichmentStore.writeEnrichmentResult(
         entry.candidate.signal_id,
+        claimToken,
         patch,
       );
+      mutationCount += 1;
     } catch (error) {
       results.push({
         signal_id: entry.candidate.signal_id,
         status: 'failed',
         reason: 'provider_failed',
+        skipped_reason: null,
         provider: provider.providerName,
         model: provider.modelName,
+        claim_status: 'claimed',
         provider_status: 'completed',
         validation_status: 'passed',
         write_status: 'failed',
         readback_status: 'not_attempted',
+        error_code: 'write_failed',
         enrichment_status_after_write: null,
         last_enriched_at_after_write: null,
         readback: null,
         proposed_output: providerResult.payload,
         token_usage: providerResult.token_usage,
-        error_message: error instanceof Error ? error.message : 'AI enrichment write failed.',
+        error_message:
+          sanitizeErrorDetail(
+            error instanceof Error ? error.message : 'AI enrichment write failed.',
+          ) ?? 'AI enrichment write failed.',
       });
       continue;
     }
 
-    let readback: Phase4AiEnrichmentReadbackRecord | null = null;
-    let readbackStatus: Phase4AiReadbackStatus = 'loaded';
-    let readbackError: string | null = null;
-    try {
-      readback = await options.aiEnrichmentStore.readEnrichmentResult(
-        entry.candidate.signal_id,
-      );
-      readbackStatus = readback ? 'loaded' : 'missing';
-    } catch (error) {
-      readbackStatus = 'failed';
-      readbackError =
-        error instanceof Error ? error.message : 'AI enrichment readback failed.';
-    }
+    const {
+      readback,
+      readbackStatus,
+      readbackError,
+    } = await loadReadback(entry.candidate.signal_id);
 
     results.push({
       signal_id: entry.candidate.signal_id,
       status: readbackStatus === 'failed' ? 'failed' : 'completed',
       reason: 'written',
+      skipped_reason: null,
       provider: provider.providerName,
       model: provider.modelName,
+      claim_status: 'claimed',
       provider_status: 'completed',
       validation_status: 'passed',
       write_status: 'written',
       readback_status: readbackStatus,
+      error_code: readbackStatus === 'failed' ? 'readback_failed' : null,
       enrichment_status_after_write: readback?.enrichment_status ?? patch.enrichment_status,
       last_enriched_at_after_write: readback?.last_enriched_at ?? patch.last_enriched_at,
       readback,
@@ -1001,12 +1361,15 @@ export async function runPhase4AiEnrichment(
   const writtenCount = results.filter(result => result.write_status === 'written').length;
   const skippedCount = results.filter(result => result.status === 'skipped').length;
   const failedCount = results.filter(result => result.status === 'failed').length;
+  const overallStatus = getOverallWriteStatus(results);
 
   return {
     dry_run: false,
+    run_id: runId,
+    overall_status: overallStatus,
     provider: provider.providerName,
     model: provider.modelName,
-    no_writes_performed: writtenCount === 0,
+    no_writes_performed: mutationCount === 0,
     write_mode_enabled: true,
     requested_signal_ids: requestConfig.signalIds,
     selected_signal_count: selectedCandidates.length,

@@ -286,6 +286,13 @@ export interface GeneratedSignalRecord {
   enriched_why_it_matters_zh?: string[] | null;
   enrichment_error?: string | null;
   last_enriched_at?: string | null;
+  enrichment_claim_id?: string | null;
+  enrichment_claimed_at?: string | null;
+  enrichment_claim_expires_at?: string | null;
+  enrichment_attempt_count?: number;
+  enrichment_last_attempt_at?: string | null;
+  enrichment_next_retry_at?: string | null;
+  enrichment_last_run_id?: string | null;
   topic_ids?: string[];
   entity_names?: string[];
   tags?: string[];

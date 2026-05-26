@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Task 13B, and Task 13C: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, and a manual-only guarded AI enrichment write mode
+- Phase 4 Tasks 0-12 plus Task 13-preflight and Tasks 13B-13E: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, and additive lease/retry hardening for one-to-three signal manual batches
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -34,6 +34,7 @@ Current confirmed project state:
 - Today can preview real Supabase content when explicitly enabled
 - an optional server-side DeepSeek dry-run path exists behind explicit env gating
 - a manual-only guarded DeepSeek enrichment write mode now exists for one-to-three signals at a time
+- manual AI write mode now uses claim / retry bookkeeping on `public.intelligence_signals`
 
 ## What SignalDesk Currently Does
 
@@ -59,6 +60,11 @@ Server-side content pipeline:
 - deterministic topic/entity mapping
 - deterministic candidate signal generation
 - Supabase persistence for raw items and deterministic candidate signals
+- optional server-only DeepSeek enrichment with:
+  - dry-run by default
+  - manual write mode only
+  - max batch size of 3 signals
+  - lease / claim / retry bookkeeping on `intelligence_signals`
 
 ## What Is Still Mock
 
@@ -67,9 +73,9 @@ Server-side content pipeline:
 - Watchlist fixture catalog / existing non-real-content behavior
 - Library fixture content / existing non-real-content behavior
 - AI-enriched summaries and AI translations are not enabled by default and only appear if manual server-side enrichment writes have been run successfully
-- Task 12 only prepares optional enrichment-ready schema and read-path support without introducing AI calls
-- Task 13B added the first optional real provider path as a server-side DeepSeek dry-run
-- Task 13C adds a manual-only guarded AI write mode that updates enrichment-ready fields on `intelligence_signals` only
+- the AI provider path is still operator-facing and server-side only
+- Radar remains mock
+- Watchlist and Library are not real-content-backed yet
 
 ## Local Development
 
@@ -138,9 +144,15 @@ Safety model:
   - `AI_PROVIDER=deepseek`
   - `DEEPSEEK_API_KEY`
   - matching `x-phase4-write-token`
-- Task 13C writes only approved enrichment fields on `public.intelligence_signals`
+- manual AI write mode also requires:
+  - claim / lease success before the provider call
+  - max `signalIds.length <= 3`
+  - max `maxSignals <= 3`
+  - valid provider JSON before any enrichment text write
+- Task 13C-13E writes only approved enrichment fields plus additive lease/retry bookkeeping fields on `public.intelligence_signals`
 - deterministic headline/summary/category/score/provenance fields are not overwritten by AI writes
 - future AI enrichment must remain server-side only and manually gated first
+- if `phase4-dry-run` is deployed with `--no-verify-jwt`, AI-enabled usage should be treated as operator-only and kept behind explicit server env plus write-token controls
 
 ## Manual Supabase SQL Assets
 
@@ -148,6 +160,7 @@ Current manual SQL and migration assets:
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
 - `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
 - `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
+- `supabase/migrations/202605250001_phase4_ai_enrichment_leases.sql`
 - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 - `supabase/manual/phase4_content_readiness_checks.sql`
 - `supabase/manual/phase4_preview_read_policies.sql`
@@ -159,33 +172,37 @@ Use them manually in a non-production Supabase project. Do not automate their ap
 Use this order for a new non-production environment:
 
 1. Apply `supabase/migrations/202605170001_phase4_content_foundation.sql`
-2. Apply `supabase/migrations/202605210001_phase4_enrichment_ready.sql` when validating Task 12 enrichment-ready fields
-3. Seed `content_sources` with `supabase/manual/phase4_content_sources_smoke_seed.sql`
-4. Run `supabase/manual/phase4_content_readiness_checks.sql`
-5. Deploy the `phase4-dry-run` Edge Function
-6. Run a `liveFetch: true` plus `dryRun: true` smoke test
-7. Run a guarded write-mode smoke test with `dryRun: false`
-8. Verify content-table row counts conceptually:
+2. Apply `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
+3. Apply `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
+4. Apply `supabase/migrations/202605250001_phase4_ai_enrichment_leases.sql` before validating manual AI claim/retry behavior
+5. Seed `content_sources` with `supabase/manual/phase4_content_sources_smoke_seed.sql`
+6. Run `supabase/manual/phase4_content_readiness_checks.sql`
+7. Deploy the `phase4-dry-run` Edge Function
+8. Run a `liveFetch: true` plus `dryRun: true` smoke test
+9. Run a guarded write-mode smoke test with `dryRun: false`
+10. Verify content-table row counts conceptually:
    - ingestion runs should increment
    - duplicate reruns should not duplicate raw items or deterministic candidate signals
-9. Apply `supabase/manual/phase4_preview_read_policies.sql`
-10. Enable frontend preview locally with `VITE_USE_REAL_CONTENT_FEED=true`
-11. Optionally configure DeepSeek dry-run env on the Edge Function:
+11. Apply `supabase/manual/phase4_preview_read_policies.sql`
+12. Enable frontend preview locally with `VITE_USE_REAL_CONTENT_FEED=true`
+13. Optionally configure DeepSeek dry-run env on the Edge Function:
    - `PHASE4_ENABLE_AI_ENRICHMENT=true`
    - `PHASE4_AI_DRY_RUN_ONLY=true`
    - `AI_PROVIDER=deepseek`
    - `DEEPSEEK_API_KEY=<server-only secret>`
    - `DEEPSEEK_BASE_URL=https://api.deepseek.com`
    - `DEEPSEEK_MODEL=deepseek-chat`
-12. Run a one-signal AI dry-run request against `phase4-dry-run`
-13. Verify the response returns proposed enrichment output only and performs no database writes
-14. For manual Task 13C write-mode validation only:
+14. Run a one-signal AI dry-run request against `phase4-dry-run`
+15. Verify the response returns proposed enrichment output only and performs no database writes
+16. For manual Task 13D/13E write-mode validation only:
    - set `PHASE4_AI_DRY_RUN_ONLY=false`
    - keep `PHASE4_ENABLE_AI_ENRICHMENT=true`
    - keep `AI_PROVIDER=deepseek`
    - keep `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL` server-side only
    - send `dryRun: false` plus `aiEnrichment.writeMode: true` plus `x-phase4-write-token`
-15. Verify only enrichment-ready columns on `public.intelligence_signals` changed and that Today preview still falls back safely when disabled
+17. Verify only enrichment-ready columns plus additive claim/retry bookkeeping fields on `public.intelligence_signals` changed
+18. Verify one-to-three signal manual batches process sequentially and return per-signal statuses
+19. Verify Today preview still falls back safely when disabled
 
 ## Current Safety Model
 
@@ -197,14 +214,16 @@ Use this order for a new non-production environment:
 - no AI keys or secrets should be committed
 - DeepSeek is the first optional provider and remains server-side only
 - AI dry-run remains the default supported AI mode
-- Task 13C manual write mode is intentionally narrow and requires explicit server-side guards
+- Task 13D and Task 13E keep manual AI writes intentionally narrow and require explicit server-side guards
+- lease / claim / retry bookkeeping now exists to reduce concurrent-manual-rerun risk
 - no frontend or client-side Phase 4 content writes have been added
 
 ## Known Limitations
 
 - full article body storage is not implemented yet
 - no scheduled AI enrichment exists yet
-- Task 13C AI writes update enrichment-ready fields only and do not overwrite deterministic fields
+- Task 13D/13E AI writes update enrichment-ready fields plus additive lease/retry bookkeeping only and do not overwrite deterministic fields
+- AI dry-run and write mode should still be treated as operator-only manual tools
 - no scheduled ingestion exists yet
 - the Today real-content path is still preview-only
 - Radar is still mock
@@ -219,3 +238,4 @@ Start with:
 - [docs/CODEX_HANDOFF.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/CODEX_HANDOFF.md)
 - [docs/PHASE_4_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PHASE_4_PLAN.md)
 - [docs/PHASE_4_MANUAL_QA.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PHASE_4_MANUAL_QA.md)
+- [docs/APP_STORE_READINESS.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/APP_STORE_READINESS.md)

@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Task 13B, and Task 13C: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, and a manual-only guarded DeepSeek enrichment write path
+- Phase 4 Tasks 0-12 plus Task 13-preflight and Tasks 13B-13E: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, and additive lease/retry hardening for one-to-three signal manual batches
 
 ## Current App Architecture
 
@@ -70,6 +70,7 @@ Phase 4 AI enrichment path:
 - a guarded DeepSeek provider implementation now exists only in the Edge Function/shared server path
 - dry-run remains the default AI path
 - Task 13C adds a manual-only guarded write mode for one-to-three signals at a time
+- Task 13D and Task 13E add claim / retry bookkeeping and sequential batch handling for up to 3 manual writes
 - AI writes are limited to enrichment-ready columns on `public.intelligence_signals`
 - no AI SDKs are installed in the frontend, and no client env/provider calls exist
 
@@ -150,10 +151,11 @@ Confirmed current working state:
 - clicking a real content card opens Detail safely
 - Detail shows source provenance and safe source links when available
 - Radar remains mock
-- no AI summary or translation exists yet
+- manual AI enrichment can now populate enrichment-ready summary / translation fields server-side, but it remains optional and operator-only
 - Task 12 enrichment-ready columns and read fallbacks are additive only and remain optional
 - Task 13B adds the first optional DeepSeek dry-run path on the server side only
 - Task 13C adds a guarded manual AI write mode that can persist validated DeepSeek output into enrichment-ready `intelligence_signals` columns only
+- Task 13D and Task 13E add additive claim / lease / retry bookkeeping so manual write mode can skip claimed rows, respect retry windows, and return clearer per-signal run statuses
 
 ## Environment And Deployment
 
@@ -179,6 +181,7 @@ Manual SQL assets:
 - `supabase/migrations/202605170001_phase4_content_foundation.sql`
 - `supabase/migrations/202605210001_phase4_enrichment_ready.sql`
 - `supabase/migrations/202605230001_phase4_enrichment_source_deepseek.sql`
+- `supabase/migrations/202605250001_phase4_ai_enrichment_leases.sql`
 - `supabase/manual/phase4_content_sources_smoke_seed.sql`
 - `supabase/manual/phase4_content_readiness_checks.sql`
 - `supabase/manual/phase4_preview_read_policies.sql`
@@ -192,15 +195,19 @@ Manual SQL assets:
 - do not switch default Today to real content yet
 - do not touch Radar real-data integration yet
 - do not expose DeepSeek or future AI keys to the frontend
-- do not broaden AI enrichment writes beyond the guarded manual Task 13C path without explicit future approval
+- do not broaden AI enrichment writes beyond the guarded manual Task 13C-13E path without explicit future approval
 - do not store raw provider errors or prompt text in publicly readable preview tables
+- do not bypass the new claim / retry guards for manual AI writes
+- do not enable scheduled AI execution yet
+- do not implement Capacitor or iOS runtime work in Phase 4
 - do not add secrets or commit `.env`
 - do not fabricate full article bodies in Detail
 
 ## Next Recommended Task
 
-Phase 4 Task 13D:
-- manual non-production AI enrichment validation plus lease/retry hardening after Task 13C
+Phase 4 Task 14:
+- scheduled ingestion for the non-AI content pipeline only, after repeated manual validation of the current AI lease/retry path
 - keep Today mock-by-default
 - keep Radar, Watchlist, and Library on current behavior
 - keep scheduled AI enrichment out of scope until manual write mode is operationally stable
+- use [docs/APP_STORE_READINESS.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/APP_STORE_READINESS.md) as planning only, not as implementation scope in Phase 4

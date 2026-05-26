@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Task 13B, And Task 13C
+## Completed Through Task 12 Plus Task 13-preflight And Tasks 13B-13E
 
 ### Tasks 0-4: Foundations
 
@@ -114,6 +114,25 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - current-version completed enrichment is skipped unless `force=true`
 - write responses include readback summaries and do not expose raw article bodies or secrets
 
+### Task 13D And Task 13E: Lease / Retry Hardening And Manual Batch Support
+
+- additive manual AI bookkeeping now exists on `public.intelligence_signals`:
+  - `enrichment_claim_id`
+  - `enrichment_claimed_at`
+  - `enrichment_claim_expires_at`
+  - `enrichment_attempt_count`
+  - `enrichment_last_attempt_at`
+  - `enrichment_next_retry_at`
+  - `enrichment_last_run_id`
+- manual write mode now claims a signal before the provider call
+- active claims are skipped safely
+- expired claims can be reclaimed
+- retry windows are persisted and respected
+- provider and validation failure now record safe failed state without writing enriched text
+- manual batch write mode remains sequential only and capped at 3
+- one failed signal no longer collapses the whole batch
+- dry-run behavior remains claim-free and no-write
+
 Proposed future AI enrichment flow:
 - runtime location:
   - server-side only
@@ -172,22 +191,16 @@ Proposed future AI enrichment flow:
   - `supabase/manual/phase4_preview_read_policies.sql` has been applied
 - default Today behavior is still mock
 - Radar remains mock
-- there are still no AI summary or translation calls
+- there is still no scheduled AI execution
 
 ## Remaining Tasks
-
-### Task 13D: Lease / Retry Hardening Before Scheduled AI
-
-- add stronger lease or claim bookkeeping for concurrent/manual reruns
-- harden retry/backoff behavior and operator-safe failure recording
-- validate the manual write-mode flow repeatedly in non-production before any scheduled trigger exists
-- keep AI write scope limited to enrichment-ready `intelligence_signals` fields only
 
 ### Task 14: Scheduled Ingestion
 
 - add bounded scheduling for recurring ingestion
 - preserve dry-run and explicit write controls
 - make operational observability stronger before increasing ingestion cadence
+- keep AI enrichment manual-only while scheduled ingestion is stabilized
 
 ### Task 15: Controlled Today Real-Feed Rollout
 
@@ -204,6 +217,7 @@ Proposed future AI enrichment flow:
 - source provenance quality depends on source metadata consistency
 - full article body is not stored yet, so Detail must stay honest about preview limitations
 - AI cost and retry behavior can spiral without strict per-run batch limits and explicit version gating
+- operator-facing AI dry-run calls are still sensitive if paired with `--no-verify-jwt`, so keep AI execution tightly gated server-side
 - preview-read policies expose enrichment-ready rows, so AI write copy must stay sanitized and operator-safe
 
 ## Guardrails
