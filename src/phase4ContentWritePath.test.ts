@@ -293,6 +293,10 @@ test('runPhase4Ingestion writes expected raw items and records a succeeded inges
 
   assert.equal(result.dry_run, false);
   assert.equal(result.writes_disabled, false);
+  assert.equal(result.request_kind, 'ingestion');
+  assert.equal(result.trigger_mode, 'manual');
+  assert.equal(typeof result.started_at, 'string');
+  assert.equal(typeof result.completed_at, 'string');
   assert.equal(result.fetched_item_count, 2);
   assert.equal(result.inserted_item_count, 2);
   assert.equal(result.skipped_duplicate_count, 0);
@@ -309,6 +313,12 @@ test('runPhase4Ingestion writes expected raw items and records a succeeded inges
   assert.equal(result.ingestion_runs[0]?.items_skipped_as_duplicates, 0);
   assert.equal(typeof result.ingestion_runs[0]?.started_at, 'string');
   assert.equal(typeof result.ingestion_runs[0]?.completed_at, 'string');
+  assert.equal(result.source_previews[0]?.reliability_tier, SAMPLE_AI_RSS_SOURCE.reliability_tier);
+  assert.equal(typeof result.source_previews[0]?.started_at, 'string');
+  assert.equal(typeof result.source_previews[0]?.completed_at, 'string');
+  assert.equal(result.summary.succeeded_source_count, 1);
+  assert.equal(result.summary.partial_source_count, 0);
+  assert.equal(result.summary.failed_source_count, 0);
   assert.equal(result.write_steps.every(step => step.enabled === true), true);
 });
 
@@ -446,15 +456,45 @@ test('runPhase4Ingestion returns partial_success for multi-source batches when o
   assert.equal(result.overall_status, 'partial_success');
   assert.equal(result.summary.overall_status, 'partial_success');
   assert.equal(result.summary.source_count, 2);
+  assert.equal(result.summary.succeeded_source_count, 1);
+  assert.equal(result.summary.partial_source_count, 0);
+  assert.equal(result.summary.failed_source_count, 1);
   assert.equal(result.summary.signal_inserted_count >= 1, true);
   assert.equal(result.source_previews.length, 2);
   assert.equal(result.source_previews.some(source => source.status === 'succeeded'), true);
   assert.equal(result.source_previews.some(source => source.status === 'failed'), true);
   assert.equal(
+    result.source_previews.find(source => source.source_id === failingSource.id)
+      ?.reliability_tier,
+    failingSource.reliability_tier,
+  );
+  assert.equal(
     result.source_previews.find(source => source.source_id === failingSource.id)?.error_message?.includes('fetch failed'),
     true,
   );
   assert.equal(result.ingestion_runs.length, 2);
+});
+
+test('runPhase4Ingestion surfaces scheduled ingestion intent as observability-only metadata without changing dry-run safety', async () => {
+  const result = await runPhase4Ingestion(
+    {
+      sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+      discoveredAt: '2026-05-17T12:00:00.000Z',
+      triggerMode: 'scheduled',
+      maxItemsPerSource: 1,
+    },
+    {
+      sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+      fetchImpl: createFetchImpl(SAMPLE_AI_RSS_FEED_XML),
+      now: () => '2026-05-17T12:00:00.000Z',
+    },
+  );
+
+  assert.equal(result.dry_run, true);
+  assert.equal(result.trigger_mode, 'scheduled');
+  assert.equal(result.request_kind, 'ingestion');
+  assert.equal(result.summary.write_mode_enabled, false);
+  assert.equal(result.source_previews[0]?.started_at, '2026-05-17T12:00:00.000Z');
 });
 
 test('runPhase4Ingestion keeps dry-run previews usable for multi-source partial failures', async () => {

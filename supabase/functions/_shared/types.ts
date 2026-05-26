@@ -59,6 +59,12 @@ export const PHASE4_BATCH_STATUSES = [
 ] as const;
 export type Phase4BatchStatus = (typeof PHASE4_BATCH_STATUSES)[number];
 
+export const PHASE4_REQUEST_INTENTS = ['ingestion', 'ai_enrichment'] as const;
+export type Phase4RequestIntent = (typeof PHASE4_REQUEST_INTENTS)[number];
+
+export const PHASE4_TRIGGER_MODES = ['manual', 'scheduled'] as const;
+export type Phase4TriggerMode = (typeof PHASE4_TRIGGER_MODES)[number];
+
 export const CONTENT_LANGUAGES = ['en', 'zh', 'mixed', 'unknown'] as const;
 export type ContentLanguage = (typeof CONTENT_LANGUAGES)[number];
 
@@ -426,6 +432,8 @@ export interface CandidateSignalRecord {
 }
 
 export interface Phase4DryRunRequest {
+  intent?: Phase4RequestIntent;
+  triggerMode?: Phase4TriggerMode;
   dryRun?: boolean;
   liveFetch?: boolean;
   sourceIds?: string[];
@@ -450,6 +458,7 @@ export interface Phase4IngestionRunSummary {
 export interface Phase4SourcePreview {
   source_id: string;
   source_name: string;
+  reliability_tier: SourceReliabilityTier;
   status: IngestionRunStatus;
   fetched_count: number;
   normalized_count: number;
@@ -457,6 +466,8 @@ export interface Phase4SourcePreview {
   skipped_count: number;
   failed_count: number;
   run_id: string | null;
+  started_at: string;
+  completed_at: string | null;
   run_status: IngestionRunStatus | null;
   error_message: string | null;
 }
@@ -469,6 +480,9 @@ export interface Phase4WriteStep {
 export interface Phase4IngestionSummary {
   overall_status: Phase4BatchStatus;
   source_count: number;
+  succeeded_source_count: number;
+  partial_source_count: number;
+  failed_source_count: number;
   candidate_signal_count: number;
   raw_item_count: number;
   raw_inserted_count: number;
@@ -481,10 +495,19 @@ export interface Phase4IngestionSummary {
 }
 
 export interface Phase4IngestionResult {
+  request_kind: 'ingestion';
+  trigger_mode: Phase4TriggerMode;
+  started_at: string;
+  completed_at: string;
   dry_run: boolean;
   writes_disabled: boolean;
+  live_fetch_requested: boolean;
+  write_mode_requested: boolean;
   overall_status: Phase4BatchStatus;
+  requested_source_ids: string[];
   selected_source_ids: string[];
+  unknown_source_ids: string[];
+  warnings: string[];
   fetched_item_count: number;
   normalized_item_count: number;
   raw_item_count: number;

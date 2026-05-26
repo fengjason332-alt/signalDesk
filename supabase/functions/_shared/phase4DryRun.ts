@@ -87,6 +87,21 @@ interface Phase4WriteGuardrailPayload {
   write_token_configured: boolean;
 }
 
+interface Phase4RequestValidationPayload {
+  error: string;
+  code:
+    | 'phase4_mixed_intent_not_allowed'
+    | 'phase4_request_intent_mismatch'
+    | 'phase4_no_known_source_ids'
+    | 'phase4_ai_requests_not_supported_here';
+  intent: 'ingestion' | 'ai_enrichment';
+  trigger_mode: 'manual' | 'scheduled';
+  requested_source_ids: string[];
+  unknown_source_ids: string[];
+  live_fetch_requested: boolean;
+  write_mode_requested: boolean;
+}
+
 interface PendingRunState {
   source: SourceRegistryEntry;
   runRef:
@@ -96,6 +111,8 @@ interface PendingRunState {
         started_at: string;
       }
     | null;
+  startedAt: string;
+  completedAt: string | null;
   errorMessage: string | null;
   fetchedCount: number;
   normalizedCount: number;
@@ -107,6 +124,9 @@ interface PendingRunState {
 const isExplicitWriteRequest = (payload: Phase4DryRunRequest) => payload.dryRun === false;
 const isExplicitLiveFetchRequest = (payload: Phase4DryRunRequest) =>
   payload.liveFetch === true;
+const resolveTriggerMode = (
+  payload: Pick<Phase4DryRunRequest, 'triggerMode'>,
+): 'manual' | 'scheduled' => (payload.triggerMode === 'scheduled' ? 'scheduled' : 'manual');
 
 const getNow = (payload: Phase4DryRunRequest, now: (() => string) | undefined, fallback: string) =>
   payload.now ?? now?.() ?? fallback;
@@ -119,6 +139,15 @@ const buildWriteSteps = (dryRun: boolean) =>
 
 const toErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : 'Phase 4 ingestion failed.';
+
+class Phase4RequestError extends Error {
+  constructor(
+    readonly status: number,
+    readonly payload: Phase4RequestValidationPayload,
+  ) {
+    super(payload.error);
+  }
+}
 
 const getWriteResponseStatus = (result: Phase4IngestionResult) => {
   if (result.dry_run) {
@@ -170,6 +199,10 @@ const getAiEnrichmentResponseStatus = (
     return 400;
   }
 
+  if (result.code === 'ai_scheduled_trigger_not_allowed') {
+    return 403;
+  }
+
   if (result.dry_run) {
     return 200;
   }
@@ -217,6 +250,32 @@ const appendErrorMessage = (current: string | null, next: string) => {
   }
 
   return `${current}; ${next}`;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const hasAiEnrichmentBlock = (value: unknown) =>
+  isRecord(value) && 'aiEnrichment' in value && Boolean(value.aiEnrichment);
+
+const hasIngestionRequestFields = (value: unknown) =>
+  isRecord(value) &&
+  ['sourceIds', 'liveFetch', 'discoveredAt', 'now', 'maxItemsPerSource'].some(
+    key => key in value && value[key] !== undefined,
+  );
+
+const resolveRequestIntent = (
+  value: unknown,
+): 'ingestion' | 'ai_enrichment' => {
+  if (isRecord(value) && value.intent === 'ai_enrichment') {
+    return 'ai_enrichment';
+  }
+
+  if (isRecord(value) && value.intent === 'ingestion') {
+    return 'ingestion';
+  }
+
+  return hasAiEnrichmentBlock(value) ? 'ai_enrichment' : 'ingestion';
 };
 
 const toRawItemWriteInput = (
@@ -462,8 +521,13 @@ export async function runPhase4Ingestion(
   payload: Phase4DryRunRequest,
   options: Phase4IngestionOptions = {},
 ): Promise<Phase4IngestionResult> {
+  const requestedSourceIds = [...(payload.sourceIds ?? [])];
+  const triggerMode = resolveTriggerMode(payload);
+  const writeModeRequested = isExplicitWriteRequest(payload);
+  const liveFetchRequested = isExplicitLiveFetchRequest(payload);
+
   if (!options.fetchImpl) {
-    if (!isExplicitLiveFetchRequest(payload)) {
+    if (!liveFetchRequested) {
       throw new Error(
         'Phase 4 live fetch is disabled by default. Re-run with liveFetch: true only for intentional smoke tests.',
       );
@@ -480,11 +544,31 @@ export async function runPhase4Ingestion(
   const selectedSources = resolveDryRunSources(payload.sourceIds, sourceRegistry);
   const discoveredAt = payload.discoveredAt ?? options.now?.() ?? new Date().toISOString();
   const now = getNow(payload, options.now, discoveredAt);
+  const unknownSourceIds = requestedSourceIds.filter(
+    sourceId => !selectedSources.some(source => source.id === sourceId),
+  );
+  if (requestedSourceIds.length > 0 && selectedSources.length === 0) {
+    throw new Phase4RequestError(400, {
+      error:
+        'No requested Phase 4 sourceIds matched the active source registry. Check source ids before retrying.',
+      code: 'phase4_no_known_source_ids',
+      intent: 'ingestion',
+      trigger_mode: triggerMode,
+      requested_source_ids: requestedSourceIds,
+      unknown_source_ids: unknownSourceIds,
+      live_fetch_requested: liveFetchRequested,
+      write_mode_requested: writeModeRequested,
+    });
+  }
+  const warnings =
+    unknownSourceIds.length > 0
+      ? [`Unknown source ids were ignored: ${unknownSourceIds.join(', ')}`]
+      : [];
   const maxItemsPerSource = Math.max(
     1,
     Math.min(payload.maxItemsPerSource ?? DEFAULT_MAX_ITEMS_PER_SOURCE, 20),
   );
-  const dryRun = !isExplicitWriteRequest(payload);
+  const dryRun = !writeModeRequested;
   const contentStore = options.contentStore ?? null;
 
   if (!dryRun) {
@@ -518,6 +602,8 @@ export async function runPhase4Ingestion(
     const pendingRun: PendingRunState = {
       source,
       runRef: null,
+      startedAt: now,
+      completedAt: null,
       errorMessage: null,
       fetchedCount: 0,
       normalizedCount: 0,
@@ -534,6 +620,7 @@ export async function runPhase4Ingestion(
           source_id: source.id,
           started_at: now,
         });
+        pendingRun.startedAt = pendingRun.runRef.started_at;
       }
 
       const feed = await fetchSourceFeed(source, options.fetchImpl);
@@ -659,9 +746,9 @@ export async function runPhase4Ingestion(
       failed: pendingRun.failedCount,
     });
 
-    let completedAt: string | null = null;
+    let completedAt: string | null = getNow(payload, options.now, new Date().toISOString());
+    pendingRun.completedAt = completedAt;
     if (!dryRun && pendingRun.runRef) {
-      completedAt = getNow(payload, options.now, new Date().toISOString());
       await contentStore!.finalizeIngestionRun(pendingRun.runRef.id, {
         completed_at: completedAt,
         status,
@@ -690,6 +777,7 @@ export async function runPhase4Ingestion(
     sourcePreviews.push({
       source_id: pendingRun.source.id,
       source_name: pendingRun.source.name,
+      reliability_tier: pendingRun.source.reliability_tier,
       status,
       fetched_count: pendingRun.fetchedCount,
       normalized_count: pendingRun.normalizedCount,
@@ -697,18 +785,33 @@ export async function runPhase4Ingestion(
       skipped_count: pendingRun.skippedCount,
       failed_count: pendingRun.failedCount,
       run_id: pendingRun.runRef?.id ?? null,
+      started_at: pendingRun.startedAt,
+      completed_at: pendingRun.completedAt,
       run_status: dryRun ? null : status,
       error_message: pendingRun.errorMessage,
     });
   }
 
   const overallStatus = resolveBatchStatus(sourceStatuses);
+  const requestCompletedAt = getNow(payload, options.now, new Date().toISOString());
+  const succeededSourceCount = sourceStatuses.filter(status => status === 'succeeded').length;
+  const partialSourceCount = sourceStatuses.filter(status => status === 'partial').length;
+  const failedSourceCount = sourceStatuses.filter(status => status === 'failed').length;
 
   return {
+    request_kind: 'ingestion',
+    trigger_mode: triggerMode,
+    started_at: now,
+    completed_at: requestCompletedAt,
     dry_run: dryRun,
     writes_disabled: dryRun,
+    live_fetch_requested: liveFetchRequested,
+    write_mode_requested: writeModeRequested,
     overall_status: overallStatus,
+    requested_source_ids: requestedSourceIds,
     selected_source_ids: selectedSources.map(source => source.id),
+    unknown_source_ids: unknownSourceIds,
+    warnings,
     fetched_item_count: fetchedItemCount,
     normalized_item_count: normalizedItemCount,
     raw_item_count: previewRawItems.length,
@@ -723,6 +826,9 @@ export async function runPhase4Ingestion(
     summary: {
       overall_status: overallStatus,
       source_count: selectedSources.length,
+      succeeded_source_count: succeededSourceCount,
+      partial_source_count: partialSourceCount,
+      failed_source_count: failedSourceCount,
       candidate_signal_count: candidateSignals.length,
       raw_item_count: previewRawItems.length,
       raw_inserted_count: insertedItemCount,
@@ -770,6 +876,48 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
         {
           error: 'Invalid JSON body for the phase4 dry-run preview.',
         },
+        400,
+      );
+    }
+
+    const requestIntent = resolveRequestIntent(body);
+    const triggerMode = resolveTriggerMode((body as Phase4DryRunRequest) ?? {});
+    const requestedSourceIds = [...(((body as Phase4DryRunRequest) ?? {}).sourceIds ?? [])];
+    const liveFetchRequested = Boolean((body as Phase4DryRunRequest)?.liveFetch === true);
+    const writeModeRequested = Boolean((body as Phase4DryRunRequest)?.dryRun === false);
+
+    // Task 14 keeps this endpoint single-intent so future schedulers cannot
+    // accidentally combine non-AI ingestion with manual AI enrichment.
+    if (hasAiEnrichmentBlock(body) && hasIngestionRequestFields(body)) {
+      return jsonResponse(
+        {
+          error:
+            'Phase 4 requests must declare a single intent. Do not combine ingestion fields with aiEnrichment in one request.',
+          code: 'phase4_mixed_intent_not_allowed',
+          intent: requestIntent,
+          trigger_mode: triggerMode,
+          requested_source_ids: requestedSourceIds,
+          unknown_source_ids: [],
+          live_fetch_requested: liveFetchRequested,
+          write_mode_requested: writeModeRequested,
+        } satisfies Phase4RequestValidationPayload,
+        400,
+      );
+    }
+
+    if (requestIntent === 'ai_enrichment' && !hasAiEnrichmentBlock(body)) {
+      return jsonResponse(
+        {
+          error:
+            'Phase 4 request intent ai_enrichment requires an aiEnrichment payload block.',
+          code: 'phase4_request_intent_mismatch',
+          intent: requestIntent,
+          trigger_mode: triggerMode,
+          requested_source_ids: requestedSourceIds,
+          unknown_source_ids: [],
+          live_fetch_requested: liveFetchRequested,
+          write_mode_requested: writeModeRequested,
+        } satisfies Phase4RequestValidationPayload,
         400,
       );
     }
@@ -849,6 +997,10 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
 
       return jsonResponse(preview, getWriteResponseStatus(preview));
     } catch (error) {
+      if (error instanceof Phase4RequestError) {
+        return jsonResponse(error.payload, error.status);
+      }
+
       return jsonResponse(
         {
           error: toErrorMessage(error),
@@ -870,9 +1022,9 @@ export function createPhase4DryRunHandler(options: Phase4IngestionOptions = {}) 
       );
     }
 
-    let body: Phase4DryRunRequest;
+    let body: unknown;
     try {
-      body = (await request.json()) as Phase4DryRunRequest;
+      body = await request.json();
     } catch {
       return jsonResponse(
         {
@@ -882,8 +1034,25 @@ export function createPhase4DryRunHandler(options: Phase4IngestionOptions = {}) 
       );
     }
 
+    if (hasAiEnrichmentBlock(body)) {
+      return jsonResponse(
+        {
+          error:
+            'This preview-only handler supports non-AI ingestion preview payloads only.',
+          code: 'phase4_ai_requests_not_supported_here',
+          intent: resolveRequestIntent(body),
+          trigger_mode: resolveTriggerMode((body as Phase4DryRunRequest) ?? {}),
+          requested_source_ids: [...(((body as Phase4DryRunRequest) ?? {}).sourceIds ?? [])],
+          unknown_source_ids: [],
+          live_fetch_requested: Boolean((body as Phase4DryRunRequest)?.liveFetch === true),
+          write_mode_requested: Boolean((body as Phase4DryRunRequest)?.dryRun === false),
+        } satisfies Phase4RequestValidationPayload,
+        400,
+      );
+    }
+
     try {
-      const preview = await runPhase4DryRun(body, {
+      const preview = await runPhase4DryRun(body as Phase4DryRunRequest, {
         ...options,
         allowWrites: false,
         contentStore: null,
@@ -891,6 +1060,10 @@ export function createPhase4DryRunHandler(options: Phase4IngestionOptions = {}) 
 
       return jsonResponse(preview, 200);
     } catch (error) {
+      if (error instanceof Phase4RequestError) {
+        return jsonResponse(error.payload, error.status);
+      }
+
       return jsonResponse(
         {
           error: toErrorMessage(error),

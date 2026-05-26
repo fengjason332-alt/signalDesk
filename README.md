@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight and Tasks 13B-13E: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, and additive lease/retry hardening for one-to-three signal manual batches
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-14D: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, and stronger ingestion observability
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -32,9 +32,19 @@ Current confirmed project state:
 - live RSS dry-run and write-mode smoke tests have succeeded
 - Supabase content tables now contain real rows in the active preview environment
 - Today can preview real Supabase content when explicitly enabled
+- the non-AI ingestion endpoint now uses a single-intent contract:
+  - `intent: "ingestion"` for RSS/content ingestion
+  - `intent: "ai_enrichment"` for server-side AI enrichment
+- mixed ingestion plus `aiEnrichment` payloads are now rejected clearly instead of being routed implicitly
+- non-AI ingestion now returns clearer diagnostics for:
+  - requested / resolved / unknown source ids
+  - per-source reliability tier
+  - per-source started / completed timestamps
+  - per-run source success / partial / failed counts
 - an optional server-side DeepSeek dry-run path exists behind explicit env gating
 - a manual-only guarded DeepSeek enrichment write mode now exists for one-to-three signals at a time
 - manual AI write mode now uses claim / retry bookkeeping on `public.intelligence_signals`
+- AI enrichment still rejects `triggerMode: "scheduled"` and remains manual-only
 
 ## What SignalDesk Currently Does
 
@@ -60,6 +70,8 @@ Server-side content pipeline:
 - deterministic topic/entity mapping
 - deterministic candidate signal generation
 - Supabase persistence for raw items and deterministic candidate signals
+- explicit non-AI ingestion intent plus trigger metadata for future scheduling work
+- mixed ingestion plus AI requests rejected at the endpoint boundary
 - optional server-only DeepSeek enrichment with:
   - dry-run by default
   - manual write mode only
@@ -132,10 +144,14 @@ Safety model:
 - `dryRun: true` is the default
 - write mode requires explicit `dryRun: false`
 - write mode also requires server-side enablement plus a matching write token
+- non-AI ingestion requests should use `intent: "ingestion"`
+- future recurring non-AI ingestion may use `triggerMode: "scheduled"`, but that is still server-side/operator work
+- requests that combine ingestion fields with `aiEnrichment` are rejected
 - frontend preview is read-only
 - frontend does not write Phase 4 content tables
 - DeepSeek enrichment calls exist only on the server
 - AI dry-run remains the default path
+- AI enrichment remains manual-only and rejects `triggerMode: "scheduled"`
 - manual AI write mode requires:
   - `dryRun: false`
   - `aiEnrichment.writeMode: true`
@@ -178,8 +194,8 @@ Use this order for a new non-production environment:
 5. Seed `content_sources` with `supabase/manual/phase4_content_sources_smoke_seed.sql`
 6. Run `supabase/manual/phase4_content_readiness_checks.sql`
 7. Deploy the `phase4-dry-run` Edge Function
-8. Run a `liveFetch: true` plus `dryRun: true` smoke test
-9. Run a guarded write-mode smoke test with `dryRun: false`
+8. Run an ingestion-only `intent: "ingestion"` plus `liveFetch: true` plus `dryRun: true` smoke test
+9. Run an ingestion-only guarded write-mode smoke test with `intent: "ingestion"` plus `dryRun: false`
 10. Verify content-table row counts conceptually:
    - ingestion runs should increment
    - duplicate reruns should not duplicate raw items or deterministic candidate signals
@@ -194,15 +210,16 @@ Use this order for a new non-production environment:
    - `DEEPSEEK_MODEL=deepseek-chat`
 14. Run a one-signal AI dry-run request against `phase4-dry-run`
 15. Verify the response returns proposed enrichment output only and performs no database writes
-16. For manual Task 13D/13E write-mode validation only:
+16. Confirm AI enrichment is still manual-only by sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` and verifying a clear rejection response
+17. For manual Task 13D/13E write-mode validation only:
    - set `PHASE4_AI_DRY_RUN_ONLY=false`
    - keep `PHASE4_ENABLE_AI_ENRICHMENT=true`
    - keep `AI_PROVIDER=deepseek`
    - keep `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL` server-side only
    - send `dryRun: false` plus `aiEnrichment.writeMode: true` plus `x-phase4-write-token`
-17. Verify only enrichment-ready columns plus additive claim/retry bookkeeping fields on `public.intelligence_signals` changed
-18. Verify one-to-three signal manual batches process sequentially and return per-signal statuses
-19. Verify Today preview still falls back safely when disabled
+18. Verify only enrichment-ready columns plus additive claim/retry bookkeeping fields on `public.intelligence_signals` changed
+19. Verify one-to-three signal manual batches process sequentially and return per-signal statuses
+20. Verify Today preview still falls back safely when disabled
 
 ## Current Safety Model
 
@@ -224,7 +241,7 @@ Use this order for a new non-production environment:
 - no scheduled AI enrichment exists yet
 - Task 13D/13E AI writes update enrichment-ready fields plus additive lease/retry bookkeeping only and do not overwrite deterministic fields
 - AI dry-run and write mode should still be treated as operator-only manual tools
-- no scheduled ingestion exists yet
+- no recurring non-AI ingestion job exists yet even though the endpoint contract is now scheduler-ready
 - the Today real-content path is still preview-only
 - Radar is still mock
 - Watchlist and Library are not real-content-backed yet

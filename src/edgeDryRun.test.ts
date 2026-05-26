@@ -325,6 +325,78 @@ test('phase4 ingestion handler keeps dry-run working without write secrets', asy
   assert.equal(payload.writes_disabled, true);
 });
 
+test('phase4 ingestion handler fails fast when explicit sourceIds resolve to none', async () => {
+  const handler = createPhase4IngestionHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => SAMPLE_AI_RSS_FEED_XML,
+    }),
+    now: () => '2026-05-17T12:00:00.000Z',
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-ingestion', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        intent: 'ingestion',
+        triggerMode: 'scheduled',
+        dryRun: true,
+        sourceIds: ['rss_unknown_source'],
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 400);
+  const payload = await response.json();
+  assert.equal(payload.code, 'phase4_no_known_source_ids');
+  assert.deepEqual(payload.requested_source_ids, ['rss_unknown_source']);
+  assert.deepEqual(payload.unknown_source_ids, ['rss_unknown_source']);
+  assert.equal(payload.trigger_mode, 'scheduled');
+});
+
+test('phase4 ingestion handler reports unknown sourceIds as warnings while still processing known sources', async () => {
+  const handler = createPhase4IngestionHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => SAMPLE_AI_RSS_FEED_XML,
+    }),
+    now: () => '2026-05-17T12:00:00.000Z',
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-ingestion', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        intent: 'ingestion',
+        dryRun: true,
+        sourceIds: [SAMPLE_AI_RSS_SOURCE.id, 'rss_unknown_source'],
+        maxItemsPerSource: 1,
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.deepEqual(payload.requested_source_ids, [
+    SAMPLE_AI_RSS_SOURCE.id,
+    'rss_unknown_source',
+  ]);
+  assert.deepEqual(payload.selected_source_ids, [SAMPLE_AI_RSS_SOURCE.id]);
+  assert.deepEqual(payload.unknown_source_ids, ['rss_unknown_source']);
+  assert.equal(payload.warnings.length, 1);
+  assert.match(payload.warnings[0], /unknown source ids/i);
+});
+
 test('phase4 ingestion handler surfaces partial write failures with a non-200 status', async () => {
   const store = new EdgeMockContentStore();
   store.failSignalWrites = true;

@@ -226,6 +226,41 @@ test('maps missing enrichment preview signals into a safe detail payload without
   assert.equal(payload.usesEnrichedSummary, false);
 });
 
+test('maps completed real-content enrichment end-to-end into detail payload and still avoids fake article blocks', () => {
+  const payload = toDetailPayloadFromSignal(
+    mapRealContentSignalRowToSignal({
+      id: 'signal-real-enriched-end-to-end',
+      primary_category: 'ai',
+      categories: ['ai'],
+      headline_en: 'OpenAI country rollout',
+      headline_zh: null,
+      summary_en: 'Deterministic summary fallback.',
+      summary_zh: null,
+      enriched_summary_en: 'Enriched English summary only.',
+      enriched_summary_zh: null,
+      why_it_matters_en: ['Deterministic bullet.'],
+      why_it_matters_zh: [],
+      enriched_why_it_matters_en: ['Enriched English bullet.'],
+      enriched_why_it_matters_zh: [],
+      enrichment_status: 'completed',
+      summary_status: 'completed',
+      translation_status: 'completed',
+      primary_source_name: 'OpenAI',
+      published_at: '2026-05-21T09:00:00.000Z',
+      overall_score: 73,
+      signal_topics: [],
+      signal_entities: [],
+      signal_source_items: [],
+    }),
+  );
+
+  assert.equal(payload.previewMode, 'real_content');
+  assert.equal(payload.summaryZh, 'Enriched English summary only.');
+  assert.deepEqual(payload.whyItMatters, ['Enriched English bullet.']);
+  assert.equal(payload.usesEnrichedSummary, true);
+  assert.equal(payload.content, undefined);
+});
+
 test('maps a library item to a safe detail payload with complete arrays', () => {
   const payload = toDetailPayloadFromLibraryItem(MOCK_LIBRARY[0]);
 

@@ -21,7 +21,11 @@ import {
   type Phase4AiEnrichmentWritePatch,
 } from './enrichmentStore.ts';
 import { createDeepSeekAiEnrichmentProvider } from './deepseekProvider.ts';
-import type { ContentLanguage } from './types.ts';
+import type {
+  ContentLanguage,
+  Phase4RequestIntent,
+  Phase4TriggerMode,
+} from './types.ts';
 
 interface FetchResponseLike {
   ok: boolean;
@@ -45,6 +49,8 @@ export interface Phase4AiEnrichmentRequest {
 }
 
 export interface Phase4AiEnrichmentRequestEnvelope {
+  intent?: Phase4RequestIntent;
+  triggerMode?: Phase4TriggerMode;
   dryRun?: boolean;
   aiEnrichment?: Phase4AiEnrichmentRequest | null;
 }
@@ -70,7 +76,8 @@ type Phase4AiEnrichmentErrorCode =
   | 'ai_write_token_missing'
   | 'ai_write_token_mismatch'
   | 'ai_write_signal_limit_exceeded'
-  | 'ai_write_signal_ids_limit_exceeded';
+  | 'ai_write_signal_ids_limit_exceeded'
+  | 'ai_scheduled_trigger_not_allowed';
 
 type Phase4AiEnrichmentSkippedReason =
   | 'proposed'
@@ -231,11 +238,17 @@ const isAiEnrichmentProvider = (
   value: string | null | undefined,
 ): value is AiEnrichmentProviderName => value === 'noop' || value === 'deepseek';
 
+const resolveTriggerMode = (
+  value: Phase4TriggerMode | undefined,
+): Phase4TriggerMode => (value === 'scheduled' ? 'scheduled' : 'manual');
+
 const getRequestConfig = (request: Phase4AiEnrichmentRequestEnvelope) => ({
   provider:
     isAiEnrichmentProvider(request.aiEnrichment?.provider)
       ? request.aiEnrichment.provider
       : 'noop',
+  intent: request.intent === 'ai_enrichment' ? 'ai_enrichment' : 'ai_enrichment',
+  triggerMode: resolveTriggerMode(request.triggerMode),
   signalIds: [...(request.aiEnrichment?.signalIds ?? [])],
   maxSignals: request.aiEnrichment?.maxSignals,
   targetLanguages: normalizeTargetLanguages(request.aiEnrichment?.targetLanguages),
@@ -662,6 +675,18 @@ export async function createPhase4AiEnrichmentDryRun(
   const requestConfig = getRequestConfig(request);
   const config = options.aiConfig ?? null;
 
+  // Task 14 explicitly leaves AI enrichment operator-run only. Non-AI RSS
+  // ingestion may be scheduled later, but AI enrichment must still be manual.
+  if (requestConfig.triggerMode === 'scheduled') {
+    return buildDryRunErrorResponse(
+      requestConfig.provider,
+      getWriteErrorModel(requestConfig.provider, config),
+      'ai_scheduled_trigger_not_allowed',
+      'AI enrichment remains manual-only. Scheduled triggerMode is not allowed.',
+      requestConfig.signalIds,
+    );
+  }
+
   if (request.dryRun === false) {
     return buildDryRunErrorResponse(
       requestConfig.provider,
@@ -821,6 +846,21 @@ export async function runPhase4AiEnrichment(
     `phase4-ai-${Date.now().toString(36)}`;
   const writeModeRequested =
     requestConfig.writeMode || request.dryRun === false;
+
+  if (requestConfig.triggerMode === 'scheduled') {
+    if (writeModeRequested) {
+      return buildWriteErrorResponse(
+        runId,
+        requestConfig.provider,
+        getWriteErrorModel(requestConfig.provider, config),
+        'ai_scheduled_trigger_not_allowed',
+        'AI enrichment remains manual-only. Scheduled triggerMode is not allowed.',
+        requestConfig.signalIds,
+      );
+    }
+
+    return createPhase4AiEnrichmentDryRun(request, options);
+  }
 
   if (!writeModeRequested) {
     return createPhase4AiEnrichmentDryRun(request, options);

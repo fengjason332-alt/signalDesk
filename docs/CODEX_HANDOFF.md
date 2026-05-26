@@ -1,6 +1,6 @@
 # SignalDesk Codex Handoff
 
-## Latest Handoff: 2026-05-25
+## Latest Handoff: 2026-05-26
 
 This handoff supersedes older Phase 4 notes. Use this section first before touching code.
 
@@ -33,6 +33,7 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - DeepSeek is now wired as the first optional server-side provider
 - Task 13C adds a guarded manual-only AI write mode
 - Task 13D and Task 13E add additive claim / retry hardening plus sequential one-to-three signal manual batch support
+- Task 14A-14D add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, and confirmation that AI enrichment still rejects scheduled trigger mode
 - AI writes remain limited to enrichment-ready columns plus additive claim/retry bookkeeping columns on `public.intelligence_signals`
 
 ### Current Test Status
@@ -97,8 +98,8 @@ Do not commit any of these secrets or real values.
 3. Run readiness checks
 4. Confirm preview read policies are applied
 5. Deploy `phase4-dry-run`
-6. Run `liveFetch: true` plus `dryRun: true`
-7. Run a guarded write-mode smoke test with `dryRun: false`
+6. Run an ingestion-only request with `intent: "ingestion"` plus `liveFetch: true` plus `dryRun: true`
+7. Run an ingestion-only guarded write-mode smoke test with `intent: "ingestion"` plus `dryRun: false`
 8. Verify:
    - ingestion runs increment
    - duplicate reruns do not duplicate raw items or candidate signals
@@ -106,12 +107,21 @@ Do not commit any of these secrets or real values.
 9. Enable `VITE_USE_REAL_CONTENT_FEED=true` locally
 10. Verify Today preview and Detail provenance
 11. Set `VITE_USE_REAL_CONTENT_FEED=false` again and confirm Today returns to mock
-12. If intentionally validating Task 13B-13E, configure DeepSeek server env only
-13. Run one-signal AI dry-run against `phase4-dry-run`
-14. For Task 13D/13E, apply `202605250001_phase4_ai_enrichment_leases.sql`
-15. Set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
-16. Optionally run a three-signal manual batch request and confirm sequential per-signal statuses
-17. Verify only enrichment-ready plus additive claim/retry fields changed and that Today preview prefers enriched text when present
+12. Inspect the ingestion response for:
+   - `requested_source_ids`
+   - `selected_source_ids`
+   - `unknown_source_ids`
+   - `warnings`
+   - `source_previews[].reliability_tier`
+   - `source_previews[].started_at`
+   - `source_previews[].completed_at`
+13. If intentionally validating Task 13B-13E, configure DeepSeek server env only
+14. Run one-signal AI dry-run against `phase4-dry-run`
+15. Confirm AI remains manual-only by sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` and verifying a clear rejection payload
+16. For Task 13D/13E, apply `202605250001_phase4_ai_enrichment_leases.sql`
+17. Set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
+18. Optionally run a three-signal manual batch request and confirm sequential per-signal statuses
+19. Verify only enrichment-ready plus additive claim/retry fields changed and that Today preview prefers enriched text when present
 
 ### Boundaries For The Next Session
 
@@ -119,6 +129,7 @@ Do not commit any of these secrets or real values.
 - Do not touch Radar real-data integration yet.
 - Do not add any new frontend AI calls.
 - Do not broaden AI writes beyond the guarded manual `intelligence_signals` enrichment-field scope.
+- Do not automate AI enrichment yet.
 - Do not commit `.env` or secrets.
 - Do not add frontend writes to Phase 4 content tables.
 - Do not weaken write-mode guardrails for the Edge Function.
@@ -213,10 +224,32 @@ Do not commit any of these secrets or real values.
 - there is still no scheduled AI execution
 - deploys using `--no-verify-jwt` should treat AI-enabled requests as operator-only
 
+### Latest Task 14A-14D Status
+
+- non-AI ingestion now uses an explicit endpoint contract:
+  - `intent: "ingestion"`
+  - `triggerMode: "manual"` or `triggerMode: "scheduled"`
+- mixed payloads that combine ingestion fields with `aiEnrichment` are now rejected clearly
+- explicit but unknown `sourceIds` now fail fast when none resolve and surface warnings when only some resolve
+- ingestion responses now include:
+  - `request_kind`
+  - `trigger_mode`
+  - `started_at`
+  - `completed_at`
+  - `requested_source_ids`
+  - `selected_source_ids`
+  - `unknown_source_ids`
+  - `warnings`
+  - per-source `reliability_tier`
+  - per-source `started_at` / `completed_at`
+  - summary source success / partial / failed counts
+- AI enrichment still remains manual-only and now rejects `triggerMode: "scheduled"`
+- Today and Detail still prefer completed enriched summary content when present and otherwise fall back safely to deterministic preview content
+
 ### Exact Next Recommended Task
 
-Phase 4 Task 14:
-- scheduled ingestion for the non-AI content pipeline only
+Phase 4 Task 14E:
+- bounded recurring non-AI ingestion execution only
 - keep the real-content path read-only on the client
 - keep Today mock by default
 - keep Radar on mock

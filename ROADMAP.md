@@ -22,7 +22,7 @@ Phase 3 did not move content cards or feed data into Supabase.
 
 Phase 4 is the real-content phase. Its purpose is to ingest real information, store raw source items, deduplicate them, generate structured intelligence signals, and eventually feed those results into the Today experience without breaking the mock-first default rollout.
 
-### Phase 4 Tasks 0-12 Plus Task 13-preflight And Tasks 13B-13E Complete
+### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-14D Complete
 
 1. Task 0: content-domain foundation types, additive mappers, and Phase 4 schema draft
 2. Task 1: source registry and RSS ingestion skeleton
@@ -42,6 +42,10 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 16. Task 13C: manual-only guarded AI enrichment write mode for one-to-three signals, validated DeepSeek output persistence into enrichment-ready `intelligence_signals` columns only, readback confirmation, and no deterministic-field overwrites
 17. Task 13D: additive claim / lease / retry bookkeeping for manual AI enrichment writes
 18. Task 13E: sequential manual batch write-mode support for up to 3 signals, partial-failure handling, and richer operator readback / observability
+19. Task 14A: non-AI ingestion operation-plan hardening and explicit scheduling boundary documentation
+20. Task 14B: single-intent ingestion vs AI request guardrails and mixed-request rejection
+21. Task 14C: richer non-AI ingestion observability for requested/resolved source ids, per-source reliability/timestamps, and source-status counts
+22. Task 14D: Today/Detail enriched-content display-priority verification without changing defaults
 
 ### Current Phase 4 Status
 
@@ -61,13 +65,16 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 - guarded manual AI enrichment persistence now exists for enrichment-ready `intelligence_signals` fields only
 - manual DeepSeek write mode has succeeded in non-production
 - claim / retry bookkeeping now exists for manual AI reruns
+- non-AI ingestion now has an explicit single-intent request contract and clearer source-level diagnostics
+- mixed ingestion plus AI requests are rejected instead of being routed implicitly
+- AI enrichment still rejects `triggerMode: "scheduled"` and remains manual-only
 - no scheduled AI execution exists yet
 
 ## Next Recommended Tasks
 
-### Task 14: Scheduled Ingestion
+### Task 14E: Recurring Non-AI Ingestion Execution
 
-- add controlled scheduling for recurring ingestion
+- add controlled recurring execution for non-AI ingestion
 - keep live fetch and writes observable and bounded
 - preserve dry-run and manual smoke-test safety patterns
 - keep AI enrichment manual-only while scheduled ingestion is stabilized

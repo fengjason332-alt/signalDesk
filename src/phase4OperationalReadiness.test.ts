@@ -112,6 +112,8 @@ test('phase 4 preview read-policy SQL is manual, select-only, and scoped to prev
 
 test('buildPhase4SmokeTestRequest defaults to the safest smoke-test settings', () => {
   assert.deepEqual(buildPhase4SmokeTestRequest(), {
+    intent: 'ingestion',
+    triggerMode: 'manual',
     dryRun: true,
     liveFetch: false,
     maxItemsPerSource: 3,
@@ -121,12 +123,16 @@ test('buildPhase4SmokeTestRequest defaults to the safest smoke-test settings', (
 test('buildPhase4SmokeTestRequest accepts explicit source ids and write-mode overrides', () => {
   assert.deepEqual(
     buildPhase4SmokeTestRequest({
+      intent: 'ingestion',
+      triggerMode: 'scheduled',
       dryRun: false,
       liveFetch: true,
       maxItemsPerSource: 2,
       sourceIds: ['rss_openai_blog_ai', 'rss_coindesk_crypto'],
     }),
     {
+      intent: 'ingestion',
+      triggerMode: 'scheduled',
       dryRun: false,
       liveFetch: true,
       maxItemsPerSource: 2,

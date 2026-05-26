@@ -10,8 +10,10 @@ export interface Phase4SmokeTestRequestOptions extends Phase4DryRunRequest {}
 
 export const DEFAULT_PHASE4_SMOKE_TEST_REQUEST: Pick<
   Phase4SmokeTestRequest,
-  'dryRun' | 'liveFetch' | 'maxItemsPerSource'
+  'intent' | 'triggerMode' | 'dryRun' | 'liveFetch' | 'maxItemsPerSource'
 > = {
+  intent: 'ingestion',
+  triggerMode: 'manual',
   dryRun: true,
   liveFetch: false,
   maxItemsPerSource: 3,
@@ -21,6 +23,9 @@ export function buildPhase4SmokeTestRequest(
   options: Phase4SmokeTestRequestOptions = {},
 ): Phase4SmokeTestRequest {
   return {
+    intent: options.intent ?? DEFAULT_PHASE4_SMOKE_TEST_REQUEST.intent,
+    triggerMode:
+      options.triggerMode ?? DEFAULT_PHASE4_SMOKE_TEST_REQUEST.triggerMode,
     dryRun: options.dryRun ?? DEFAULT_PHASE4_SMOKE_TEST_REQUEST.dryRun,
     liveFetch: options.liveFetch ?? DEFAULT_PHASE4_SMOKE_TEST_REQUEST.liveFetch,
     maxItemsPerSource:

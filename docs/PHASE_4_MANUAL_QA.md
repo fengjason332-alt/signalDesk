@@ -14,6 +14,7 @@ Important boundaries:
 - Task 13B adds an optional DeepSeek dry-run path on the server side only
 - Task 13C adds a guarded manual-only AI write mode for enrichment-ready `intelligence_signals` fields only
 - Task 13D and Task 13E add additive claim / retry bookkeeping and sequential batch handling for one-to-three manual AI writes
+- Task 14A-14D add an explicit ingestion request contract, mixed-request rejection, and richer non-AI ingestion diagnostics
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -29,6 +30,8 @@ The active preview environment has already proven:
 - Supabase content tables contain real rows
 - duplicate reruns do not duplicate raw items or deterministic candidate signals
 - Today real-content preview works when explicitly enabled
+- non-AI ingestion now returns requested / resolved / unknown source-id diagnostics
+- AI enrichment still rejects `triggerMode: "scheduled"` and remains manual-only
 
 ## 1. Supabase Migration Applied
 
@@ -114,6 +117,8 @@ curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-r
   --header 'Content-Type: application/json' \
   --header 'apikey: <publishable-key>' \
   --data '{
+    "intent": "ingestion",
+    "triggerMode": "manual",
     "dryRun": true,
     "liveFetch": true,
     "maxItemsPerSource": 1,
@@ -124,6 +129,7 @@ curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-r
 Expected conceptually:
 - request succeeds without content writes
 - response includes readable run summary
+- response includes `requested_source_ids`, `selected_source_ids`, `unknown_source_ids`, and `warnings`
 - per-source previews are visible
 - candidate signals can appear in preview output
 
@@ -145,6 +151,8 @@ curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-r
   --header 'apikey: <publishable-key>' \
   --header 'x-phase4-write-token: <phase4-write-auth-token>' \
   --data '{
+    "intent": "ingestion",
+    "triggerMode": "manual",
     "dryRun": false,
     "liveFetch": true,
     "maxItemsPerSource": 1,
@@ -155,6 +163,7 @@ curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-r
 Expected conceptually:
 - content rows may be written
 - ingestion run status is recorded
+- response includes per-source `reliability_tier`, `started_at`, and `completed_at`
 - rerunning the same sources should not blindly duplicate raw items or deterministic candidate signals
 
 ## 7. Row Count Verification
@@ -168,6 +177,84 @@ Verify conceptually after a successful write smoke test:
 - provenance/link tables should populate when source/entity/topic matches exist
 
 Do not hardcode fragile exact counts as a requirement.
+
+SQL inspection snippets:
+
+```sql
+select
+  id,
+  source_id,
+  status,
+  started_at,
+  completed_at,
+  items_fetched,
+  items_inserted,
+  items_skipped_as_duplicates,
+  items_failed,
+  error_message
+from public.content_ingestion_runs
+order by started_at desc
+limit 10;
+```
+
+```sql
+select
+  id,
+  source_id,
+  title,
+  canonical_url,
+  published_at
+from public.raw_source_items
+order by published_at desc nulls last
+limit 20;
+```
+
+```sql
+select
+  id,
+  headline_en,
+  headline_zh,
+  primary_source_name,
+  published_at,
+  overall_score,
+  enrichment_status,
+  summary_status,
+  translation_status
+from public.intelligence_signals
+order by published_at desc nulls last
+limit 20;
+```
+
+```sql
+select source_id, count(*) as raw_item_count
+from public.raw_source_items
+group by source_id
+order by raw_item_count desc, source_id asc;
+```
+
+```sql
+select signal_id, count(*) as linked_source_count
+from public.signal_source_items
+group by signal_id
+order by linked_source_count desc, signal_id asc
+limit 20;
+```
+
+```sql
+select signal_id, count(*) as topic_count
+from public.signal_topics
+group by signal_id
+order by topic_count desc, signal_id asc
+limit 20;
+```
+
+```sql
+select signal_id, count(*) as entity_count
+from public.signal_entities
+group by signal_id
+order by entity_count desc, signal_id asc
+limit 20;
+```
 
 ## 8. Preview Read Policies
 
@@ -236,6 +323,8 @@ curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-r
   --header 'Content-Type: application/json' \
   --header 'apikey: <publishable-key>' \
   --data '{
+    "intent": "ai_enrichment",
+    "triggerMode": "manual",
     "dryRun": true,
     "aiEnrichment": {
       "provider": "deepseek",
@@ -271,6 +360,7 @@ Verify conceptually:
 - Task 13B dry-run still performs no AI writes
 - Task 13C writes only enrichment-ready fields on `public.intelligence_signals`
 - no scheduled AI jobs exist
+- sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` should fail clearly
 - future AI implementation is still expected to stay guarded and server-side only
 
 ## 14. Task 13C-13E DeepSeek Write Mode

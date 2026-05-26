@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight And Tasks 13B-13E
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-14D
 
 ### Tasks 0-4: Foundations
 
@@ -133,6 +133,28 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - one failed signal no longer collapses the whole batch
 - dry-run behavior remains claim-free and no-write
 
+### Task 14A Through Task 14D: Non-AI Ingestion Hardening And Preview Verification
+
+- non-AI ingestion now has an explicit single-intent request contract:
+  - `intent: "ingestion"`
+  - `triggerMode: "manual"` or `triggerMode: "scheduled"`
+- mixed payloads that combine ingestion fields with `aiEnrichment` are rejected clearly
+- explicit but unknown `sourceIds` now fail fast when none resolve and surface warnings when only some resolve
+- non-AI ingestion responses now include:
+  - `request_kind`
+  - `trigger_mode`
+  - `started_at`
+  - `completed_at`
+  - `requested_source_ids`
+  - `selected_source_ids`
+  - `unknown_source_ids`
+  - `warnings`
+  - per-source reliability tiers and timestamps
+  - source success / partial / failed counts in the summary
+- non-AI ingestion still performs no AI provider calls
+- AI enrichment still remains manual-only and rejects `triggerMode: "scheduled"`
+- Today and Detail enriched-content priority behavior is verified and still falls back safely to deterministic preview content when enrichment is missing
+
 Proposed future AI enrichment flow:
 - runtime location:
   - server-side only
@@ -191,13 +213,14 @@ Proposed future AI enrichment flow:
   - `supabase/manual/phase4_preview_read_policies.sql` has been applied
 - default Today behavior is still mock
 - Radar remains mock
+- non-AI ingestion is now scheduler-ready at the request-contract level, but recurring execution is not wired yet
 - there is still no scheduled AI execution
 
 ## Remaining Tasks
 
-### Task 14: Scheduled Ingestion
+### Task 14E: Recurring Non-AI Ingestion Execution
 
-- add bounded scheduling for recurring ingestion
+- add bounded recurring execution for non-AI ingestion
 - preserve dry-run and explicit write controls
 - make operational observability stronger before increasing ingestion cadence
 - keep AI enrichment manual-only while scheduled ingestion is stabilized
@@ -212,6 +235,7 @@ Proposed future AI enrichment flow:
 
 - RLS and preview-read policies can drift from what the frontend read adapter expects
 - RSS feeds can go stale, change shape, or become noisy
+- explicit source-id typos can still waste operator time unless scheduler callers surface `unknown_source_ids` and warnings
 - duplicate handling can still miss tricky cross-source near-duplicates
 - partial failures can leave the system operationally confusing even when writes are guarded
 - source provenance quality depends on source metadata consistency
@@ -224,6 +248,7 @@ Proposed future AI enrichment flow:
 
 - keep `dryRun: true` as the default
 - keep write mode guarded by explicit enablement and `PHASE4_WRITE_AUTH_TOKEN`
+- keep ingestion and AI enrichment as separate request intents
 - keep the frontend real-content path read-only
 - keep Today mock by default
 - keep Radar mock

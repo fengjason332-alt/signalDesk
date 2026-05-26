@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import {
+  SAMPLE_AI_RSS_FEED_XML,
+  SAMPLE_AI_RSS_SOURCE,
+} from './lib/content/rssFixtures';
 import type { AiEnrichmentSignalInput } from '../supabase/functions/_shared/enrichmentProvider.ts';
 import {
   DEFAULT_DEEPSEEK_BASE_URL,
@@ -494,6 +498,136 @@ test('phase4 ingestion handler routes aiEnrichment requests through the server-o
   const payload = await response.json();
   assert.equal(payload.code, 'provider_not_configured');
   assert.equal(payload.no_writes_performed, true);
+  assert.equal(store.writeCalls, 0);
+});
+
+test('phase4 ingestion handler rejects mixed ingestion and aiEnrichment payloads before any provider call', async () => {
+  let aiFetchCalls = 0;
+  const store = new FakeAiEnrichmentStore([makeCandidateRecord('signal-mixed-1')]);
+  const handler = createPhase4IngestionHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => SAMPLE_AI_RSS_FEED_XML,
+    }),
+    aiEnrichmentStore: store,
+    aiConfig: {
+      provider: 'deepseek',
+      enabled: true,
+      dryRunOnly: true,
+      deepseekApiKey: 'server-only-secret',
+      deepseekBaseUrl: DEFAULT_DEEPSEEK_BASE_URL,
+      deepseekModel: DEFAULT_DEEPSEEK_MODEL,
+    },
+    aiFetchImpl: async () => {
+      aiFetchCalls += 1;
+      throw new Error('AI provider should not be called for mixed requests');
+    },
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-dry-run', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        intent: 'ingestion',
+        triggerMode: 'scheduled',
+        dryRun: true,
+        sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+        aiEnrichment: {
+          provider: 'deepseek',
+          maxSignals: 1,
+        },
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 400);
+  const payload = await response.json();
+  assert.equal(payload.code, 'phase4_mixed_intent_not_allowed');
+  assert.equal(aiFetchCalls, 0);
+  assert.equal(store.claimCalls, 0);
+  assert.equal(store.writeCalls, 0);
+});
+
+test('phase4 ingestion handler keeps non-AI ingestion requests away from the AI provider path entirely', async () => {
+  let aiFetchCalls = 0;
+  const handler = createPhase4IngestionHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      text: async () => SAMPLE_AI_RSS_FEED_XML,
+    }),
+    aiConfig: {
+      provider: 'deepseek',
+      enabled: true,
+      dryRunOnly: true,
+      deepseekApiKey: 'server-only-secret',
+      deepseekBaseUrl: DEFAULT_DEEPSEEK_BASE_URL,
+      deepseekModel: DEFAULT_DEEPSEEK_MODEL,
+    },
+    aiFetchImpl: async () => {
+      aiFetchCalls += 1;
+      throw new Error('AI provider should not run during non-AI ingestion');
+    },
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-dry-run', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        intent: 'ingestion',
+        dryRun: true,
+        sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+        maxItemsPerSource: 1,
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.request_kind, 'ingestion');
+  assert.equal(payload.dry_run, true);
+  assert.equal(aiFetchCalls, 0);
+});
+
+test('AI enrichment rejects scheduled trigger mode so manual-only execution remains enforced', async () => {
+  const store = new FakeAiEnrichmentStore([makeCandidateRecord('signal-scheduled-ai')]);
+
+  const response = await createPhase4AiEnrichmentDryRun(
+    {
+      intent: 'ai_enrichment',
+      triggerMode: 'scheduled',
+      dryRun: true,
+      aiEnrichment: {
+        provider: 'deepseek',
+        signalIds: ['signal-scheduled-ai'],
+        maxSignals: 1,
+      },
+    },
+    {
+      aiEnrichmentStore: store,
+      aiConfig: {
+        provider: 'deepseek',
+        enabled: true,
+        dryRunOnly: true,
+        deepseekApiKey: 'server-only-secret',
+        deepseekBaseUrl: DEFAULT_DEEPSEEK_BASE_URL,
+        deepseekModel: DEFAULT_DEEPSEEK_MODEL,
+      },
+    },
+  );
+
+  assert.equal(response.code, 'ai_scheduled_trigger_not_allowed');
+  assert.equal(response.no_writes_performed, true);
+  assert.equal(store.claimCalls, 0);
   assert.equal(store.writeCalls, 0);
 });
 

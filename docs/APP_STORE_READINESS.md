@@ -5,7 +5,9 @@
 - SignalDesk is currently a React/Vite PWA-style app.
 - Today and Detail can preview real content behind feature flags.
 - Radar, Watchlist, and Library still have mock or incomplete real-data integration.
+- non-AI RSS ingestion may become scheduled before any AI enrichment scheduling is approved.
 - AI enrichment is server-side only through Supabase Edge Functions.
+- AI enrichment remains manual-only in Phase 4.
 - No frontend AI keys or service-role keys exist.
 
 ## 2. Recommended Future Route
@@ -87,6 +89,7 @@
 ## Notes
 
 - This document is planning-only for a future Phase 5 path.
+- It is compatible with Phase 4 continuing to harden non-AI ingestion before any AI automation work.
 - It does not approve native runtime work in Phase 4.
 - It does not change current web deployment behavior.
 - Current Apple reference points worth checking before real implementation:
