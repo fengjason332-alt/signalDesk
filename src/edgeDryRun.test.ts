@@ -333,6 +333,7 @@ test('phase4 ingestion handler fails fast when explicit sourceIds resolve to non
       status: 200,
       text: async () => SAMPLE_AI_RSS_FEED_XML,
     }),
+    allowScheduledIngestion: true,
     now: () => '2026-05-17T12:00:00.000Z',
   });
 

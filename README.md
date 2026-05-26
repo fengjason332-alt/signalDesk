@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-14D: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, and stronger ingestion observability
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-14E: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, and a bounded scheduled non-AI ingestion contract that remains disabled by default
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -36,6 +36,8 @@ Current confirmed project state:
   - `intent: "ingestion"` for RSS/content ingestion
   - `intent: "ai_enrichment"` for server-side AI enrichment
 - mixed ingestion plus `aiEnrichment` payloads are now rejected clearly instead of being routed implicitly
+- scheduled non-AI ingestion can now use `triggerMode: "scheduled"` only when `PHASE4_ENABLE_SCHEDULED_INGESTION=true` is enabled server-side
+- scheduled non-AI ingestion remains disabled by default and applies hard caps for source count, items per source, total candidate items, and candidate signals
 - non-AI ingestion now returns clearer diagnostics for:
   - requested / resolved / unknown source ids
   - per-source reliability tier
@@ -133,6 +135,7 @@ Do not place these in the client bundle. These are server-side concepts for the 
 - `PHASE4_ENABLE_CONTENT_WRITES`
 - `PHASE4_WRITE_AUTH_TOKEN`
 - `PHASE4_ENABLE_LIVE_FETCH`
+- `PHASE4_ENABLE_SCHEDULED_INGESTION`
 - `PHASE4_ENABLE_AI_ENRICHMENT`
 - `PHASE4_AI_DRY_RUN_ONLY`
 - `AI_PROVIDER`
@@ -145,7 +148,14 @@ Safety model:
 - write mode requires explicit `dryRun: false`
 - write mode also requires server-side enablement plus a matching write token
 - non-AI ingestion requests should use `intent: "ingestion"`
-- future recurring non-AI ingestion may use `triggerMode: "scheduled"`, but that is still server-side/operator work
+- recurring non-AI ingestion may use `triggerMode: "scheduled"` only when `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
+- scheduled non-AI ingestion remains server-side/operator work only and stays disabled by default
+- scheduled non-AI ingestion currently applies these hard caps:
+  - max `4` sources per run
+  - max `3` items per source
+  - max `12` total candidate items
+  - max `12` candidate signals
+  - recommended minimum `30` minutes between scheduler-triggered runs
 - requests that combine ingestion fields with `aiEnrichment` are rejected
 - frontend preview is read-only
 - frontend does not write Phase 4 content tables
@@ -211,15 +221,18 @@ Use this order for a new non-production environment:
 14. Run a one-signal AI dry-run request against `phase4-dry-run`
 15. Verify the response returns proposed enrichment output only and performs no database writes
 16. Confirm AI enrichment is still manual-only by sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` and verifying a clear rejection response
-17. For manual Task 13D/13E write-mode validation only:
+17. Confirm scheduled non-AI ingestion is disabled by default by sending `intent: "ingestion"` plus `triggerMode: "scheduled"` before enabling `PHASE4_ENABLE_SCHEDULED_INGESTION`
+18. Optionally enable `PHASE4_ENABLE_SCHEDULED_INGESTION=true` in a non-production environment and run a bounded scheduled-ingestion dry-run first
+19. Optionally validate a bounded scheduled-ingestion write-mode request with one source and `maxItemsPerSource: 1`
+20. For manual Task 13D/13E write-mode validation only:
    - set `PHASE4_AI_DRY_RUN_ONLY=false`
    - keep `PHASE4_ENABLE_AI_ENRICHMENT=true`
    - keep `AI_PROVIDER=deepseek`
    - keep `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL` server-side only
    - send `dryRun: false` plus `aiEnrichment.writeMode: true` plus `x-phase4-write-token`
-18. Verify only enrichment-ready columns plus additive claim/retry bookkeeping fields on `public.intelligence_signals` changed
-19. Verify one-to-three signal manual batches process sequentially and return per-signal statuses
-20. Verify Today preview still falls back safely when disabled
+21. Verify only enrichment-ready columns plus additive claim/retry bookkeeping fields on `public.intelligence_signals` changed
+22. Verify one-to-three signal manual batches process sequentially and return per-signal statuses
+23. Verify Today preview still falls back safely when disabled
 
 ## Current Safety Model
 
@@ -241,7 +254,7 @@ Use this order for a new non-production environment:
 - no scheduled AI enrichment exists yet
 - Task 13D/13E AI writes update enrichment-ready fields plus additive lease/retry bookkeeping only and do not overwrite deterministic fields
 - AI dry-run and write mode should still be treated as operator-only manual tools
-- no recurring non-AI ingestion job exists yet even though the endpoint contract is now scheduler-ready
+- no production recurring non-AI ingestion job is enabled by default even though the endpoint contract now supports bounded scheduled requests
 - the Today real-content path is still preview-only
 - Radar is still mock
 - Watchlist and Library are not real-content-backed yet

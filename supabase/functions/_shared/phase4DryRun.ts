@@ -45,6 +45,7 @@ export interface Phase4IngestionOptions {
   sourceRegistry?: SourceRegistryEntry[];
   fetchImpl?: FetchLike;
   allowLiveFetch?: boolean;
+  allowScheduledIngestion?: boolean;
   now?: () => string;
   allowWrites?: boolean;
   writeAuthToken?: string | null;
@@ -55,6 +56,13 @@ export interface Phase4IngestionOptions {
 }
 
 const DEFAULT_MAX_ITEMS_PER_SOURCE = 5;
+const MAX_MANUAL_ITEMS_PER_SOURCE = 20;
+const DEFAULT_SCHEDULED_MAX_SOURCES = 4;
+const DEFAULT_SCHEDULED_MAX_ITEMS_PER_SOURCE = 2;
+const MAX_SCHEDULED_ITEMS_PER_SOURCE = 3;
+const MAX_SCHEDULED_TOTAL_ITEMS = 12;
+const MAX_SCHEDULED_CANDIDATE_SIGNALS = 12;
+const SCHEDULED_MIN_INTERVAL_MINUTES = 30;
 
 const WRITE_STEP_ENABLEMENT = {
   insert_raw_source_items: true,
@@ -93,9 +101,11 @@ interface Phase4RequestValidationPayload {
     | 'phase4_mixed_intent_not_allowed'
     | 'phase4_request_intent_mismatch'
     | 'phase4_no_known_source_ids'
+    | 'phase4_scheduled_ingestion_disabled'
     | 'phase4_ai_requests_not_supported_here';
   intent: 'ingestion' | 'ai_enrichment';
   trigger_mode: 'manual' | 'scheduled';
+  scheduled_ingestion_enabled: boolean;
   requested_source_ids: string[];
   unknown_source_ids: string[];
   live_fetch_requested: boolean;
@@ -127,6 +137,9 @@ const isExplicitLiveFetchRequest = (payload: Phase4DryRunRequest) =>
 const resolveTriggerMode = (
   payload: Pick<Phase4DryRunRequest, 'triggerMode'>,
 ): 'manual' | 'scheduled' => (payload.triggerMode === 'scheduled' ? 'scheduled' : 'manual');
+
+const isScheduledTrigger = (payload: Pick<Phase4DryRunRequest, 'triggerMode'>) =>
+  resolveTriggerMode(payload) === 'scheduled';
 
 const getNow = (payload: Phase4DryRunRequest, now: (() => string) | undefined, fallback: string) =>
   payload.now ?? now?.() ?? fallback;
@@ -517,12 +530,34 @@ export function resolveDryRunSources(
   return sourceRegistry.filter(source => (selectedIds ? selectedIds.has(source.id) : source.active));
 }
 
+const buildIngestionLimitsApplied = (options: {
+  triggerMode: 'manual' | 'scheduled';
+  maxItemsPerSource: number;
+  sourceCountCapped: boolean;
+  itemsPerSourceCapped: boolean;
+  candidateSignalCountCapped: boolean;
+}) => ({
+  max_sources_per_run:
+    options.triggerMode === 'scheduled' ? DEFAULT_SCHEDULED_MAX_SOURCES : null,
+  max_items_per_source: options.maxItemsPerSource,
+  max_total_items:
+    options.triggerMode === 'scheduled' ? MAX_SCHEDULED_TOTAL_ITEMS : null,
+  max_candidate_signals:
+    options.triggerMode === 'scheduled' ? MAX_SCHEDULED_CANDIDATE_SIGNALS : null,
+  min_interval_minutes:
+    options.triggerMode === 'scheduled' ? SCHEDULED_MIN_INTERVAL_MINUTES : null,
+  source_count_capped: options.sourceCountCapped,
+  items_per_source_capped: options.itemsPerSourceCapped,
+  candidate_signal_count_capped: options.candidateSignalCountCapped,
+});
+
 export async function runPhase4Ingestion(
   payload: Phase4DryRunRequest,
   options: Phase4IngestionOptions = {},
 ): Promise<Phase4IngestionResult> {
   const requestedSourceIds = [...(payload.sourceIds ?? [])];
   const triggerMode = resolveTriggerMode(payload);
+  const scheduledIngestionEnabled = Boolean(options.allowScheduledIngestion);
   const writeModeRequested = isExplicitWriteRequest(payload);
   const liveFetchRequested = isExplicitLiveFetchRequest(payload);
 
@@ -541,33 +576,77 @@ export async function runPhase4Ingestion(
   }
 
   const sourceRegistry = options.sourceRegistry ?? getActiveEnglishRssSources();
-  const selectedSources = resolveDryRunSources(payload.sourceIds, sourceRegistry);
+  const resolvedSources = resolveDryRunSources(payload.sourceIds, sourceRegistry);
   const discoveredAt = payload.discoveredAt ?? options.now?.() ?? new Date().toISOString();
   const now = getNow(payload, options.now, discoveredAt);
   const unknownSourceIds = requestedSourceIds.filter(
-    sourceId => !selectedSources.some(source => source.id === sourceId),
+    sourceId => !resolvedSources.some(source => source.id === sourceId),
   );
-  if (requestedSourceIds.length > 0 && selectedSources.length === 0) {
-    throw new Phase4RequestError(400, {
+
+  if (isScheduledTrigger(payload) && !scheduledIngestionEnabled) {
+    throw new Phase4RequestError(403, {
       error:
-        'No requested Phase 4 sourceIds matched the active source registry. Check source ids before retrying.',
-      code: 'phase4_no_known_source_ids',
+        'Scheduled non-AI ingestion is disabled on this server. Set PHASE4_ENABLE_SCHEDULED_INGESTION=true before using triggerMode: "scheduled".',
+      code: 'phase4_scheduled_ingestion_disabled',
       intent: 'ingestion',
       trigger_mode: triggerMode,
+      scheduled_ingestion_enabled: scheduledIngestionEnabled,
       requested_source_ids: requestedSourceIds,
       unknown_source_ids: unknownSourceIds,
       live_fetch_requested: liveFetchRequested,
       write_mode_requested: writeModeRequested,
     });
   }
-  const warnings =
+
+  if (requestedSourceIds.length > 0 && resolvedSources.length === 0) {
+    throw new Phase4RequestError(400, {
+      error:
+        'No requested Phase 4 sourceIds matched the active source registry. Check source ids before retrying.',
+      code: 'phase4_no_known_source_ids',
+      intent: 'ingestion',
+      trigger_mode: triggerMode,
+      scheduled_ingestion_enabled: scheduledIngestionEnabled,
+      requested_source_ids: requestedSourceIds,
+      unknown_source_ids: unknownSourceIds,
+      live_fetch_requested: liveFetchRequested,
+      write_mode_requested: writeModeRequested,
+    });
+  }
+
+  let warnings =
     unknownSourceIds.length > 0
       ? [`Unknown source ids were ignored: ${unknownSourceIds.join(', ')}`]
       : [];
+  let selectedSources = resolvedSources;
+  let sourceCountCapped = false;
+  if (isScheduledTrigger(payload) && selectedSources.length > DEFAULT_SCHEDULED_MAX_SOURCES) {
+    selectedSources = selectedSources.slice(0, DEFAULT_SCHEDULED_MAX_SOURCES);
+    sourceCountCapped = true;
+    warnings = [
+      ...warnings,
+      `Scheduled ingestion capped source selection to ${DEFAULT_SCHEDULED_MAX_SOURCES} sources for this run.`,
+    ];
+  }
+
+  const requestedMaxItemsPerSource =
+    payload.maxItemsPerSource ??
+    (isScheduledTrigger(payload)
+      ? DEFAULT_SCHEDULED_MAX_ITEMS_PER_SOURCE
+      : DEFAULT_MAX_ITEMS_PER_SOURCE);
+  const itemsPerSourceCap = isScheduledTrigger(payload)
+    ? MAX_SCHEDULED_ITEMS_PER_SOURCE
+    : MAX_MANUAL_ITEMS_PER_SOURCE;
   const maxItemsPerSource = Math.max(
     1,
-    Math.min(payload.maxItemsPerSource ?? DEFAULT_MAX_ITEMS_PER_SOURCE, 20),
+    Math.min(requestedMaxItemsPerSource, itemsPerSourceCap),
   );
+  const itemsPerSourceCapped = requestedMaxItemsPerSource > itemsPerSourceCap;
+  if (itemsPerSourceCapped && isScheduledTrigger(payload)) {
+    warnings = [
+      ...warnings,
+      `Scheduled ingestion capped maxItemsPerSource to ${MAX_SCHEDULED_ITEMS_PER_SOURCE}.`,
+    ];
+  }
   const dryRun = !writeModeRequested;
   const contentStore = options.contentStore ?? null;
 
@@ -697,13 +776,23 @@ export async function runPhase4Ingestion(
     }
   }
 
-  const candidateSignals = generateCandidateSignals(
+  let candidateSignals = generateCandidateSignals(
     dryRun ? previewRawItems : signalCandidateRawItems,
     {
       sourceRegistry: selectedSources,
       now,
     },
   );
+  const candidateSignalCountCapped =
+    isScheduledTrigger(payload) &&
+    candidateSignals.length > MAX_SCHEDULED_CANDIDATE_SIGNALS;
+  if (candidateSignalCountCapped) {
+    candidateSignals = candidateSignals.slice(0, MAX_SCHEDULED_CANDIDATE_SIGNALS);
+    warnings = [
+      ...warnings,
+      `Scheduled ingestion capped candidate signals to ${MAX_SCHEDULED_CANDIDATE_SIGNALS} for this run.`,
+    ];
+  }
 
   if (!dryRun) {
     for (const candidateSignal of candidateSignals) {
@@ -801,12 +890,20 @@ export async function runPhase4Ingestion(
   return {
     request_kind: 'ingestion',
     trigger_mode: triggerMode,
+    scheduled_ingestion_enabled: scheduledIngestionEnabled,
     started_at: now,
     completed_at: requestCompletedAt,
     dry_run: dryRun,
     writes_disabled: dryRun,
     live_fetch_requested: liveFetchRequested,
     write_mode_requested: writeModeRequested,
+    limits_applied: buildIngestionLimitsApplied({
+      triggerMode,
+      maxItemsPerSource,
+      sourceCountCapped,
+      itemsPerSourceCapped,
+      candidateSignalCountCapped,
+    }),
     overall_status: overallStatus,
     requested_source_ids: requestedSourceIds,
     selected_source_ids: selectedSources.map(source => source.id),
@@ -896,6 +993,7 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
           code: 'phase4_mixed_intent_not_allowed',
           intent: requestIntent,
           trigger_mode: triggerMode,
+          scheduled_ingestion_enabled: Boolean(options.allowScheduledIngestion),
           requested_source_ids: requestedSourceIds,
           unknown_source_ids: [],
           live_fetch_requested: liveFetchRequested,
@@ -913,6 +1011,7 @@ export function createPhase4IngestionHandler(options: Phase4IngestionOptions = {
           code: 'phase4_request_intent_mismatch',
           intent: requestIntent,
           trigger_mode: triggerMode,
+          scheduled_ingestion_enabled: Boolean(options.allowScheduledIngestion),
           requested_source_ids: requestedSourceIds,
           unknown_source_ids: [],
           live_fetch_requested: liveFetchRequested,
@@ -1042,6 +1141,7 @@ export function createPhase4DryRunHandler(options: Phase4IngestionOptions = {}) 
           code: 'phase4_ai_requests_not_supported_here',
           intent: resolveRequestIntent(body),
           trigger_mode: resolveTriggerMode((body as Phase4DryRunRequest) ?? {}),
+          scheduled_ingestion_enabled: Boolean(options.allowScheduledIngestion),
           requested_source_ids: [...(((body as Phase4DryRunRequest) ?? {}).sourceIds ?? [])],
           unknown_source_ids: [],
           live_fetch_requested: Boolean((body as Phase4DryRunRequest)?.liveFetch === true),

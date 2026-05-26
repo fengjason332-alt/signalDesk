@@ -6,6 +6,7 @@
 - Today and Detail can preview real content behind feature flags.
 - Radar, Watchlist, and Library still have mock or incomplete real-data integration.
 - non-AI RSS ingestion may become scheduled before any AI enrichment scheduling is approved.
+- bounded scheduled non-AI ingestion is still backend-only and does not add any frontend background task.
 - AI enrichment is server-side only through Supabase Edge Functions.
 - AI enrichment remains manual-only in Phase 4.
 - No frontend AI keys or service-role keys exist.
@@ -90,6 +91,7 @@
 
 - This document is planning-only for a future Phase 5 path.
 - It is compatible with Phase 4 continuing to harden non-AI ingestion before any AI automation work.
+- It does not imply any iOS background fetch, native scheduler, or frontend runtime change for recurring ingestion.
 - It does not approve native runtime work in Phase 4.
 - It does not change current web deployment behavior.
 - Current Apple reference points worth checking before real implementation:

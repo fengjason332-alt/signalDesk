@@ -14,7 +14,7 @@ Important boundaries:
 - Task 13B adds an optional DeepSeek dry-run path on the server side only
 - Task 13C adds a guarded manual-only AI write mode for enrichment-ready `intelligence_signals` fields only
 - Task 13D and Task 13E add additive claim / retry bookkeeping and sequential batch handling for one-to-three manual AI writes
-- Task 14A-14D add an explicit ingestion request contract, mixed-request rejection, and richer non-AI ingestion diagnostics
+- Task 14A-14E add an explicit ingestion request contract, mixed-request rejection, richer non-AI ingestion diagnostics, and bounded scheduled-ingestion enablement that remains off by default
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -97,6 +97,7 @@ Required server-side env concepts:
 - `PHASE4_ENABLE_CONTENT_WRITES`
 - `PHASE4_WRITE_AUTH_TOKEN`
 - `PHASE4_ENABLE_LIVE_FETCH`
+- `PHASE4_ENABLE_SCHEDULED_INGESTION`
 - `PHASE4_ENABLE_AI_ENRICHMENT`
 - `PHASE4_AI_DRY_RUN_ONLY`
 - `AI_PROVIDER`
@@ -133,6 +134,52 @@ Expected conceptually:
 - per-source previews are visible
 - candidate signals can appear in preview output
 
+## 5A. Scheduled Ingestion Disabled Check
+
+Before enabling any recurring ingestion path, confirm the server still rejects scheduled ingestion by default.
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --data '{
+    "intent": "ingestion",
+    "triggerMode": "scheduled",
+    "dryRun": true,
+    "sourceIds": ["rss_openai_blog_ai"]
+  }'
+```
+
+Expected conceptually:
+- response fails clearly
+- response includes `code: "phase4_scheduled_ingestion_disabled"`
+- no content writes occur
+
+## 5B. Scheduled Ingestion Dry-Run When Enabled
+
+Only after intentionally setting `PHASE4_ENABLE_SCHEDULED_INGESTION=true` server-side, run a bounded scheduled dry-run:
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --data '{
+    "intent": "ingestion",
+    "triggerMode": "scheduled",
+    "dryRun": true,
+    "liveFetch": true,
+    "maxItemsPerSource": 1,
+    "sourceIds": ["rss_openai_blog_ai", "rss_coindesk_crypto"]
+  }'
+```
+
+Expected conceptually:
+- response succeeds without writes
+- response includes `scheduled_ingestion_enabled: true`
+- response includes `limits_applied`
+- response still includes `requested_source_ids`, `selected_source_ids`, `unknown_source_ids`, `warnings`, and per-source counts
+- no AI provider call is involved
+
 ## 6. Write-Mode Smoke Test
 
 Only run after dry-run looks healthy.
@@ -165,6 +212,32 @@ Expected conceptually:
 - ingestion run status is recorded
 - response includes per-source `reliability_tier`, `started_at`, and `completed_at`
 - rerunning the same sources should not blindly duplicate raw items or deterministic candidate signals
+
+## 6A. Scheduled Ingestion Write-Mode Smoke Test
+
+Only after `PHASE4_ENABLE_SCHEDULED_INGESTION=true` is enabled intentionally and the scheduled dry-run looks healthy, run a bounded scheduled write-mode request.
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --header 'x-phase4-write-token: <phase4-write-auth-token>' \
+  --data '{
+    "intent": "ingestion",
+    "triggerMode": "scheduled",
+    "dryRun": false,
+    "liveFetch": true,
+    "maxItemsPerSource": 1,
+    "sourceIds": ["rss_openai_blog_ai"]
+  }'
+```
+
+Expected conceptually:
+- response includes `scheduled_ingestion_enabled: true`
+- response includes `limits_applied`
+- response remains bounded even if the request asks for more than the scheduled caps
+- only non-AI ingestion tables are written
+- one failing source should not collapse the whole run if another source succeeds
 
 ## 7. Row Count Verification
 
@@ -342,6 +415,29 @@ Expected conceptually:
 - no database writes are performed
 - if `DEEPSEEK_API_KEY` is missing, response fails clearly with `provider_not_configured`
 - if using `--no-verify-jwt`, treat AI dry-run as operator-only and keep `maxSignals` intentionally small
+
+Manual-only boundary check for AI:
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --data '{
+    "intent": "ai_enrichment",
+    "triggerMode": "scheduled",
+    "dryRun": true,
+    "aiEnrichment": {
+      "provider": "deepseek",
+      "maxSignals": 1,
+      "signalIds": ["<existing-intelligence-signal-id>"]
+    }
+  }'
+```
+
+Expected conceptually:
+- response fails clearly
+- response includes `code: "ai_scheduled_trigger_not_allowed"`
+- no AI writes occur
 
 ## 13. Task 13 Boundary Check
 

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { buildPhase4SmokeTestRequest } from './lib/content/phase4SmokeTestRequest';
 
 const manualQaDocPath = resolve(process.cwd(), 'docs/PHASE_4_MANUAL_QA.md');
+const readmePath = resolve(process.cwd(), 'README.md');
 const edgeFunctionPath = resolve(
   process.cwd(),
   'supabase/functions/phase4-dry-run/index.ts',
@@ -33,6 +34,7 @@ const previewReadPoliciesPath = resolve(
 
 test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(manualQaDocPath), true);
+  assert.equal(existsSync(readmePath), true);
   assert.equal(existsSync(edgeFunctionPath), true);
   assert.equal(existsSync(sharedPhase4HandlerPath), true);
   assert.equal(existsSync(sharedContentStorePath), true);
@@ -139,4 +141,16 @@ test('buildPhase4SmokeTestRequest accepts explicit source ids and write-mode ove
       sourceIds: ['rss_openai_blog_ai', 'rss_coindesk_crypto'],
     },
   );
+});
+
+test('scheduled ingestion docs mention the explicit env gate, bounded scheduled trigger, and continued AI manual-only boundary', () => {
+  const readme = readFileSync(readmePath, 'utf8');
+  const manualQaDoc = readFileSync(manualQaDocPath, 'utf8');
+
+  assert.match(readme, /PHASE4_ENABLE_SCHEDULED_INGESTION/i);
+  assert.match(readme, /triggerMode:\s*"scheduled"/i);
+  assert.match(readme, /scheduled non-AI ingestion/i);
+  assert.match(manualQaDoc, /PHASE4_ENABLE_SCHEDULED_INGESTION/i);
+  assert.match(manualQaDoc, /code:\s*"phase4_scheduled_ingestion_disabled"/i);
+  assert.match(manualQaDoc, /code:\s*"ai_scheduled_trigger_not_allowed"/i);
 });

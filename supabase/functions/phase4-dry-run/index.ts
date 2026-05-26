@@ -32,6 +32,7 @@ export function createConfiguredPhase4Handler() {
   const serviceRoleKey = getServerEnv('SUPABASE_SERVICE_ROLE_KEY');
   const allowWrites = isEnabled('PHASE4_ENABLE_CONTENT_WRITES');
   const allowLiveFetch = isEnabled('PHASE4_ENABLE_LIVE_FETCH');
+  const allowScheduledIngestion = isEnabled('PHASE4_ENABLE_SCHEDULED_INGESTION');
   const writeAuthToken = getServerEnv('PHASE4_WRITE_AUTH_TOKEN');
   const canCreateStore = Boolean(supabaseUrl && serviceRoleKey);
   const aiConfig = resolvePhase4AiEnrichmentServerConfig(getServerEnv);
@@ -51,6 +52,7 @@ export function createConfiguredPhase4Handler() {
 
   return createPhase4IngestionHandler({
     allowLiveFetch,
+    allowScheduledIngestion,
     allowWrites: allowWrites && Boolean(contentStore),
     writeAuthToken: writeAuthToken ?? null,
     contentStore,

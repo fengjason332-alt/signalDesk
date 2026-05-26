@@ -486,6 +486,7 @@ test('runPhase4Ingestion surfaces scheduled ingestion intent as observability-on
     {
       sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
       fetchImpl: createFetchImpl(SAMPLE_AI_RSS_FEED_XML),
+      allowScheduledIngestion: true,
       now: () => '2026-05-17T12:00:00.000Z',
     },
   );
@@ -493,6 +494,7 @@ test('runPhase4Ingestion surfaces scheduled ingestion intent as observability-on
   assert.equal(result.dry_run, true);
   assert.equal(result.trigger_mode, 'scheduled');
   assert.equal(result.request_kind, 'ingestion');
+  assert.equal(result.scheduled_ingestion_enabled, true);
   assert.equal(result.summary.write_mode_enabled, false);
   assert.equal(result.source_previews[0]?.started_at, '2026-05-17T12:00:00.000Z');
 });

@@ -494,15 +494,28 @@ export interface Phase4IngestionSummary {
   write_mode_enabled: boolean;
 }
 
+export interface Phase4IngestionLimitsApplied {
+  max_sources_per_run: number | null;
+  max_items_per_source: number;
+  max_total_items: number | null;
+  max_candidate_signals: number | null;
+  min_interval_minutes: number | null;
+  source_count_capped: boolean;
+  items_per_source_capped: boolean;
+  candidate_signal_count_capped: boolean;
+}
+
 export interface Phase4IngestionResult {
   request_kind: 'ingestion';
   trigger_mode: Phase4TriggerMode;
+  scheduled_ingestion_enabled: boolean;
   started_at: string;
   completed_at: string;
   dry_run: boolean;
   writes_disabled: boolean;
   live_fetch_requested: boolean;
   write_mode_requested: boolean;
+  limits_applied: Phase4IngestionLimitsApplied;
   overall_status: Phase4BatchStatus;
   requested_source_ids: string[];
   selected_source_ids: string[];

@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-14D
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-14E
 
 ### Tasks 0-4: Foundations
 
@@ -133,7 +133,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - one failed signal no longer collapses the whole batch
 - dry-run behavior remains claim-free and no-write
 
-### Task 14A Through Task 14D: Non-AI Ingestion Hardening And Preview Verification
+### Task 14A Through Task 14E: Non-AI Ingestion Hardening, Scheduled Guardrails, And Preview Verification
 
 - non-AI ingestion now has an explicit single-intent request contract:
   - `intent: "ingestion"`
@@ -152,6 +152,12 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
   - per-source reliability tiers and timestamps
   - source success / partial / failed counts in the summary
 - non-AI ingestion still performs no AI provider calls
+- bounded scheduled non-AI ingestion now exists behind `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
+- scheduled non-AI ingestion remains disabled by default and clamps to:
+  - max `4` sources per run
+  - max `3` items per source
+  - max `12` total candidate items
+  - max `12` candidate signals
 - AI enrichment still remains manual-only and rejects `triggerMode: "scheduled"`
 - Today and Detail enriched-content priority behavior is verified and still falls back safely to deterministic preview content when enrichment is missing
 
@@ -213,23 +219,22 @@ Proposed future AI enrichment flow:
   - `supabase/manual/phase4_preview_read_policies.sql` has been applied
 - default Today behavior is still mock
 - Radar remains mock
-- non-AI ingestion is now scheduler-ready at the request-contract level, but recurring execution is not wired yet
+- non-AI ingestion now supports a bounded scheduled request path, but no production recurring scheduler is enabled by default
 - there is still no scheduled AI execution
 
 ## Remaining Tasks
-
-### Task 14E: Recurring Non-AI Ingestion Execution
-
-- add bounded recurring execution for non-AI ingestion
-- preserve dry-run and explicit write controls
-- make operational observability stronger before increasing ingestion cadence
-- keep AI enrichment manual-only while scheduled ingestion is stabilized
 
 ### Task 15: Controlled Today Real-Feed Rollout
 
 - move Today from preview-only toward a controlled rollout
 - preserve mock fallback and safe disable paths
 - do not touch Radar, Watchlist, or Library real-data rollout until Today is stable
+
+### Task 16: Operational Recurring Ingestion Automation
+
+- if desired later, wire bounded recurring execution to an actual scheduler
+- keep production scheduling disabled by default until the operator path is validated repeatedly
+- do not add scheduled AI enrichment in this step either
 
 ## Risks To Keep In Mind
 
@@ -243,12 +248,14 @@ Proposed future AI enrichment flow:
 - AI cost and retry behavior can spiral without strict per-run batch limits and explicit version gating
 - operator-facing AI dry-run calls are still sensitive if paired with `--no-verify-jwt`, so keep AI execution tightly gated server-side
 - preview-read policies expose enrichment-ready rows, so AI write copy must stay sanitized and operator-safe
+- recurring non-AI ingestion can still overload noisy sources if future schedulers ignore the current hard caps or warning diagnostics
 
 ## Guardrails
 
 - keep `dryRun: true` as the default
 - keep write mode guarded by explicit enablement and `PHASE4_WRITE_AUTH_TOKEN`
 - keep ingestion and AI enrichment as separate request intents
+- keep scheduled ingestion disabled unless `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
 - keep the frontend real-content path read-only
 - keep Today mock by default
 - keep Radar mock
