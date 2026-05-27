@@ -35,6 +35,10 @@ const OPTIONAL_ENRICHMENT_PREVIEW_COLUMNS = [
 
 export const REAL_CONTENT_FEED_FALLBACK_MESSAGE =
   'Prototype: real content preview is unavailable here, showing the mock feed.';
+export const REAL_CONTENT_FEED_EMPTY_MESSAGE =
+  'Real-content preview is enabled, but no preview-safe signals were found yet.';
+export const REAL_CONTENT_FILTER_EMPTY_MESSAGE =
+  'No real-content signals found matching your current filters yet.';
 
 type SupabaseErrorLike = {
   message?: string;
@@ -138,6 +142,7 @@ export interface RealContentFeedLoaderClient {
 export interface LoadTodaySignalsResult {
   signals: Signal[];
   source: 'mock' | 'real';
+  feedMode: 'mock' | 'real' | 'fallback_to_mock' | 'real_empty';
   usedFallback: boolean;
   errorMessage: string | null;
   isEmpty: boolean;
@@ -793,6 +798,19 @@ const logPreviewDiagnostics = (
   );
 };
 
+const logTodayFeedMode = (
+  feedMode: LoadTodaySignalsResult['feedMode'],
+  details: {
+    signalCount: number;
+    usedFallback: boolean;
+    isEmpty: boolean;
+  },
+) => {
+  console.info(
+    `[Phase 4 Today feed] mode=${feedMode} signalCount=${details.signalCount} usedFallback=${details.usedFallback} isEmpty=${details.isEmpty}`,
+  );
+};
+
 const parseRealContentSignalRow = (row: unknown): RealContentSignalRow => {
   if (!isRecord(row)) {
     throw new Error('row is not an object');
@@ -833,6 +851,26 @@ export function resolveRealContentFeedEnabled(value: string | undefined) {
 export const isRealContentFeedEnabled = resolveRealContentFeedEnabled(
   import.meta.env?.VITE_USE_REAL_CONTENT_FEED,
 );
+
+export function getTodayFeedEmptyStateMessage({
+  feedMode,
+  totalFeedSignals,
+  filteredSignalCount,
+}: {
+  feedMode: LoadTodaySignalsResult['feedMode'];
+  totalFeedSignals: number;
+  filteredSignalCount: number;
+}) {
+  if (feedMode === 'real_empty' && totalFeedSignals === 0) {
+    return REAL_CONTENT_FEED_EMPTY_MESSAGE;
+  }
+
+  if (feedMode === 'real' && totalFeedSignals > 0 && filteredSignalCount === 0) {
+    return REAL_CONTENT_FILTER_EMPTY_MESSAGE;
+  }
+
+  return 'No signals found matching your current filters.';
+}
 
 // Phase 4 preview only: this adapter is intentionally deterministic and
 // read-only. It can prefer future enriched summary fields when they exist, but
@@ -983,6 +1021,7 @@ export async function loadTodaySignals({
     return {
       signals: [...mockSignals],
       source: 'mock',
+      feedMode: 'mock',
       usedFallback: false,
       errorMessage: null,
       isEmpty: false,
@@ -990,28 +1029,42 @@ export async function loadTodaySignals({
   }
 
   if (!client) {
-    return {
+    const result: LoadTodaySignalsResult = {
       signals: [...mockSignals],
       source: 'mock',
+      feedMode: 'fallback_to_mock',
       usedFallback: true,
       errorMessage:
         '[Phase 4 real content preview] Supabase client is not configured for frontend reads.',
       isEmpty: false,
     };
+    logTodayFeedMode(result.feedMode, {
+      signalCount: result.signals.length,
+      usedFallback: result.usedFallback,
+      isEmpty: result.isEmpty,
+    });
+    return result;
   }
 
   try {
     const { signals, diagnostics } = await fetchRealContentFeedPreview(client);
     if (diagnostics.fallbackReason) {
       logPreviewDiagnostics({ ...diagnostics, fallbackOccurred: true });
-      return {
+      const result: LoadTodaySignalsResult = {
         signals: [...mockSignals],
         source: 'mock',
+        feedMode: 'fallback_to_mock',
         usedFallback: true,
         errorMessage:
           `[Phase 4 real content preview] All eligible preview rows failed mapping. rowsFetched=${diagnostics.rowsFetched} skippedRows=${diagnostics.skippedRows}.`,
         isEmpty: false,
       };
+      logTodayFeedMode(result.feedMode, {
+        signalCount: result.signals.length,
+        usedFallback: result.usedFallback,
+        isEmpty: result.isEmpty,
+      });
+      return result;
     }
 
     logPreviewDiagnostics({ ...diagnostics, fallbackOccurred: false });
@@ -1021,20 +1074,28 @@ export async function loadTodaySignals({
         ? `[Phase 4 real content preview] Read succeeded but returned 0 eligible preview rows. rowsFetched=${diagnostics.rowsFetched} filteredCount=${diagnostics.filteredCount} skippedRows=${diagnostics.skippedRows}.`
         : null;
 
-    return {
+    const result: LoadTodaySignalsResult = {
       signals,
       source: 'real',
+      feedMode: signals.length === 0 ? 'real_empty' : 'real',
       usedFallback: false,
       errorMessage: emptyDebugMessage,
       isEmpty: signals.length === 0,
     };
+    logTodayFeedMode(result.feedMode, {
+      signalCount: result.signals.length,
+      usedFallback: result.usedFallback,
+      isEmpty: result.isEmpty,
+    });
+    return result;
   } catch (error) {
     console.info(
       '[Phase 4 real content preview] rowsFetched=0 mappedCards=0 filteredCount=0 skippedRows=0 fallbackOccurred=true fallbackReason=read_failed',
     );
-    return {
+    const result: LoadTodaySignalsResult = {
       signals: [...mockSignals],
       source: 'mock',
+      feedMode: 'fallback_to_mock',
       usedFallback: true,
       errorMessage:
         error instanceof Error
@@ -1042,5 +1103,11 @@ export async function loadTodaySignals({
           : '[Phase 4 real content preview] Unknown read failure.',
       isEmpty: false,
     };
+    logTodayFeedMode(result.feedMode, {
+      signalCount: result.signals.length,
+      usedFallback: result.usedFallback,
+      isEmpty: result.isEmpty,
+    });
+    return result;
   }
 }

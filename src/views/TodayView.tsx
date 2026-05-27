@@ -8,6 +8,7 @@ import { Plus } from 'lucide-react';
 import { AddTopicModal } from '../components/AddTopicModal';
 import { getTodayFilterOptions, getVisibleTodaySignals } from '../topicPreferences';
 import {
+  getTodayFeedEmptyStateMessage,
   isRealContentFeedEnabled,
   type RealContentFeedLoaderClient,
   loadTodaySignals,
@@ -29,8 +30,8 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
     isRealContentFeedEnabled ? [] : MOCK_SIGNALS,
   );
   const [isLoadingRealFeed, setIsLoadingRealFeed] = useState(isRealContentFeedEnabled);
-  const [feedSource, setFeedSource] = useState<'mock' | 'real'>(
-    isRealContentFeedEnabled ? 'real' : 'mock',
+  const [feedMode, setFeedMode] = useState<'mock' | 'real' | 'fallback_to_mock' | 'real_empty'>(
+    isRealContentFeedEnabled ? 'real_empty' : 'mock',
   );
   const realContentClient = supabase as unknown as RealContentFeedLoaderClient | null;
   
@@ -51,7 +52,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
     if (!isRealContentFeedEnabled) {
       setFeedSignals(MOCK_SIGNALS);
       setIsLoadingRealFeed(false);
-      setFeedSource('mock');
+      setFeedMode('mock');
       return;
     }
 
@@ -70,7 +71,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
 
         setFeedSignals(result.signals);
         setIsLoadingRealFeed(false);
-        setFeedSource(result.source);
+        setFeedMode(result.feedMode);
 
         if (result.usedFallback) {
           console.warn(
@@ -89,7 +90,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
           error,
         );
         setFeedSignals(MOCK_SIGNALS);
-        setFeedSource('mock');
+        setFeedMode('fallback_to_mock');
         setIsLoadingRealFeed(false);
         prototypeToastRef.current(REAL_CONTENT_FEED_FALLBACK_MESSAGE);
       });
@@ -144,9 +145,11 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
           ) : (
             <div className="py-20 text-center text-on-surface-variant/40 italic flex flex-col items-center justify-center">
               <p>
-                {feedSource === 'real'
-                  ? 'No real-content signals found matching your current filters yet.'
-                  : 'No signals found matching your current filters.'}
+                {getTodayFeedEmptyStateMessage({
+                  feedMode,
+                  totalFeedSignals: feedSignals.length,
+                  filteredSignalCount: filteredSignals.length,
+                })}
               </p>
             </div>
           )}

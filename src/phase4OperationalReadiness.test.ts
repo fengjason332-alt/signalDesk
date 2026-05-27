@@ -31,6 +31,10 @@ const previewReadPoliciesPath = resolve(
   process.cwd(),
   'supabase/manual/phase4_preview_read_policies.sql',
 );
+const appStoreReadinessDocPath = resolve(
+  process.cwd(),
+  'docs/APP_STORE_READINESS.md',
+);
 
 test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(manualQaDocPath), true);
@@ -41,6 +45,7 @@ test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(readinessSqlPath), true);
   assert.equal(existsSync(contentSourcesSeedPath), true);
   assert.equal(existsSync(previewReadPoliciesPath), true);
+  assert.equal(existsSync(appStoreReadinessDocPath), true);
 });
 
 test('phase 4 edge function uses a direct Deno-compatible npm supabase import', () => {
@@ -153,4 +158,13 @@ test('scheduled ingestion docs mention the explicit env gate, bounded scheduled 
   assert.match(manualQaDoc, /PHASE4_ENABLE_SCHEDULED_INGESTION/i);
   assert.match(manualQaDoc, /code:\s*"phase4_scheduled_ingestion_disabled"/i);
   assert.match(manualQaDoc, /code:\s*"ai_scheduled_trigger_not_allowed"/i);
+});
+
+test('App Store readiness doc remains planning-only and does not imply Phase 4 runtime changes', () => {
+  const doc = readFileSync(appStoreReadinessDocPath, 'utf8');
+
+  assert.match(doc, /planning-only/i);
+  assert.match(doc, /Do not add Capacitor in Phase 4/i);
+  assert.match(doc, /Do not add\s+`?ios\/`?\s+yet/i);
+  assert.match(doc, /AI enrichment remains manual-only/i);
 });

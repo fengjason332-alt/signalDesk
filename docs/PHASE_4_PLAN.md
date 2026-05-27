@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-14E
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-15
 
 ### Tasks 0-4: Foundations
 
@@ -133,7 +133,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - one failed signal no longer collapses the whole batch
 - dry-run behavior remains claim-free and no-write
 
-### Task 14A Through Task 14E: Non-AI Ingestion Hardening, Scheduled Guardrails, And Preview Verification
+### Task 14A Through Task 15: Non-AI Ingestion Hardening, Scheduled Guardrails, And Controlled Today Rollout
 
 - non-AI ingestion now has an explicit single-intent request contract:
   - `intent: "ingestion"`
@@ -160,6 +160,12 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
   - max `12` candidate signals
 - AI enrichment still remains manual-only and rejects `triggerMode: "scheduled"`
 - Today and Detail enriched-content priority behavior is verified and still falls back safely to deterministic preview content when enrichment is missing
+- Today real-feed mode now reports explicit rollout states:
+  - `mock`
+  - `real`
+  - `fallback_to_mock`
+  - `real_empty`
+- Today still remains mock-by-default unless `VITE_USE_REAL_CONTENT_FEED=true`
 
 Proposed future AI enrichment flow:
 - runtime location:
@@ -224,17 +230,17 @@ Proposed future AI enrichment flow:
 
 ## Remaining Tasks
 
-### Task 15: Controlled Today Real-Feed Rollout
-
-- move Today from preview-only toward a controlled rollout
-- preserve mock fallback and safe disable paths
-- do not touch Radar, Watchlist, or Library real-data rollout until Today is stable
-
 ### Task 16: Operational Recurring Ingestion Automation
 
 - if desired later, wire bounded recurring execution to an actual scheduler
 - keep production scheduling disabled by default until the operator path is validated repeatedly
 - do not add scheduled AI enrichment in this step either
+
+### Task 17: Evaluate Default Today Rollout Decision
+
+- only after repeated manual QA should the team decide whether Today stays mock-by-default or graduates to real-by-default
+- preserve fallback paths and disable paths either way
+- do not use this task to touch Radar, Watchlist, or Library real-data rollout
 
 ## Risks To Keep In Mind
 

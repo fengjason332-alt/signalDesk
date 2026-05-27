@@ -14,7 +14,7 @@ Important boundaries:
 - Task 13B adds an optional DeepSeek dry-run path on the server side only
 - Task 13C adds a guarded manual-only AI write mode for enrichment-ready `intelligence_signals` fields only
 - Task 13D and Task 13E add additive claim / retry bookkeeping and sequential batch handling for one-to-three manual AI writes
-- Task 14A-14E add an explicit ingestion request contract, mixed-request rejection, richer non-AI ingestion diagnostics, and bounded scheduled-ingestion enablement that remains off by default
+- Task 14A-15 add an explicit ingestion request contract, mixed-request rejection, richer non-AI ingestion diagnostics, bounded scheduled-ingestion enablement that remains off by default, and a controlled Today real-feed rollout path that remains mock-by-default
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -348,8 +348,11 @@ Required local env:
 Verify:
 - Today shows real Supabase-backed cards
 - existing visual style remains unchanged
+- completed enrichment fields override deterministic preview text when present
+- deterministic preview text still renders when enrichment is missing, pending, failed, or incomplete
 - AI/OpenAI content can match the AI filter
 - nonmatching filters show a normal empty state
+- if zero preview-safe rows exist, Today shows a clear real-feed empty state instead of looking broken
 - preview read failures fall back safely to mock
 - preview still works even before applying the Task 12 enrichment migration
 - after applying the Task 12 migration, completed enrichment fields should override deterministic summary / why-it-matters fields when present
@@ -622,7 +625,7 @@ where id = '<existing-intelligence-signal-id>';
 10. Run guarded content write-mode smoke test
 11. Verify row-count behavior conceptually
 12. Enable frontend preview with `VITE_USE_REAL_CONTENT_FEED=true`
-13. Verify Today preview and Detail provenance
+13. Verify Today preview, explicit feed mode behavior, and Detail provenance
 14. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
 15. If validating Task 13B-13E, configure DeepSeek server-side env only
 16. Run one-signal DeepSeek dry-run against `phase4-dry-run`
@@ -631,5 +634,6 @@ where id = '<existing-intelligence-signal-id>';
 19. Optionally run a three-signal manual batch write
 20. Query `public.intelligence_signals` and confirm only enrichment-ready plus claim/retry fields changed
 21. Open Today with `VITE_USE_REAL_CONTENT_FEED=true` and confirm enriched text is preferred when present
-22. Verify Radar, Watchlist, and Library remain untouched
-23. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds
+22. Verify the real-feed empty state and fallback-to-mock path look intentional and do not resemble a crash
+23. Verify Radar, Watchlist, and Library remain untouched
+24. Set `VITE_USE_REAL_CONTENT_FEED=false` and confirm mock default still holds

@@ -1,6 +1,6 @@
 # SignalDesk Codex Handoff
 
-## Latest Handoff: 2026-05-26
+## Latest Handoff: 2026-05-28
 
 This handoff supersedes older Phase 4 notes. Use this section first before touching code.
 
@@ -33,7 +33,7 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - DeepSeek is now wired as the first optional server-side provider
 - Task 13C adds a guarded manual-only AI write mode
 - Task 13D and Task 13E add additive claim / retry hardening plus sequential one-to-three signal manual batch support
-- Task 14A-14E add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, and confirmation that AI enrichment still rejects scheduled trigger mode
+- Task 14A-15 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, and a controlled Today real-feed rollout path that remains mock-by-default
 - AI writes remain limited to enrichment-ready columns plus additive claim/retry bookkeeping columns on `public.intelligence_signals`
 - scheduled non-AI ingestion now exists behind `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
 - scheduled non-AI ingestion remains disabled by default, keeps AI out of the path entirely, and applies hard caps for:
@@ -41,6 +41,11 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
   - max `3` items per source
   - max `12` total candidate items
   - max `12` candidate signals
+- Today real-feed mode now distinguishes:
+  - `real`
+  - `real_empty`
+  - `fallback_to_mock`
+  - default `mock`
 
 ### Current Test Status
 
@@ -112,7 +117,7 @@ Do not commit any of these secrets or real values.
    - duplicate reruns do not duplicate raw items or candidate signals
    - `signal_topics` can populate for clearly mappable items
 9. Enable `VITE_USE_REAL_CONTENT_FEED=true` locally
-10. Verify Today preview and Detail provenance
+10. Verify Today preview, explicit feed-mode behavior, and Detail provenance
 11. Set `VITE_USE_REAL_CONTENT_FEED=false` again and confirm Today returns to mock
 12. Inspect the ingestion response for:
    - `requested_source_ids`
@@ -236,7 +241,7 @@ Do not commit any of these secrets or real values.
 - there is still no scheduled AI execution
 - deploys using `--no-verify-jwt` should treat AI-enabled requests as operator-only
 
-### Latest Task 14A-14E Status
+### Latest Task 14A-15 Status
 
 - non-AI ingestion now uses an explicit endpoint contract:
   - `intent: "ingestion"`
@@ -253,6 +258,12 @@ Do not commit any of these secrets or real values.
   - max `3` items per source
   - max `12` total candidate items
   - max `12` candidate signals
+- Today real-feed mode now keeps the same UI style but returns clearer prototype states:
+  - `mock` when preview is disabled
+  - `real` when preview-safe rows load
+  - `real_empty` when preview mode is enabled but zero preview-safe rows are found
+  - `fallback_to_mock` when frontend Supabase reads fail safely
+- Today and Detail still prefer completed enriched fields when present and fall back to deterministic preview fields otherwise
 - ingestion responses now include:
   - `request_kind`
   - `trigger_mode`
@@ -270,9 +281,9 @@ Do not commit any of these secrets or real values.
 
 ### Exact Next Recommended Task
 
-Phase 4 Task 15:
-- controlled Today real-feed rollout only
+Phase 4 Task 16:
+- operational recurring non-AI ingestion automation only
 - keep the real-content path read-only on the client
-- keep Today mock by default until the rollout task explicitly changes it
+- keep Today mock by default unless a later explicit task changes it
 - keep Radar on mock
 - keep AI enrichment manual-only while scheduled non-AI ingestion gains more operational validation

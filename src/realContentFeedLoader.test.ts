@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
+  getTodayFeedEmptyStateMessage,
   loadTodaySignals,
   loadRealContentFeedPreview,
   type RealContentFeedLoaderClient,
@@ -77,6 +78,34 @@ class SequencedRealContentFeedLoaderClient implements RealContentFeedLoaderClien
           return response;
         },
       }),
+    };
+  }
+}
+
+class CountingRealContentFeedLoaderClient implements RealContentFeedLoaderClient {
+  public selectCalls = 0;
+
+  from() {
+    const self = this;
+    return {
+      select: () => {
+        self.selectCalls += 1;
+        return {
+          in() {
+            return this;
+          },
+          or() {
+            return this;
+          },
+          order() {
+            return this;
+          },
+          limit: async () => ({
+            data: [],
+            error: null,
+          }),
+        };
+      },
     };
   }
 }
@@ -566,16 +595,51 @@ test('loadRealContentFeedPreview keeps rows with fallback categories even when p
 });
 
 test('loadTodaySignals keeps mock feed as the default when preview mode is disabled', async () => {
+  const client = new CountingRealContentFeedLoaderClient();
   const result = await loadTodaySignals({
     enableRealContentFeed: false,
-    client: null,
+    client: client as never,
     mockSignals: MOCK_SIGNALS,
   });
 
+  assert.equal(client.selectCalls, 0);
+  assert.equal(result.feedMode, 'mock');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, false);
   assert.equal(result.errorMessage, null);
   assert.deepEqual(result.signals.map(signal => signal.id), MOCK_SIGNALS.map(signal => signal.id));
+});
+
+test('loadTodaySignals returns an explicit real feed mode when preview-safe rows are available', async () => {
+  const result = await loadTodaySignals({
+    enableRealContentFeed: true,
+    client: new FakeRealContentFeedLoaderClient([
+      {
+        id: 'signal-real-openai-rollout',
+        primary_category: 'ai',
+        categories: ['ai'],
+        headline_en: 'OpenAI rollout preview signal',
+        headline_zh: null,
+        summary_en: 'Preview-safe real content is available.',
+        summary_zh: null,
+        why_it_matters_en: [],
+        why_it_matters_zh: [],
+        primary_source_name: 'OpenAI',
+        published_at: '2026-05-27T08:00:00.000Z',
+        overall_score: 85,
+        signal_topics: [],
+        signal_entities: [],
+        signal_source_items: [],
+      },
+    ]) as never,
+    mockSignals: MOCK_SIGNALS,
+  });
+
+  assert.equal(result.feedMode, 'real');
+  assert.equal(result.source, 'real');
+  assert.equal(result.usedFallback, false);
+  assert.equal(result.isEmpty, false);
+  assert.deepEqual(result.signals.map(signal => signal.id), ['signal-real-openai-rollout']);
 });
 
 test('loadTodaySignals falls back to mock feed when Supabase is unavailable', async () => {
@@ -585,6 +649,7 @@ test('loadTodaySignals falls back to mock feed when Supabase is unavailable', as
     mockSignals: MOCK_SIGNALS,
   });
 
+  assert.equal(result.feedMode, 'fallback_to_mock');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, true);
   assert.match(result.errorMessage ?? '', /not configured/i);
@@ -601,6 +666,7 @@ test('loadTodaySignals keeps the read failure reason for preview-mode fallback l
     mockSignals: MOCK_SIGNALS,
   });
 
+  assert.equal(result.feedMode, 'fallback_to_mock');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, true);
   assert.match(result.errorMessage ?? '', /permission denied/i);
@@ -649,6 +715,7 @@ test('loadTodaySignals falls back to mock feed when all preview rows are malform
     mockSignals: MOCK_SIGNALS,
   });
 
+  assert.equal(result.feedMode, 'fallback_to_mock');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, true);
   assert.equal(result.isEmpty, false);
@@ -663,9 +730,32 @@ test('loadTodaySignals returns a real empty state without forcing a mock fallbac
     mockSignals: MOCK_SIGNALS,
   });
 
+  assert.equal(result.feedMode, 'real_empty');
   assert.equal(result.source, 'real');
   assert.equal(result.usedFallback, false);
   assert.equal(result.isEmpty, true);
   assert.match(result.errorMessage ?? '', /returned 0 eligible preview rows/i);
   assert.deepEqual(result.signals, []);
+});
+
+test('getTodayFeedEmptyStateMessage explains the real preview-safe empty state without looking like a crash', () => {
+  assert.equal(
+    getTodayFeedEmptyStateMessage({
+      feedMode: 'real_empty',
+      totalFeedSignals: 0,
+      filteredSignalCount: 0,
+    }),
+    'Real-content preview is enabled, but no preview-safe signals were found yet.',
+  );
+});
+
+test('getTodayFeedEmptyStateMessage keeps the normal filter-miss copy for real feeds that loaded successfully', () => {
+  assert.equal(
+    getTodayFeedEmptyStateMessage({
+      feedMode: 'real',
+      totalFeedSignals: 2,
+      filteredSignalCount: 0,
+    }),
+    'No real-content signals found matching your current filters yet.',
+  );
 });

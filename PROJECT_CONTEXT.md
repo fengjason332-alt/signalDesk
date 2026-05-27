@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-14E: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, and single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-15: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, and controlled Today real-feed rollout hardening
 
 ## Current App Architecture
 
@@ -68,6 +68,11 @@ Phase 4 server-side content pipeline:
 Phase 4 read path:
 - read-only adapter from Supabase content tables into the frontend `Signal` shape
 - feature-flagged Today preview behind `VITE_USE_REAL_CONTENT_FEED=true`
+- explicit Today feed-mode states now exist for rollout diagnostics:
+  - `mock`
+  - `real`
+  - `fallback_to_mock`
+  - `real_empty`
 - safe Detail preview with provenance and limited-preview messaging when full body content is unavailable
 - optional enrichment-aware summary fallback while full body content still remains unstored
 
@@ -164,6 +169,7 @@ Confirmed current working state:
 - Task 13D and Task 13E add additive claim / lease / retry bookkeeping so manual write mode can skip claimed rows, respect retry windows, and return clearer per-signal run statuses
 - Task 14A-14D add explicit non-AI ingestion intent / trigger metadata, mixed-request rejection, unknown-source diagnostics, and confirmation that AI enrichment still rejects scheduled trigger mode
 - Task 14E adds bounded scheduled non-AI ingestion support behind a server-side env gate, while keeping scheduled AI explicitly rejected
+- Task 15 keeps Today mock-by-default while making the real-feed rollout path clearer for manual QA with explicit empty/fallback states and completed-enrichment preference
 
 ## Environment And Deployment
 
@@ -216,9 +222,9 @@ Manual SQL assets:
 
 ## Next Recommended Task
 
-Phase 4 Task 15:
-- controlled Today real-feed rollout only, after repeated manual validation of the bounded scheduled non-AI ingestion path
-- keep Today mock-by-default
+Phase 4 Task 16:
+- operational recurring non-AI ingestion automation only, after repeated manual validation of the bounded scheduled-ingestion path and the controlled Today rollout path
+- keep Today mock-by-default unless a later explicit task changes that
 - keep Radar, Watchlist, and Library on current behavior
-- keep scheduled AI enrichment out of scope until manual write mode is operationally stable
+- keep scheduled AI enrichment out of scope until manual AI write mode is operationally stable
 - use [docs/APP_STORE_READINESS.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/APP_STORE_READINESS.md) as planning only, not as implementation scope in Phase 4
