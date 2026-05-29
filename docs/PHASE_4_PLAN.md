@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-15
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-16
 
 ### Tasks 0-4: Foundations
 
@@ -226,21 +226,23 @@ Proposed future AI enrichment flow:
 - default Today behavior is still mock
 - Radar remains mock
 - non-AI ingestion now supports a bounded scheduled request path, but no production recurring scheduler is enabled by default
+- Task 16 now adds an operator-safe recurring request helper plus explicit allowlist / cadence / rollback guidance for bounded scheduled runs
 - there is still no scheduled AI execution
 
 ## Remaining Tasks
-
-### Task 16: Operational Recurring Ingestion Automation
-
-- if desired later, wire bounded recurring execution to an actual scheduler
-- keep production scheduling disabled by default until the operator path is validated repeatedly
-- do not add scheduled AI enrichment in this step either
 
 ### Task 17: Evaluate Default Today Rollout Decision
 
 - only after repeated manual QA should the team decide whether Today stays mock-by-default or graduates to real-by-default
 - preserve fallback paths and disable paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout
+
+### Task 18: Optional Scheduler Activation In A Non-Production Environment
+
+- if desired later, wire the already-bounded recurring ingestion contract to an actual scheduler
+- keep production scheduling disabled by default until the operator path is validated repeatedly
+- keep explicit `sourceIds` allowlists and current hard caps intact
+- do not add scheduled AI enrichment in this step either
 
 ## Risks To Keep In Mind
 
@@ -255,6 +257,7 @@ Proposed future AI enrichment flow:
 - operator-facing AI dry-run calls are still sensitive if paired with `--no-verify-jwt`, so keep AI execution tightly gated server-side
 - preview-read policies expose enrichment-ready rows, so AI write copy must stay sanitized and operator-safe
 - recurring non-AI ingestion can still overload noisy sources if future schedulers ignore the current hard caps or warning diagnostics
+- recurring non-AI ingestion can still drift too broad if scheduler callers stop using explicit `sourceIds` allowlists for bounded runs
 
 ## Guardrails
 

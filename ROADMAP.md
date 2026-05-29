@@ -22,7 +22,7 @@ Phase 3 did not move content cards or feed data into Supabase.
 
 Phase 4 is the real-content phase. Its purpose is to ingest real information, store raw source items, deduplicate them, generate structured intelligence signals, and eventually feed those results into the Today experience without breaking the mock-first default rollout.
 
-### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-15 Complete
+### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-16 Complete
 
 1. Task 0: content-domain foundation types, additive mappers, and Phase 4 schema draft
 2. Task 1: source registry and RSS ingestion skeleton
@@ -48,6 +48,7 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 22. Task 14D: Today/Detail enriched-content display-priority verification without changing defaults
 23. Task 14E: bounded recurring non-AI ingestion execution readiness with explicit server-side enablement, hard caps, and scheduled-AI rejection preserved
 24. Task 15: controlled Today real-feed rollout hardening with explicit mock / real / fallback / real-empty behavior while preserving mock-by-default
+25. Task 16: operator-safe recurring non-AI ingestion automation with an explicit scheduled-request helper, allowlist-first guidance, rollback runbook, and bounded recurring diagnostics while keeping production scheduling disabled by default
 
 ### Current Phase 4 Status
 
@@ -70,16 +71,17 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 - non-AI ingestion now has an explicit single-intent request contract and clearer source-level diagnostics
 - bounded scheduled non-AI ingestion now exists behind `PHASE4_ENABLE_SCHEDULED_INGESTION=true` with hard caps and explicit diagnostics
 - Today real-feed mode now has clearer rollout states, empty-state messaging, and completed-enrichment preference while remaining mock-by-default
+- operator-safe recurring-ingestion guidance now exists for explicit source allowlists, recommended `30` or `60` minute cadence, rollback, and bounded scheduled dry-run / write-mode validation
 - mixed ingestion plus AI requests are rejected instead of being routed implicitly
 - AI enrichment still rejects `triggerMode: "scheduled"` and remains manual-only
 - no scheduled AI execution exists yet
 
 ## Next Recommended Tasks
 
-### Task 16: Operational Recurring Ingestion Automation
+### Task 17: Evaluate Default Today Rollout Decision
 
-- if desired later, wire bounded recurring execution to an actual scheduler
-- keep production scheduling disabled by default until the operator path is validated repeatedly
+- only after repeated manual QA should the team decide whether Today stays mock-by-default or graduates to real-by-default
+- preserve the explicit real / real-empty / fallback-to-mock behavior either way
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task
 

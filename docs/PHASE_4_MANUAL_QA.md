@@ -157,7 +157,33 @@ Expected conceptually:
 
 ## 5B. Scheduled Ingestion Dry-Run When Enabled
 
-Only after intentionally setting `PHASE4_ENABLE_SCHEDULED_INGESTION=true` server-side, run a bounded scheduled dry-run:
+Only after intentionally setting `PHASE4_ENABLE_SCHEDULED_INGESTION=true` server-side, start with a bounded scheduled dry-run that does not live-fetch yet. Prefer an explicit `sourceIds` allowlist or build the payload through `buildPhase4ScheduledIngestionRequest(...)`.
+
+```bash
+curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
+  --header 'Content-Type: application/json' \
+  --header 'apikey: <publishable-key>' \
+  --data '{
+    "intent": "ingestion",
+    "triggerMode": "scheduled",
+    "dryRun": true,
+    "liveFetch": false,
+    "maxItemsPerSource": 2,
+    "sourceIds": ["rss_openai_blog_ai", "rss_coindesk_crypto"]
+  }'
+```
+
+Expected conceptually:
+- response succeeds without writes
+- response includes `scheduled_ingestion_enabled: true`
+- response includes `limits_applied`
+- response still includes `requested_source_ids`, `selected_source_ids`, `unknown_source_ids`, `warnings`, and per-source counts
+- no AI provider call is involved
+- response should prefer the explicit `sourceIds` allowlist instead of falling back to capped active-source selection
+
+## 5C. Scheduled Ingestion Live-Fetch Dry-Run When Enabled
+
+Only after the bounded scheduled dry-run looks healthy, run the same scheduled request with live fetch enabled:
 
 ```bash
 curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-run' \
@@ -175,9 +201,8 @@ curl --request POST 'https://<project-ref>.supabase.co/functions/v1/phase4-dry-r
 
 Expected conceptually:
 - response succeeds without writes
-- response includes `scheduled_ingestion_enabled: true`
-- response includes `limits_applied`
-- response still includes `requested_source_ids`, `selected_source_ids`, `unknown_source_ids`, `warnings`, and per-source counts
+- response includes per-source fetched / normalized / inserted / skipped / failed diagnostics
+- response remains bounded by scheduled hard caps even if the request asks for more
 - no AI provider call is involved
 
 ## 6. Write-Mode Smoke Test
@@ -238,6 +263,7 @@ Expected conceptually:
 - response remains bounded even if the request asks for more than the scheduled caps
 - only non-AI ingestion tables are written
 - one failing source should not collapse the whole run if another source succeeds
+- keep the first recurring operator cadence conservative, such as every `30` or `60` minutes
 
 ## 7. Row Count Verification
 
@@ -250,6 +276,10 @@ Verify conceptually after a successful write smoke test:
 - provenance/link tables should populate when source/entity/topic matches exist
 
 Do not hardcode fragile exact counts as a requirement.
+
+Rollback:
+- disable recurring ingestion again by setting `PHASE4_ENABLE_SCHEDULED_INGESTION=false`
+- rerun the disabled scheduled-ingestion curl from section `5A` and confirm `code: "phase4_scheduled_ingestion_disabled"` returns again
 
 SQL inspection snippets:
 

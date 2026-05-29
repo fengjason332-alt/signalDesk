@@ -500,6 +500,8 @@ export interface Phase4IngestionLimitsApplied {
   max_total_items: number | null;
   max_candidate_signals: number | null;
   min_interval_minutes: number | null;
+  prefer_explicit_source_ids: boolean;
+  used_default_active_source_selection: boolean;
   source_count_capped: boolean;
   items_per_source_capped: boolean;
   candidate_signal_count_capped: boolean;

@@ -1,6 +1,6 @@
 # SignalDesk Codex Handoff
 
-## Latest Handoff: 2026-05-28
+## Latest Handoff: 2026-05-30
 
 This handoff supersedes older Phase 4 notes. Use this section first before touching code.
 
@@ -41,6 +41,11 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
   - max `3` items per source
   - max `12` total candidate items
   - max `12` candidate signals
+- Task 16 now adds an operator-safe recurring request helper and runbook:
+  - `src/lib/content/phase4ScheduledIngestionRequest.ts`
+  - explicit `sourceIds` allowlist preferred for recurring runs
+  - recommended starting cadence: every `30` or `60` minutes
+  - rollback is still just `PHASE4_ENABLE_SCHEDULED_INGESTION=false`
 - Today real-feed mode now distinguishes:
   - `real`
   - `real_empty`
@@ -130,14 +135,17 @@ Do not commit any of these secrets or real values.
 13. Confirm scheduled ingestion is disabled by default by sending `intent: "ingestion"` plus `triggerMode: "scheduled"` before setting `PHASE4_ENABLE_SCHEDULED_INGESTION`
 14. If intentionally validating Task 14E, set `PHASE4_ENABLE_SCHEDULED_INGESTION=true` server-side only
 15. Run a bounded scheduled-ingestion dry-run request with `intent: "ingestion"` plus `triggerMode: "scheduled"`
-16. Optionally run a bounded scheduled-ingestion write-mode request with one source, `dryRun: false`, and `x-phase4-write-token`
-17. Confirm AI remains manual-only by sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` and verifying a clear rejection payload
-18. If intentionally validating Task 13B-13E, configure DeepSeek server env only
-19. Run one-signal AI dry-run against `phase4-dry-run`
-20. For Task 13D/13E, apply `202605250001_phase4_ai_enrichment_leases.sql`
-21. Set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
-22. Optionally run a three-signal manual batch request and confirm sequential per-signal statuses
-23. Verify only enrichment-ready plus additive claim/retry fields changed and that Today preview prefers enriched text when present
+16. Keep recurring validation bounded:
+   - prefer an explicit `sourceIds` allowlist
+   - start at every `30` or `60` minutes only after dry-run validation
+17. Optionally run a bounded scheduled-ingestion write-mode request with one source, `dryRun: false`, and `x-phase4-write-token`
+18. Confirm AI remains manual-only by sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` and verifying a clear rejection payload
+19. If intentionally validating Task 13B-13E, configure DeepSeek server env only
+20. Run one-signal AI dry-run against `phase4-dry-run`
+21. For Task 13D/13E, apply `202605250001_phase4_ai_enrichment_leases.sql`
+22. Set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
+23. Optionally run a three-signal manual batch request and confirm sequential per-signal statuses
+24. Verify only enrichment-ready plus additive claim/retry fields changed and that Today preview prefers enriched text when present
 
 ### Boundaries For The Next Session
 
@@ -241,7 +249,7 @@ Do not commit any of these secrets or real values.
 - there is still no scheduled AI execution
 - deploys using `--no-verify-jwt` should treat AI-enabled requests as operator-only
 
-### Latest Task 14A-15 Status
+### Latest Task 14A-16 Status
 
 - non-AI ingestion now uses an explicit endpoint contract:
   - `intent: "ingestion"`
@@ -258,6 +266,11 @@ Do not commit any of these secrets or real values.
   - max `3` items per source
   - max `12` total candidate items
   - max `12` candidate signals
+- Task 16 now adds:
+  - `buildPhase4ScheduledIngestionRequest(...)` for bounded operator payloads
+  - explicit `sourceIds` allowlist guidance for recurring runs
+  - scheduled dry-run / live-fetch dry-run / write-mode operator QA steps
+  - a rollback path that simply disables `PHASE4_ENABLE_SCHEDULED_INGESTION`
 - Today real-feed mode now keeps the same UI style but returns clearer prototype states:
   - `mock` when preview is disabled
   - `real` when preview-safe rows load
@@ -281,9 +294,8 @@ Do not commit any of these secrets or real values.
 
 ### Exact Next Recommended Task
 
-Phase 4 Task 16:
-- operational recurring non-AI ingestion automation only
+Phase 4 Task 17:
+- evaluate whether Today should remain mock-by-default or graduate to a controlled real-by-default rollout only after repeated manual QA
 - keep the real-content path read-only on the client
-- keep Today mock by default unless a later explicit task changes it
 - keep Radar on mock
 - keep AI enrichment manual-only while scheduled non-AI ingestion gains more operational validation

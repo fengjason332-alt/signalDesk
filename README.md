@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-15: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, a bounded scheduled non-AI ingestion contract that remains disabled by default, and a controlled Today real-feed rollout path that is still mock-by-default
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-16: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, a bounded scheduled non-AI ingestion contract that remains disabled by default, a controlled Today real-feed rollout path that is still mock-by-default, and an operator-safe recurring scheduled-ingestion helper/runbook for bounded non-AI automation
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -43,6 +43,7 @@ Current confirmed project state:
 - mixed ingestion plus `aiEnrichment` payloads are now rejected clearly instead of being routed implicitly
 - scheduled non-AI ingestion can now use `triggerMode: "scheduled"` only when `PHASE4_ENABLE_SCHEDULED_INGESTION=true` is enabled server-side
 - scheduled non-AI ingestion remains disabled by default and applies hard caps for source count, items per source, total candidate items, and candidate signals
+- scheduled non-AI ingestion now also has an operator-safe request helper in `src/lib/content/phase4ScheduledIngestionRequest.ts` that requires an explicit `sourceIds` allowlist and clamps recurring requests before they hit the Edge Function
 - non-AI ingestion now returns clearer diagnostics for:
   - requested / resolved / unknown source ids
   - per-source reliability tier
@@ -82,6 +83,7 @@ Server-side content pipeline:
 - deterministic candidate signal generation
 - Supabase persistence for raw items and deterministic candidate signals
 - explicit non-AI ingestion intent plus trigger metadata for future scheduling work
+- bounded recurring-ingestion request helper for operator-safe `triggerMode: "scheduled"` payloads
 - mixed ingestion plus AI requests rejected at the endpoint boundary
 - optional server-only DeepSeek enrichment with:
   - dry-run by default
@@ -159,6 +161,7 @@ Safety model:
 - non-AI ingestion requests should use `intent: "ingestion"`
 - recurring non-AI ingestion may use `triggerMode: "scheduled"` only when `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
 - scheduled non-AI ingestion remains server-side/operator work only and stays disabled by default
+- scheduled non-AI ingestion should prefer an explicit `sourceIds` allowlist; the repo helper for this is `buildPhase4ScheduledIngestionRequest(...)`
 - scheduled non-AI ingestion currently applies these hard caps:
   - max `4` sources per run
   - max `3` items per source
@@ -235,17 +238,19 @@ Use this order for a new non-production environment:
 16. Verify the response returns proposed enrichment output only and performs no database writes
 17. Confirm AI enrichment is still manual-only by sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` and verifying a clear rejection response
 18. Confirm scheduled non-AI ingestion is disabled by default by sending `intent: "ingestion"` plus `triggerMode: "scheduled"` before enabling `PHASE4_ENABLE_SCHEDULED_INGESTION`
-19. Optionally enable `PHASE4_ENABLE_SCHEDULED_INGESTION=true` in a non-production environment and run a bounded scheduled-ingestion dry-run first
-20. Optionally validate a bounded scheduled-ingestion write-mode request with one source and `maxItemsPerSource: 1`
-21. For manual Task 13D/13E write-mode validation only:
+19. Optionally enable `PHASE4_ENABLE_SCHEDULED_INGESTION=true` in a non-production environment and start with a bounded scheduled-ingestion dry-run that uses an explicit `sourceIds` allowlist
+20. Keep the first recurring validation at a recommended cadence of every `30` or `60` minutes, and prefer using `buildPhase4ScheduledIngestionRequest(...)` or an equivalent explicit allowlist payload builder
+21. Optionally validate a bounded scheduled-ingestion live-fetch dry-run and then a one-source write-mode request with `maxItemsPerSource: 1`
+22. Roll back scheduled-ingestion enablement by setting `PHASE4_ENABLE_SCHEDULED_INGESTION=false`
+23. For manual Task 13D/13E write-mode validation only:
    - set `PHASE4_AI_DRY_RUN_ONLY=false`
    - keep `PHASE4_ENABLE_AI_ENRICHMENT=true`
    - keep `AI_PROVIDER=deepseek`
    - keep `DEEPSEEK_API_KEY`, `DEEPSEEK_BASE_URL`, and `DEEPSEEK_MODEL` server-side only
    - send `dryRun: false` plus `aiEnrichment.writeMode: true` plus `x-phase4-write-token`
-22. Verify only enrichment-ready columns plus additive claim/retry bookkeeping fields on `public.intelligence_signals` changed
-23. Verify one-to-three signal manual batches process sequentially and return per-signal statuses
-24. Verify Today preview still falls back safely when disabled and still shows deterministic fallback text when enrichment is incomplete
+24. Verify only enrichment-ready columns plus additive claim/retry bookkeeping fields on `public.intelligence_signals` changed
+25. Verify one-to-three signal manual batches process sequentially and return per-signal statuses
+26. Verify Today preview still falls back safely when disabled and still shows deterministic fallback text when enrichment is incomplete
 
 ## Current Safety Model
 
@@ -267,7 +272,7 @@ Use this order for a new non-production environment:
 - no scheduled AI enrichment exists yet
 - Task 13D/13E AI writes update enrichment-ready fields plus additive lease/retry bookkeeping only and do not overwrite deterministic fields
 - AI dry-run and write mode should still be treated as operator-only manual tools
-- no production recurring non-AI ingestion job is enabled by default even though the endpoint contract now supports bounded scheduled requests
+- no production recurring non-AI ingestion job is enabled by default even though the endpoint contract now supports bounded scheduled requests and an operator-safe request helper
 - the Today real-content path is still preview-only and still mock-by-default
 - Radar is still mock
 - Watchlist and Library are not real-content-backed yet

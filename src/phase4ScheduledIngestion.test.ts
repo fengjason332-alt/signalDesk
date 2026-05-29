@@ -192,6 +192,40 @@ test('scheduled non-AI ingestion dry-run works when PHASE4_ENABLE_SCHEDULED_INGE
   assert.equal(store.insertedRawItems.length, 0);
 });
 
+test('scheduled non-AI ingestion warns when it falls back to active sources without an explicit allowlist', async () => {
+  const sourceRegistry = [
+    makeSource('rss_sched_default_1', 'https://example.com/rss/default-1.xml'),
+    makeSource('rss_sched_default_2', 'https://example.com/rss/default-2.xml'),
+    makeSource('rss_sched_default_3', 'https://example.com/rss/default-3.xml'),
+    makeSource('rss_sched_default_4', 'https://example.com/rss/default-4.xml'),
+    makeSource('rss_sched_default_5', 'https://example.com/rss/default-5.xml'),
+  ];
+
+  const result = await runPhase4Ingestion(
+    {
+      intent: 'ingestion',
+      triggerMode: 'scheduled',
+      dryRun: true,
+    },
+    {
+      sourceRegistry,
+      fetchImpl: createFetchImpl(
+        Object.fromEntries(sourceRegistry.map(source => [source.url, SAMPLE_AI_RSS_FEED_XML])),
+      ),
+      allowScheduledIngestion: true,
+      now: () => '2026-05-26T10:00:00.000Z',
+    },
+  );
+
+  assert.equal(result.selected_source_ids.length, 4);
+  assert.equal(result.limits_applied.used_default_active_source_selection, true);
+  assert.equal(result.limits_applied.prefer_explicit_source_ids, true);
+  assert.match(
+    result.warnings.join(' '),
+    /scheduled ingestion ran without explicit sourceIds/i,
+  );
+});
+
 test('scheduled non-AI ingestion applies hard caps for sources, items, and candidate signals even when the request asks for too much', async () => {
   const sourceRegistry = [
     makeSource('rss_sched_1', 'https://example.com/rss/sched-1.xml'),
@@ -276,6 +310,53 @@ test('scheduled non-AI ingestion does not call the AI provider path', async () =
   );
 
   assert.equal(response.status, 200);
+  assert.equal(aiFetchCalls, 0);
+});
+
+test('scheduled ingestion rejects mixed ingestion and aiEnrichment payloads before any provider call', async () => {
+  let aiFetchCalls = 0;
+  const handler = createPhase4IngestionHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: createFetchImpl({
+      [SAMPLE_AI_RSS_SOURCE.url]: SAMPLE_AI_RSS_FEED_XML,
+    }),
+    allowScheduledIngestion: true,
+    aiConfig: {
+      provider: 'deepseek',
+      enabled: true,
+      dryRunOnly: true,
+      deepseekApiKey: 'server-only-secret',
+      deepseekBaseUrl: 'https://api.deepseek.com',
+      deepseekModel: 'deepseek-chat',
+    },
+    aiFetchImpl: async () => {
+      aiFetchCalls += 1;
+      throw new Error('AI provider should not run for mixed scheduled ingestion requests');
+    },
+    now: () => '2026-05-26T10:00:00.000Z',
+  });
+
+  const response = await handler(
+    new Request('http://localhost/phase4-dry-run', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        intent: 'ingestion',
+        triggerMode: 'scheduled',
+        dryRun: true,
+        sourceIds: [SAMPLE_AI_RSS_SOURCE.id],
+        aiEnrichment: {
+          provider: 'deepseek',
+          maxSignals: 1,
+        },
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 400);
+  const payload = await response.json();
+  assert.equal(payload.code, 'phase4_mixed_intent_not_allowed');
+  assert.equal(payload.trigger_mode, 'scheduled');
   assert.equal(aiFetchCalls, 0);
 });
 
@@ -402,4 +483,32 @@ test('scheduled ingestion reports unknown explicit source ids clearly while stil
   assert.deepEqual(payload.selected_source_ids, [SAMPLE_AI_RSS_SOURCE.id]);
   assert.deepEqual(payload.unknown_source_ids, ['rss_unknown_source']);
   assert.equal(payload.warnings.length, 1);
+});
+
+test('scheduled ingestion fails fast when all explicit sourceIds are unknown after the env gate is enabled', async () => {
+  const response = await createPhase4IngestionHandler({
+    sourceRegistry: [SAMPLE_AI_RSS_SOURCE],
+    fetchImpl: createFetchImpl({
+      [SAMPLE_AI_RSS_SOURCE.url]: SAMPLE_AI_RSS_FEED_XML,
+    }),
+    allowScheduledIngestion: true,
+    now: () => '2026-05-26T10:00:00.000Z',
+  })(
+    new Request('http://localhost/phase4-dry-run', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        intent: 'ingestion',
+        triggerMode: 'scheduled',
+        dryRun: true,
+        sourceIds: ['rss_unknown_one', 'rss_unknown_two'],
+      }),
+    }),
+  );
+
+  assert.equal(response.status, 400);
+  const payload = await response.json();
+  assert.equal(payload.code, 'phase4_no_known_source_ids');
+  assert.equal(payload.scheduled_ingestion_enabled, true);
+  assert.deepEqual(payload.unknown_source_ids, ['rss_unknown_one', 'rss_unknown_two']);
 });

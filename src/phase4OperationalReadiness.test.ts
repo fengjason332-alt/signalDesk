@@ -155,7 +155,11 @@ test('scheduled ingestion docs mention the explicit env gate, bounded scheduled 
   assert.match(readme, /PHASE4_ENABLE_SCHEDULED_INGESTION/i);
   assert.match(readme, /triggerMode:\s*"scheduled"/i);
   assert.match(readme, /scheduled non-AI ingestion/i);
+  assert.match(readme, /buildPhase4ScheduledIngestionRequest/i);
   assert.match(manualQaDoc, /PHASE4_ENABLE_SCHEDULED_INGESTION/i);
+  assert.match(manualQaDoc, /buildPhase4ScheduledIngestionRequest/i);
+  assert.match(manualQaDoc, /every `30` or `60` minutes/i);
+  assert.match(manualQaDoc, /PHASE4_ENABLE_SCHEDULED_INGESTION=false/i);
   assert.match(manualQaDoc, /code:\s*"phase4_scheduled_ingestion_disabled"/i);
   assert.match(manualQaDoc, /code:\s*"ai_scheduled_trigger_not_allowed"/i);
 });

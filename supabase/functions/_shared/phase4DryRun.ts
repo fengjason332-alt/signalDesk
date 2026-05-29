@@ -533,6 +533,7 @@ export function resolveDryRunSources(
 const buildIngestionLimitsApplied = (options: {
   triggerMode: 'manual' | 'scheduled';
   maxItemsPerSource: number;
+  usedDefaultActiveSourceSelection: boolean;
   sourceCountCapped: boolean;
   itemsPerSourceCapped: boolean;
   candidateSignalCountCapped: boolean;
@@ -546,6 +547,8 @@ const buildIngestionLimitsApplied = (options: {
     options.triggerMode === 'scheduled' ? MAX_SCHEDULED_CANDIDATE_SIGNALS : null,
   min_interval_minutes:
     options.triggerMode === 'scheduled' ? SCHEDULED_MIN_INTERVAL_MINUTES : null,
+  prefer_explicit_source_ids: options.triggerMode === 'scheduled',
+  used_default_active_source_selection: options.usedDefaultActiveSourceSelection,
   source_count_capped: options.sourceCountCapped,
   items_per_source_capped: options.itemsPerSourceCapped,
   candidate_signal_count_capped: options.candidateSignalCountCapped,
@@ -579,6 +582,8 @@ export async function runPhase4Ingestion(
   const resolvedSources = resolveDryRunSources(payload.sourceIds, sourceRegistry);
   const discoveredAt = payload.discoveredAt ?? options.now?.() ?? new Date().toISOString();
   const now = getNow(payload, options.now, discoveredAt);
+  const usedDefaultActiveSourceSelection =
+    isScheduledTrigger(payload) && requestedSourceIds.length === 0;
   const unknownSourceIds = requestedSourceIds.filter(
     sourceId => !resolvedSources.some(source => source.id === sourceId),
   );
@@ -617,6 +622,12 @@ export async function runPhase4Ingestion(
     unknownSourceIds.length > 0
       ? [`Unknown source ids were ignored: ${unknownSourceIds.join(', ')}`]
       : [];
+  if (usedDefaultActiveSourceSelection) {
+    warnings = [
+      ...warnings,
+      'Scheduled ingestion ran without explicit sourceIds; active sources were selected after applying scheduled caps. Prefer an explicit sourceIds allowlist for recurring runs.',
+    ];
+  }
   let selectedSources = resolvedSources;
   let sourceCountCapped = false;
   if (isScheduledTrigger(payload) && selectedSources.length > DEFAULT_SCHEDULED_MAX_SOURCES) {
@@ -900,6 +911,7 @@ export async function runPhase4Ingestion(
     limits_applied: buildIngestionLimitsApplied({
       triggerMode,
       maxItemsPerSource,
+      usedDefaultActiveSourceSelection,
       sourceCountCapped,
       itemsPerSourceCapped,
       candidateSignalCountCapped,

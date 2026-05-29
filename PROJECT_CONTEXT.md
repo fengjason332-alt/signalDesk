@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-15: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, and controlled Today real-feed rollout hardening
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-16: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, and an operator-safe recurring-ingestion contract/helper for bounded non-AI automation
 
 ## Current App Architecture
 
@@ -57,6 +57,7 @@ Phase 4 server-side content pipeline:
   - `intent: "ingestion"` for non-AI content ingestion
   - `intent: "ai_enrichment"` for server-side AI enrichment
 - bounded scheduled non-AI ingestion support exists behind `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
+- operator-safe recurring requests can now be built with `src/lib/content/phase4ScheduledIngestionRequest.ts`, which requires explicit `sourceIds` and clamps scheduled payloads to repo defaults
 - normalization and deduplication helpers
 - deterministic topic/entity mapping
 - deterministic candidate signal generation
@@ -64,6 +65,7 @@ Phase 4 server-side content pipeline:
 - Supabase persistence for raw items and deterministic candidate signals
 - additive ingestion diagnostics for requested / resolved / unknown source ids, per-source timestamps, and per-source reliability tiers
 - scheduled non-AI ingestion now has hard caps for sources, items per source, total candidate items, and candidate signals
+- recurring non-AI ingestion is still expected to start with explicit source allowlists and a conservative `30` or `60` minute cadence
 
 Phase 4 read path:
 - read-only adapter from Supabase content tables into the frontend `Signal` shape
@@ -170,6 +172,7 @@ Confirmed current working state:
 - Task 14A-14D add explicit non-AI ingestion intent / trigger metadata, mixed-request rejection, unknown-source diagnostics, and confirmation that AI enrichment still rejects scheduled trigger mode
 - Task 14E adds bounded scheduled non-AI ingestion support behind a server-side env gate, while keeping scheduled AI explicitly rejected
 - Task 15 keeps Today mock-by-default while making the real-feed rollout path clearer for manual QA with explicit empty/fallback states and completed-enrichment preference
+- Task 16 adds an operator-safe recurring-ingestion helper, clearer scheduled-run docs, explicit allowlist guidance, and rollback/cadence instructions while keeping actual scheduling disabled by default
 
 ## Environment And Deployment
 
@@ -213,6 +216,7 @@ Manual SQL assets:
 - do not broaden AI enrichment writes beyond the guarded manual Task 13C-13E path without explicit future approval
 - do not combine ingestion fields and `aiEnrichment` in one request body
 - do not assume scheduled ingestion is enabled unless `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
+- do not run recurring ingestion without an explicit `sourceIds` allowlist unless you intentionally want the capped active-source fallback
 - do not store raw provider errors or prompt text in publicly readable preview tables
 - do not bypass the new claim / retry guards for manual AI writes
 - do not enable scheduled AI execution yet
@@ -222,8 +226,8 @@ Manual SQL assets:
 
 ## Next Recommended Task
 
-Phase 4 Task 16:
-- operational recurring non-AI ingestion automation only, after repeated manual validation of the bounded scheduled-ingestion path and the controlled Today rollout path
+Phase 4 Task 17:
+- evaluate whether Today should remain mock-by-default or move to a controlled real-by-default rollout only after repeated manual validation of the bounded scheduled-ingestion path and the controlled Today rollout path
 - keep Today mock-by-default unless a later explicit task changes that
 - keep Radar, Watchlist, and Library on current behavior
 - keep scheduled AI enrichment out of scope until manual AI write mode is operationally stable
