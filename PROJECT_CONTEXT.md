@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-16: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, and an operator-safe recurring-ingestion contract/helper for bounded non-AI automation
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-18: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, and a planning-only future X/Grok user-curated source connector path
 
 ## Current App Architecture
 
@@ -173,6 +173,8 @@ Confirmed current working state:
 - Task 14E adds bounded scheduled non-AI ingestion support behind a server-side env gate, while keeping scheduled AI explicitly rejected
 - Task 15 keeps Today mock-by-default while making the real-feed rollout path clearer for manual QA with explicit empty/fallback states and completed-enrichment preference
 - Task 16 adds an operator-safe recurring-ingestion helper, clearer scheduled-run docs, explicit allowlist guidance, and rollback/cadence instructions while keeping actual scheduling disabled by default
+- Task 17 adds a controlled Today real-feed QA checklist plus explicit product/technical criteria for any future real-by-default decision, without changing the default feed
+- Task 18 keeps scheduled non-AI ingestion operator-safe, records the activation/runbook boundary in docs, and adds a planning-only future X/Grok user-curated source connector document
 
 ## Environment And Deployment
 
@@ -226,8 +228,8 @@ Manual SQL assets:
 
 ## Next Recommended Task
 
-Phase 4 Task 17:
-- evaluate whether Today should remain mock-by-default or move to a controlled real-by-default rollout only after repeated manual validation of the bounded scheduled-ingestion path and the controlled Today rollout path
+Phase 4 Task 19:
+- revisit whether Today should remain mock-by-default or move to a controlled real-by-default rollout only after repeated manual validation of the bounded scheduled-ingestion path and the controlled Today rollout path
 - keep Today mock-by-default unless a later explicit task changes that
 - keep Radar, Watchlist, and Library on current behavior
 - keep scheduled AI enrichment out of scope until manual AI write mode is operationally stable

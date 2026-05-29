@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-16: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, a bounded scheduled non-AI ingestion contract that remains disabled by default, a controlled Today real-feed rollout path that is still mock-by-default, and an operator-safe recurring scheduled-ingestion helper/runbook for bounded non-AI automation
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-18: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, a bounded scheduled non-AI ingestion contract that remains disabled by default, a controlled Today real-feed rollout path that is still mock-by-default, an operator-safe recurring scheduled-ingestion helper/runbook for bounded non-AI automation, an explicit Today real-feed QA and rollout-decision checklist without changing the default feed, and planning-only support for a future X/Grok user-curated source track
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -59,6 +59,7 @@ Current confirmed project state:
 Today:
 - default behavior still uses mock cards
 - optional real-content preview is available behind `VITE_USE_REAL_CONTENT_FEED=true`
+- rollout criteria for any future real-by-default Today decision now live in [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md)
 - when real preview is enabled, completed enriched fields are preferred
 - when enrichment is missing, pending, failed, or incomplete, Today falls back to deterministic preview fields
 - when real preview returns zero preview-safe rows, Today shows a clear real-feed empty state instead of looking broken
@@ -137,6 +138,8 @@ Notes:
 - do not commit `.env` or secrets
 
 See [.env.example](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/.env.example) for safe placeholders.
+See [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md) for the controlled real-feed QA checklist and rollback plan.
+See [docs/X_GROK_USER_CURATED_SOURCE_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/X_GROK_USER_CURATED_SOURCE_PLAN.md) for the planning-only future X or Grok user-curated source model.
 
 ## Server-Side / Edge Function Environment
 

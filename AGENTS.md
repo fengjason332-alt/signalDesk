@@ -22,8 +22,8 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 - Phase 1.5: topic personalization completed
 - Phase 2: PWA install support completed
 - Phase 3: local-first persistence with optional Supabase account sync for user state completed
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-16: content pipeline, smoke-tested persistence, read-only Today preview, enrichment-ready schema/contracts, guarded DeepSeek dry-run/write integration, lease/retry hardening, explicit non-AI ingestion contract/observability work, bounded scheduled non-AI ingestion readiness, controlled Today real-feed rollout hardening, and operator-safe recurring-ingestion automation completed
-- Next recommended task: Phase 4 Task 17 evaluate the default Today rollout decision, not Radar or scheduled AI rollout
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-18: content pipeline, smoke-tested persistence, read-only Today preview, enrichment-ready schema/contracts, guarded DeepSeek dry-run/write integration, lease/retry hardening, explicit non-AI ingestion contract/observability work, bounded scheduled non-AI ingestion readiness, controlled Today real-feed rollout hardening, operator-safe recurring-ingestion automation, controlled real-feed QA/rollout-decision criteria, and planning-only future X/Grok user-curated source work completed
+- Next recommended task: Phase 4 Task 19 revisit the default Today rollout decision, not Radar or scheduled AI rollout
 
 ## Visual Design Rules
 

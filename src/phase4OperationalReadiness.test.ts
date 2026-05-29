@@ -35,6 +35,14 @@ const appStoreReadinessDocPath = resolve(
   process.cwd(),
   'docs/APP_STORE_READINESS.md',
 );
+const todayRolloutDecisionDocPath = resolve(
+  process.cwd(),
+  'docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md',
+);
+const xGrokUserCuratedSourcePlanPath = resolve(
+  process.cwd(),
+  'docs/X_GROK_USER_CURATED_SOURCE_PLAN.md',
+);
 
 test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(manualQaDocPath), true);
@@ -46,6 +54,8 @@ test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(contentSourcesSeedPath), true);
   assert.equal(existsSync(previewReadPoliciesPath), true);
   assert.equal(existsSync(appStoreReadinessDocPath), true);
+  assert.equal(existsSync(todayRolloutDecisionDocPath), true);
+  assert.equal(existsSync(xGrokUserCuratedSourcePlanPath), true);
 });
 
 test('phase 4 edge function uses a direct Deno-compatible npm supabase import', () => {
@@ -171,4 +181,45 @@ test('App Store readiness doc remains planning-only and does not imply Phase 4 r
   assert.match(doc, /Do not add Capacitor in Phase 4/i);
   assert.match(doc, /Do not add\s+`?ios\/`?\s+yet/i);
   assert.match(doc, /AI enrichment remains manual-only/i);
+});
+
+test('Today real-feed rollout decision doc captures enablement criteria and rollback steps without switching defaults', () => {
+  const doc = readFileSync(todayRolloutDecisionDocPath, 'utf8');
+
+  assert.match(doc, /VITE_USE_REAL_CONTENT_FEED=true/i);
+  assert.match(doc, /VITE_SUPABASE_URL/i);
+  assert.match(doc, /VITE_SUPABASE_ANON_KEY/i);
+  assert.match(doc, /VITE_USE_REAL_CONTENT_FEED=false/i);
+  assert.match(doc, /Today must remain mock by default/i);
+  assert.match(doc, /Radar, Watchlist, and Library remain unchanged/i);
+  assert.match(doc, /Completed enriched summary is preferred when present/i);
+  assert.match(
+    doc,
+    /Deterministic preview summary is used when enrichment is missing, pending, failed, or incomplete/i,
+  );
+  assert.match(doc, /fallback to mock/i);
+  assert.match(doc, /Preview read policies applied/i);
+  assert.match(doc, /Supabase anon read works/i);
+  assert.match(doc, /Ingestion has recent successful runs/i);
+  assert.match(doc, /Rebuild\/redeploy/i);
+});
+
+test('X Grok user-curated source plan stays planning-only and preserves the server-side boundary', () => {
+  const doc = readFileSync(xGrokUserCuratedSourcePlanPath, 'utf8');
+
+  assert.match(doc, /planning only/i);
+  assert.match(doc, /SignalDesk should not clone a Twitter\/X timeline/i);
+  assert.match(doc, /user_x_watchlists/i);
+  assert.match(doc, /raw_x_items/i);
+  assert.match(doc, /candidate_signals/i);
+  assert.match(doc, /X API should be treated as the raw source fetch layer/i);
+  assert.match(doc, /Grok\/xAI should be treated as analysis\/enrichment\/search support/i);
+  assert.match(doc, /No scraping/i);
+  assert.match(doc, /No frontend X API calls/i);
+  assert.match(doc, /No frontend Grok calls/i);
+  assert.match(doc, /No secrets in frontend/i);
+  assert.match(doc, /No default Today inclusion/i);
+  assert.match(doc, /No Radar real-data integration yet/i);
+  assert.match(doc, /Phase 5C: schema design for user-curated source lists/i);
+  assert.match(doc, /Phase 5H: controlled Today inclusion for selected watchlists/i);
 });

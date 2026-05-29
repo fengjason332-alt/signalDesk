@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-16
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-18
 
 ### Tasks 0-4: Foundations
 
@@ -227,22 +227,17 @@ Proposed future AI enrichment flow:
 - Radar remains mock
 - non-AI ingestion now supports a bounded scheduled request path, but no production recurring scheduler is enabled by default
 - Task 16 now adds an operator-safe recurring request helper plus explicit allowlist / cadence / rollback guidance for bounded scheduled runs
+- Task 17 now adds a dedicated Today real-feed QA checklist plus explicit product and technical criteria for any future real-by-default decision
+- Task 18 keeps scheduler activation operator-safe and documented for non-production only, and adds a planning-only future X or Grok user-curated source path
 - there is still no scheduled AI execution
 
 ## Remaining Tasks
 
-### Task 17: Evaluate Default Today Rollout Decision
+### Task 19: Revisit Default Today Real-Feed Rollout
 
 - only after repeated manual QA should the team decide whether Today stays mock-by-default or graduates to real-by-default
 - preserve fallback paths and disable paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout
-
-### Task 18: Optional Scheduler Activation In A Non-Production Environment
-
-- if desired later, wire the already-bounded recurring ingestion contract to an actual scheduler
-- keep production scheduling disabled by default until the operator path is validated repeatedly
-- keep explicit `sourceIds` allowlists and current hard caps intact
-- do not add scheduled AI enrichment in this step either
 
 ## Risks To Keep In Mind
 

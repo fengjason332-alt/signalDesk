@@ -348,6 +348,40 @@ test('mapRealContentSignalRowToSignal falls back when enrichment is missing or i
   assert.equal(signal.realContentPreview?.usesEnrichedSummary, false);
 });
 
+test('mapRealContentSignalRowToSignal ignores completed enrichment summary when the enriched text is blank', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-enrichment-completed-empty',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'Completed enrichment with blank body',
+    headline_zh: null,
+    summary_en: 'Deterministic fallback summary remains visible.',
+    summary_zh: null,
+    why_it_matters_en: ['Deterministic why-it-matters bullet.'],
+    why_it_matters_zh: [],
+    summary_status: 'completed',
+    translation_status: 'completed',
+    enrichment_status: 'completed',
+    enriched_summary_en: '   ',
+    enriched_summary_zh: '',
+    enriched_why_it_matters_en: [],
+    enriched_why_it_matters_zh: [],
+    primary_source_name: 'OpenAI',
+    published_at: '2026-05-21T09:00:00.000Z',
+    overall_score: 73,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [],
+  });
+
+  assert.equal(
+    signal.summaryZh,
+    'Deterministic fallback summary remains visible.',
+  );
+  assert.equal(signal.realContentPreview?.hasEnrichedSummary, false);
+  assert.equal(signal.realContentPreview?.usesEnrichedSummary, false);
+});
+
 test('realContentFeed adapter remains read-only and contains no frontend write path', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/lib/content/realContentFeed.ts'),

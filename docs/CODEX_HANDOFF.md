@@ -33,7 +33,7 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - DeepSeek is now wired as the first optional server-side provider
 - Task 13C adds a guarded manual-only AI write mode
 - Task 13D and Task 13E add additive claim / retry hardening plus sequential one-to-three signal manual batch support
-- Task 14A-15 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, and a controlled Today real-feed rollout path that remains mock-by-default
+- Task 14A-18 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, a controlled Today real-feed rollout path that remains mock-by-default, a dedicated rollout-decision checklist before any default-feed change, and a planning-only future X or Grok user-curated source path
 - AI writes remain limited to enrichment-ready columns plus additive claim/retry bookkeeping columns on `public.intelligence_signals`
 - scheduled non-AI ingestion now exists behind `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
 - scheduled non-AI ingestion remains disabled by default, keeps AI out of the path entirely, and applies hard caps for:
@@ -51,6 +51,10 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
   - `real_empty`
   - `fallback_to_mock`
   - default `mock`
+- rollout criteria for any future real-by-default Today decision now live in:
+  - `docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md`
+- a planning-only future X or Grok user-curated source path now lives in:
+  - `docs/X_GROK_USER_CURATED_SOURCE_PLAN.md`
 
 ### Current Test Status
 
@@ -71,6 +75,8 @@ Before changing code, read:
 - [README.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/README.md)
 - [docs/PHASE_4_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PHASE_4_PLAN.md)
 - [docs/PHASE_4_MANUAL_QA.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PHASE_4_MANUAL_QA.md)
+- [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md)
+- [docs/X_GROK_USER_CURATED_SOURCE_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/X_GROK_USER_CURATED_SOURCE_PLAN.md)
 
 ### Required Client Env
 
@@ -124,7 +130,8 @@ Do not commit any of these secrets or real values.
 9. Enable `VITE_USE_REAL_CONTENT_FEED=true` locally
 10. Verify Today preview, explicit feed-mode behavior, and Detail provenance
 11. Set `VITE_USE_REAL_CONTENT_FEED=false` again and confirm Today returns to mock
-12. Inspect the ingestion response for:
+12. Use `docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md` to decide whether the current environment is even eligible for a future real-by-default Today rollout
+13. Inspect the ingestion response for:
    - `requested_source_ids`
    - `selected_source_ids`
    - `unknown_source_ids`
@@ -132,20 +139,20 @@ Do not commit any of these secrets or real values.
    - `source_previews[].reliability_tier`
    - `source_previews[].started_at`
    - `source_previews[].completed_at`
-13. Confirm scheduled ingestion is disabled by default by sending `intent: "ingestion"` plus `triggerMode: "scheduled"` before setting `PHASE4_ENABLE_SCHEDULED_INGESTION`
-14. If intentionally validating Task 14E, set `PHASE4_ENABLE_SCHEDULED_INGESTION=true` server-side only
-15. Run a bounded scheduled-ingestion dry-run request with `intent: "ingestion"` plus `triggerMode: "scheduled"`
-16. Keep recurring validation bounded:
+14. Confirm scheduled ingestion is disabled by default by sending `intent: "ingestion"` plus `triggerMode: "scheduled"` before setting `PHASE4_ENABLE_SCHEDULED_INGESTION`
+15. If intentionally validating Task 14E, set `PHASE4_ENABLE_SCHEDULED_INGESTION=true` server-side only
+16. Run a bounded scheduled-ingestion dry-run request with `intent: "ingestion"` plus `triggerMode: "scheduled"`
+17. Keep recurring validation bounded:
    - prefer an explicit `sourceIds` allowlist
    - start at every `30` or `60` minutes only after dry-run validation
-17. Optionally run a bounded scheduled-ingestion write-mode request with one source, `dryRun: false`, and `x-phase4-write-token`
-18. Confirm AI remains manual-only by sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` and verifying a clear rejection payload
-19. If intentionally validating Task 13B-13E, configure DeepSeek server env only
-20. Run one-signal AI dry-run against `phase4-dry-run`
-21. For Task 13D/13E, apply `202605250001_phase4_ai_enrichment_leases.sql`
-22. Set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
-23. Optionally run a three-signal manual batch request and confirm sequential per-signal statuses
-24. Verify only enrichment-ready plus additive claim/retry fields changed and that Today preview prefers enriched text when present
+18. Optionally run a bounded scheduled-ingestion write-mode request with one source, `dryRun: false`, and `x-phase4-write-token`
+19. Confirm AI remains manual-only by sending `intent: "ai_enrichment"` plus `triggerMode: "scheduled"` and verifying a clear rejection payload
+20. If intentionally validating Task 13B-13E, configure DeepSeek server env only
+21. Run one-signal AI dry-run against `phase4-dry-run`
+22. For Task 13D/13E, apply `202605250001_phase4_ai_enrichment_leases.sql`
+23. Set `PHASE4_AI_DRY_RUN_ONLY=false` and run a one-signal write-mode request with `x-phase4-write-token`
+24. Optionally run a three-signal manual batch request and confirm sequential per-signal statuses
+25. Verify only enrichment-ready plus additive claim/retry fields changed and that Today preview prefers enriched text when present
 
 ### Boundaries For The Next Session
 
@@ -249,7 +256,7 @@ Do not commit any of these secrets or real values.
 - there is still no scheduled AI execution
 - deploys using `--no-verify-jwt` should treat AI-enabled requests as operator-only
 
-### Latest Task 14A-16 Status
+### Latest Task 14A-18 Status
 
 - non-AI ingestion now uses an explicit endpoint contract:
   - `intent: "ingestion"`
@@ -271,6 +278,15 @@ Do not commit any of these secrets or real values.
   - explicit `sourceIds` allowlist guidance for recurring runs
   - scheduled dry-run / live-fetch dry-run / write-mode operator QA steps
   - a rollback path that simply disables `PHASE4_ENABLE_SCHEDULED_INGESTION`
+- Task 17 now adds:
+  - `docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md`
+  - explicit real-feed QA criteria before any default-feed change
+  - product and technical readiness gates for any future real-by-default decision
+- Task 18 now adds:
+  - explicit operator documentation for optional scheduler activation in non-production only
+  - rollback and cadence guidance for bounded scheduled non-AI ingestion
+  - `docs/X_GROK_USER_CURATED_SOURCE_PLAN.md` as a planning-only future connector path
+  - no runtime X API calls, no runtime Grok or xAI calls, and no default Today rollout change
 - Today real-feed mode now keeps the same UI style but returns clearer prototype states:
   - `mock` when preview is disabled
   - `real` when preview-safe rows load
@@ -294,8 +310,8 @@ Do not commit any of these secrets or real values.
 
 ### Exact Next Recommended Task
 
-Phase 4 Task 17:
-- evaluate whether Today should remain mock-by-default or graduate to a controlled real-by-default rollout only after repeated manual QA
+Phase 4 Task 19:
+- revisit whether Today should remain mock-by-default or graduate to a controlled real-by-default rollout only after repeated manual validation of the bounded scheduled-ingestion path and the explicit rollout-decision checklist
 - keep the real-content path read-only on the client
 - keep Radar on mock
 - keep AI enrichment manual-only while scheduled non-AI ingestion gains more operational validation

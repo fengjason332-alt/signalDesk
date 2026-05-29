@@ -15,6 +15,8 @@ Important boundaries:
 - Task 13C adds a guarded manual-only AI write mode for enrichment-ready `intelligence_signals` fields only
 - Task 13D and Task 13E add additive claim / retry bookkeeping and sequential batch handling for one-to-three manual AI writes
 - Task 14A-15 add an explicit ingestion request contract, mixed-request rejection, richer non-AI ingestion diagnostics, bounded scheduled-ingestion enablement that remains off by default, and a controlled Today real-feed rollout path that remains mock-by-default
+- Task 16 adds an operator-safe recurring-ingestion helper and bounded recurring runbook
+- Task 17 adds a dedicated Today real-feed QA and rollout-decision checklist without changing the default feed
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -401,6 +403,8 @@ Click a real-content card and verify:
 - no fake full article body is shown
 - a limited-preview message is shown when full body content is unavailable
 
+Use [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md) when deciding whether the current environment is eligible for any later real-by-default Today rollout.
+
 ## 11. Mock Fallback By Setting VITE_USE_REAL_CONTENT_FEED=false
 
 Disable preview mode locally:
@@ -411,6 +415,24 @@ Verify:
 - Today returns to mock by default
 - Radar remains mock
 - the app does not depend on Phase 4 preview reads for its normal default experience
+
+## 11A. Controlled Today Real-Feed Rollout Decision Checklist
+
+- Set:
+  - `VITE_USE_REAL_CONTENT_FEED=true`
+  - `VITE_SUPABASE_URL`
+  - `VITE_SUPABASE_ANON_KEY`
+- Confirm Today renders real cards with the existing visual style.
+- Confirm clicking a real card opens Detail safely.
+- Confirm completed enriched summary is preferred when present.
+- Confirm deterministic preview summary is used when enrichment is missing, pending, failed, or incomplete.
+- Confirm AI or OpenAI topic filters match real AI cards.
+- Confirm nonmatching filters show the normal filter-empty state.
+- Confirm zero preview-safe rows show the explicit real-empty state.
+- Confirm a broken Supabase preview read falls back safely to mock.
+- Confirm Radar, Watchlist, and Library remain unchanged.
+- Confirm no secrets or raw internal errors appear in UI copy.
+- Return to mock with `VITE_USE_REAL_CONTENT_FEED=false`.
 
 ## 12. Task 13B DeepSeek Dry-Run
 
