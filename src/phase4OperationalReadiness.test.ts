@@ -39,6 +39,10 @@ const todayRolloutDecisionDocPath = resolve(
   process.cwd(),
   'docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md',
 );
+const todayTargetPilotDocPath = resolve(
+  process.cwd(),
+  'docs/TODAY_REAL_FEED_TARGET_PILOT.md',
+);
 const xGrokUserCuratedSourcePlanPath = resolve(
   process.cwd(),
   'docs/X_GROK_USER_CURATED_SOURCE_PLAN.md',
@@ -55,6 +59,7 @@ test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(previewReadPoliciesPath), true);
   assert.equal(existsSync(appStoreReadinessDocPath), true);
   assert.equal(existsSync(todayRolloutDecisionDocPath), true);
+  assert.equal(existsSync(todayTargetPilotDocPath), true);
   assert.equal(existsSync(xGrokUserCuratedSourcePlanPath), true);
 });
 
@@ -174,14 +179,15 @@ test('scheduled ingestion docs mention the explicit env gate, bounded scheduled 
   assert.match(manualQaDoc, /code:\s*"ai_scheduled_trigger_not_allowed"/i);
 });
 
-test('README records the Task 20 real-feed rollout decision without switching Today by default', () => {
+test('README records the Task 22 real-feed pilot readiness without switching Today by default', () => {
   const readme = readFileSync(readmePath, 'utf8');
 
-  assert.match(readme, /Tasks 14A-20/i);
+  assert.match(readme, /Tasks 14A-22/i);
   assert.match(readme, /Today remains mock by default/i);
   assert.match(readme, /separate explicit rollout decision/i);
   assert.match(readme, /VITE_USE_REAL_CONTENT_FEED=false/i);
   assert.match(readme, /fallback to mock/i);
+  assert.match(readme, /phase4:today-pilot-check/i);
 });
 
 test('App Store readiness doc remains planning-only and does not imply Phase 4 runtime changes', () => {
@@ -226,6 +232,40 @@ test('Today real-feed rollout decision doc captures Task 20 blockers, enablement
   assert.match(doc, /manual rollback tested/i);
   assert.match(doc, /the app remains useful when enrichment is missing/i);
   assert.match(doc, /Rebuild\/redeploy/i);
+});
+
+test('Today real-feed target pilot doc captures pilot-only env, QA, rollback, and stop criteria without changing defaults', () => {
+  const doc = readFileSync(todayTargetPilotDocPath, 'utf8');
+
+  assert.match(doc, /target-environment pilot/i);
+  assert.match(doc, /phase4:today-pilot-check/i);
+  assert.match(doc, /VITE_USE_REAL_CONTENT_FEED=true/i);
+  assert.match(doc, /VITE_SUPABASE_URL/i);
+  assert.match(doc, /VITE_SUPABASE_ANON_KEY/i);
+  assert.match(doc, /VITE_USE_REAL_CONTENT_FEED=false/i);
+  assert.match(doc, /Today remains mock by default/i);
+  assert.match(doc, /Detail opens safely/i);
+  assert.match(doc, /source provenance is visible/i);
+  assert.match(doc, /completed and non-empty/i);
+  assert.match(doc, /pending, failed, skipped, not requested, or blank/i);
+  assert.match(doc, /real_empty is distinct from filter_empty/i);
+  assert.match(doc, /fallback to mock/i);
+  assert.match(doc, /stop criteria/i);
+  assert.match(doc, /Radar, Watchlist, and Library remain unchanged/i);
+  assert.match(doc, /No frontend writes/i);
+  assert.match(doc, /No frontend AI calls/i);
+});
+
+test('Task 22 docs mention the local Today pilot helper command and keep it bounded to local QA only', () => {
+  const readme = readFileSync(readmePath, 'utf8');
+  const manualQaDoc = readFileSync(manualQaDocPath, 'utf8');
+  const handoffDoc = readFileSync(resolve(process.cwd(), 'docs/CODEX_HANDOFF.md'), 'utf8');
+
+  assert.match(readme, /phase4:today-pilot-check/i);
+  assert.match(manualQaDoc, /phase4:today-pilot-check/i);
+  assert.match(handoffDoc, /phase4:today-pilot-check/i);
+  assert.match(handoffDoc, /no frontend ai calls/i);
+  assert.match(handoffDoc, /Today remains mock by default/i);
 });
 
 test('X Grok user-curated source plan stays planning-only and preserves the server-side boundary', () => {

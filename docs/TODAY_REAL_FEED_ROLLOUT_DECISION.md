@@ -17,6 +17,8 @@ This means:
 - `VITE_USE_REAL_CONTENT_FEED=false` remains the default
 - `VITE_USE_REAL_CONTENT_FEED=true` remains the opt-in QA path
 - any future real-by-default change still needs an explicit rollout task
+- Task 21 adds `docs/TODAY_REAL_FEED_TARGET_PILOT.md` as the bounded pilot runbook for gathering that evidence
+- Task 22 adds `npm run phase4:today-pilot-check` so operators can confirm the local env contract before opening the app
 
 ## Current Boundary
 

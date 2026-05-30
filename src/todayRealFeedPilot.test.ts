@@ -1,0 +1,106 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+import {
+  buildTodayRealFeedPilotCheck,
+  TODAY_REAL_FEED_PILOT_CHECKS,
+} from './lib/content/todayRealFeedPilot';
+
+test('buildTodayRealFeedPilotCheck keeps Today mock-by-default when env flag is false or missing', () => {
+  assert.deepEqual(
+    buildTodayRealFeedPilotCheck({}),
+    {
+      mode: 'mock_default',
+      shouldAttemptRealFeedRead: false,
+      missingEnvKeys: [],
+      requiredEnvKeys: [
+        'VITE_USE_REAL_CONTENT_FEED',
+        'VITE_SUPABASE_URL',
+        'VITE_SUPABASE_ANON_KEY',
+      ],
+      rollbackEnv: {
+        VITE_USE_REAL_CONTENT_FEED: 'false',
+      },
+      warnings: [
+        'Today remains mock by default until VITE_USE_REAL_CONTENT_FEED=true is explicitly enabled.',
+      ],
+      checks: TODAY_REAL_FEED_PILOT_CHECKS,
+    },
+  );
+});
+
+test('buildTodayRealFeedPilotCheck marks the pilot ready only when explicit Supabase env is present', () => {
+  const result = buildTodayRealFeedPilotCheck({
+    VITE_USE_REAL_CONTENT_FEED: 'true',
+    VITE_SUPABASE_URL: 'https://example.supabase.co',
+    VITE_SUPABASE_ANON_KEY: 'public-anon-key',
+  });
+
+  assert.equal(result.mode, 'pilot_ready');
+  assert.equal(result.shouldAttemptRealFeedRead, true);
+  assert.deepEqual(result.missingEnvKeys, []);
+  assert.equal(result.warnings.length, 0);
+  assert.ok(
+    result.checks.includes('Confirm real_empty is distinguishable from filter_empty.'),
+  );
+});
+
+test('buildTodayRealFeedPilotCheck flags missing Supabase env and warns that the app should fallback safely', () => {
+  const result = buildTodayRealFeedPilotCheck({
+    VITE_USE_REAL_CONTENT_FEED: 'true',
+    VITE_SUPABASE_URL: 'https://example.supabase.co',
+  });
+
+  assert.equal(result.mode, 'pilot_misconfigured');
+  assert.equal(result.shouldAttemptRealFeedRead, false);
+  assert.deepEqual(result.missingEnvKeys, ['VITE_SUPABASE_ANON_KEY']);
+  assert.match(
+    result.warnings.join('\n'),
+    /Today real-feed is enabled but missing required Supabase env/i,
+  );
+  assert.match(
+    result.warnings.join('\n'),
+    /fallback to mock/i,
+  );
+});
+
+test('local Today pilot helper script prints a bounded pilot-ready summary without calling network services', () => {
+  const scriptPath = resolve(process.cwd(), 'scripts/phase4-today-real-feed-pilot.ts');
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', scriptPath],
+    {
+      cwd: process.cwd(),
+      env: {
+        ...process.env,
+        VITE_USE_REAL_CONTENT_FEED: 'true',
+        VITE_SUPABASE_URL: 'https://example.supabase.co',
+        VITE_SUPABASE_ANON_KEY: 'public-anon-key',
+      },
+      encoding: 'utf8',
+    },
+  );
+
+  assert.match(output, /mode: pilot_ready/i);
+  assert.match(output, /shouldAttemptRealFeedRead: true/i);
+  assert.match(output, /manual checks:/i);
+  assert.match(output, /real_empty/i);
+  assert.doesNotMatch(output, /DEEPSEEK_API_KEY/i);
+  assert.doesNotMatch(output, /SUPABASE_SERVICE_ROLE_KEY/i);
+});
+
+test('package.json exposes the bounded local Today pilot helper command', () => {
+  const packageJson = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'),
+  ) as {
+    scripts?: Record<string, string>;
+  };
+
+  assert.equal(
+    packageJson.scripts?.['phase4:today-pilot-check'],
+    'node --import tsx scripts/phase4-today-real-feed-pilot.ts',
+  );
+});

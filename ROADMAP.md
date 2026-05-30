@@ -22,7 +22,7 @@ Phase 3 did not move content cards or feed data into Supabase.
 
 Phase 4 is the real-content phase. Its purpose is to ingest real information, store raw source items, deduplicate them, generate structured intelligence signals, and eventually feed those results into the Today experience without breaking the mock-first default rollout.
 
-### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-20 Complete
+### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-22 Complete
 
 1. Task 0: content-domain foundation types, additive mappers, and Phase 4 schema draft
 2. Task 1: source registry and RSS ingestion skeleton
@@ -53,6 +53,8 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 27. Task 18: optional scheduler-activation support documented for non-production operator use plus a planning-only X/Grok user-curated source track
 28. Task 19: controlled Today real-feed rollout readiness plus QA hardening, stronger feed-mode diagnostics, and enriched-field fallback verification without switching the default feed
 29. Task 20: explicit Today real-by-default rollout decision completed with a keep-mock-by-default outcome, explicit rollback path, and target-environment blockers documented
+30. Task 21: target-environment pilot documentation and QA support for Today real-feed mode, still without switching the default feed
+31. Task 22: target-pilot execution support with a local Today preflight helper, operator-facing QA hardening, and rollback-ready documentation without changing the default feed
 
 ### Current Phase 4 Status
 
@@ -85,9 +87,9 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 21: Target-Environment Today Real-Feed Pilot
+### Task 23: Execute Target-Environment Today Real-Feed Pilot
 
-- only after the Task 20 keep-mock decision and live-environment blockers are satisfied should the team run a target-environment pilot for any later explicit default switch
+- use the Task 21 and Task 22 pilot runbooks and helper to gather concrete evidence from a target environment before any later explicit default switch
 - preserve fallback paths and disable paths either way
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task

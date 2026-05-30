@@ -22,8 +22,8 @@ SignalDesk is a mobile-first PWA-style personal intelligence dashboard for track
 - Phase 1.5: topic personalization completed
 - Phase 2: PWA install support completed
 - Phase 3: local-first persistence with optional Supabase account sync for user state completed
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-20: content pipeline, smoke-tested persistence, read-only Today preview, enrichment-ready schema/contracts, guarded DeepSeek dry-run/write integration, lease/retry hardening, explicit non-AI ingestion contract/observability work, bounded scheduled non-AI ingestion readiness, controlled Today real-feed rollout hardening, operator-safe recurring-ingestion automation, controlled real-feed QA/rollout-decision criteria, stronger feed-mode diagnostics and fallback verification, an explicit keep-mock-by-default default-switch decision, and planning-only future X/Grok user-curated source work completed
-- Next recommended task: Phase 4 Task 21 run a target-environment Today real-feed pilot before any explicit default-switch task, not Radar or scheduled AI rollout
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-22: content pipeline, smoke-tested persistence, read-only Today preview, enrichment-ready schema/contracts, guarded DeepSeek dry-run/write integration, lease/retry hardening, explicit non-AI ingestion contract/observability work, bounded scheduled non-AI ingestion readiness, controlled Today real-feed rollout hardening, operator-safe recurring-ingestion automation, controlled real-feed QA/rollout-decision criteria, stronger feed-mode diagnostics and fallback verification, an explicit keep-mock-by-default default-switch decision, a target-environment pilot runbook, a local Today pilot preflight helper, and planning-only future X/Grok user-curated source work completed
+- Next recommended task: Phase 4 Task 23 execute a target-environment Today real-feed pilot before any explicit default-switch task, not Radar or scheduled AI rollout
 
 ## Visual Design Rules
 

@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-20: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, a bounded scheduled non-AI ingestion contract that remains disabled by default, a controlled Today real-feed rollout path that is still mock-by-default, an operator-safe recurring scheduled-ingestion helper/runbook for bounded non-AI automation, an explicit Today real-feed QA and rollout-decision checklist without changing the default feed, Task 19 feed-mode diagnostics and fallback hardening for future rollout readiness, Task 20 explicit real-by-default decision gating that still keeps Today mock-by-default, and planning-only support for a future X/Grok user-curated source track
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-22: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, a bounded scheduled non-AI ingestion contract that remains disabled by default, a controlled Today real-feed rollout path that is still mock-by-default, an operator-safe recurring scheduled-ingestion helper/runbook for bounded non-AI automation, an explicit Today real-feed QA and rollout-decision checklist without changing the default feed, Task 19 feed-mode diagnostics and fallback hardening for future rollout readiness, Task 20 explicit real-by-default decision gating that still keeps Today mock-by-default, Task 21 target-environment pilot runbook coverage, Task 22 target-pilot execution support with a local helper command, and planning-only support for a future X/Grok user-curated source track
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -70,6 +70,8 @@ Today:
 - rollout criteria for any future real-by-default Today decision now live in [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md)
 - Task 20 records a separate explicit rollout decision instead of silently changing the default feed
 - the current Task 20 decision is to keep the default on mock until a separate explicit rollout task re-validates live environment gates
+- Task 21 adds the target-environment pilot runbook in [docs/TODAY_REAL_FEED_TARGET_PILOT.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_TARGET_PILOT.md)
+- Task 22 adds the local helper command `npm run phase4:today-pilot-check` so operators can confirm pilot env readiness before opening the app
 - when real preview is enabled, completed enriched fields are preferred
 - when enrichment is missing, pending, failed, or incomplete, Today falls back to deterministic preview fields
 - when real preview returns zero preview-safe rows, Today shows a clear real-feed empty state instead of looking broken
@@ -135,6 +137,14 @@ npm run lint
 npm run build
 ```
 
+Local Today pilot helper:
+
+```bash
+npm run phase4:today-pilot-check
+```
+
+This helper is local-only. It checks the Today real-feed pilot env contract and prints the manual QA checklist without calling Supabase, calling AI providers, or writing content.
+
 ## Client Environment Variables
 
 Client-safe env vars:
@@ -149,6 +159,7 @@ Notes:
 
 See [.env.example](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/.env.example) for safe placeholders.
 See [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md) for the controlled real-feed QA checklist and rollback plan.
+See [docs/TODAY_REAL_FEED_TARGET_PILOT.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_TARGET_PILOT.md) for the target-environment pilot runbook.
 See [docs/X_GROK_USER_CURATED_SOURCE_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/X_GROK_USER_CURATED_SOURCE_PLAN.md) for the planning-only future X or Grok user-curated source model.
 Task 20 keeps the rollback path explicit: set `VITE_USE_REAL_CONTENT_FEED=false`, rebuild/redeploy, and confirm Today returns to mock.
 
