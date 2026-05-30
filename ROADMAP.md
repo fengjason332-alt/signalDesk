@@ -22,7 +22,7 @@ Phase 3 did not move content cards or feed data into Supabase.
 
 Phase 4 is the real-content phase. Its purpose is to ingest real information, store raw source items, deduplicate them, generate structured intelligence signals, and eventually feed those results into the Today experience without breaking the mock-first default rollout.
 
-### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-18 Complete
+### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-19 Complete
 
 1. Task 0: content-domain foundation types, additive mappers, and Phase 4 schema draft
 2. Task 1: source registry and RSS ingestion skeleton
@@ -51,6 +51,7 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 25. Task 16: operator-safe recurring non-AI ingestion automation with an explicit scheduled-request helper, allowlist-first guidance, rollback runbook, and bounded recurring diagnostics while keeping production scheduling disabled by default
 26. Task 17: controlled Today real-feed QA and rollout-decision criteria without switching the default feed
 27. Task 18: optional scheduler-activation support documented for non-production operator use plus a planning-only X/Grok user-curated source track
+28. Task 19: controlled Today real-feed rollout readiness plus QA hardening, stronger feed-mode diagnostics, and enriched-field fallback verification without switching the default feed
 
 ### Current Phase 4 Status
 
@@ -75,6 +76,7 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 - Today real-feed mode now has clearer rollout states, empty-state messaging, and completed-enrichment preference while remaining mock-by-default
 - operator-safe recurring-ingestion guidance now exists for explicit source allowlists, recommended `30` or `60` minute cadence, rollback, and bounded scheduled dry-run / write-mode validation
 - a dedicated Today rollout-decision checklist now exists for product and technical readiness before any real-by-default decision
+- Today feed-mode diagnostics now distinguish env-disabled, loaded-real, zero-row real-empty, and fallback-to-mock reasons
 - a planning-only future X/Grok user-curated source document now exists, with no runtime X or Grok integration added
 - mixed ingestion plus AI requests are rejected instead of being routed implicitly
 - AI enrichment still rejects `triggerMode: "scheduled"` and remains manual-only
@@ -82,9 +84,9 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 19: Revisit Default Today Real-Feed Rollout
+### Task 20: Separate Explicit Today Default Rollout Task
 
-- only after repeated manual QA should the team decide whether Today stays mock-by-default or graduates to real-by-default
+- only after the Task 19 rollout checklist passes should the team decide whether to implement a later explicit default switch
 - preserve fallback paths and disable paths either way
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task

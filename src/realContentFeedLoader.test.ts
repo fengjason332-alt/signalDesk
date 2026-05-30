@@ -5,6 +5,7 @@ import {
   getTodayFeedEmptyStateMessage,
   loadTodaySignals,
   loadRealContentFeedPreview,
+  resolveTodayFeedViewState,
   type RealContentFeedLoaderClient,
 } from './lib/content/realContentFeed';
 import { MOCK_SIGNALS } from './mockData';
@@ -604,6 +605,7 @@ test('loadTodaySignals keeps mock feed as the default when preview mode is disab
 
   assert.equal(client.selectCalls, 0);
   assert.equal(result.feedMode, 'mock');
+  assert.equal(result.feedReason, 'env_disabled');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, false);
   assert.equal(result.errorMessage, null);
@@ -636,6 +638,7 @@ test('loadTodaySignals returns an explicit real feed mode when preview-safe rows
   });
 
   assert.equal(result.feedMode, 'real');
+  assert.equal(result.feedReason, 'real_loaded');
   assert.equal(result.source, 'real');
   assert.equal(result.usedFallback, false);
   assert.equal(result.isEmpty, false);
@@ -650,6 +653,7 @@ test('loadTodaySignals falls back to mock feed when Supabase is unavailable', as
   });
 
   assert.equal(result.feedMode, 'fallback_to_mock');
+  assert.equal(result.feedReason, 'fallback_no_client');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, true);
   assert.match(result.errorMessage ?? '', /not configured/i);
@@ -667,6 +671,7 @@ test('loadTodaySignals keeps the read failure reason for preview-mode fallback l
   });
 
   assert.equal(result.feedMode, 'fallback_to_mock');
+  assert.equal(result.feedReason, 'fallback_read_failed');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, true);
   assert.match(result.errorMessage ?? '', /permission denied/i);
@@ -716,6 +721,7 @@ test('loadTodaySignals falls back to mock feed when all preview rows are malform
   });
 
   assert.equal(result.feedMode, 'fallback_to_mock');
+  assert.equal(result.feedReason, 'fallback_all_rows_failed_mapping');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, true);
   assert.equal(result.isEmpty, false);
@@ -731,6 +737,7 @@ test('loadTodaySignals returns a real empty state without forcing a mock fallbac
   });
 
   assert.equal(result.feedMode, 'real_empty');
+  assert.equal(result.feedReason, 'real_zero_rows');
   assert.equal(result.source, 'real');
   assert.equal(result.usedFallback, false);
   assert.equal(result.isEmpty, true);
@@ -742,6 +749,7 @@ test('getTodayFeedEmptyStateMessage explains the real preview-safe empty state w
   assert.equal(
     getTodayFeedEmptyStateMessage({
       feedMode: 'real_empty',
+      feedReason: 'real_zero_rows',
       totalFeedSignals: 0,
       filteredSignalCount: 0,
     }),
@@ -753,9 +761,42 @@ test('getTodayFeedEmptyStateMessage keeps the normal filter-miss copy for real f
   assert.equal(
     getTodayFeedEmptyStateMessage({
       feedMode: 'real',
+      feedReason: 'real_loaded',
       totalFeedSignals: 2,
       filteredSignalCount: 0,
     }),
     'No real-content signals found matching your current filters yet.',
+  );
+});
+
+test('resolveTodayFeedViewState distinguishes real-empty from filter-empty and preserves feed reasons', () => {
+  assert.deepEqual(
+    resolveTodayFeedViewState({
+      feedMode: 'real_empty',
+      feedReason: 'real_zero_rows',
+      totalFeedSignals: 0,
+      filteredSignalCount: 0,
+    }),
+    {
+      viewState: 'real_empty',
+      message: 'Real-content preview is enabled, but no preview-safe signals were found yet.',
+      filterExcludedAllSignals: false,
+      feedReason: 'real_zero_rows',
+    },
+  );
+
+  assert.deepEqual(
+    resolveTodayFeedViewState({
+      feedMode: 'real',
+      feedReason: 'real_loaded',
+      totalFeedSignals: 3,
+      filteredSignalCount: 0,
+    }),
+    {
+      viewState: 'filter_empty',
+      message: 'No real-content signals found matching your current filters yet.',
+      filterExcludedAllSignals: true,
+      feedReason: 'real_loaded',
+    },
   );
 });

@@ -382,6 +382,68 @@ test('mapRealContentSignalRowToSignal ignores completed enrichment summary when 
   assert.equal(signal.realContentPreview?.usesEnrichedSummary, false);
 });
 
+test('mapRealContentSignalRowToSignal ignores completed enriched why-it-matters when the enriched bullets are blank', () => {
+  const signal = mapRealContentSignalRowToSignal({
+    id: 'signal-real-enrichment-completed-empty-bullets',
+    primary_category: 'ai',
+    categories: ['ai'],
+    headline_en: 'Completed enrichment with blank bullets',
+    headline_zh: null,
+    summary_en: 'Deterministic fallback summary remains visible.',
+    summary_zh: null,
+    why_it_matters_en: ['Deterministic why-it-matters bullet.'],
+    why_it_matters_zh: [],
+    summary_status: 'completed',
+    translation_status: 'completed',
+    enrichment_status: 'completed',
+    enriched_summary_en: 'Enriched summary is available.',
+    enriched_summary_zh: '',
+    enriched_why_it_matters_en: ['   '],
+    enriched_why_it_matters_zh: [''],
+    primary_source_name: 'OpenAI',
+    published_at: '2026-05-21T09:00:00.000Z',
+    overall_score: 73,
+    signal_topics: [],
+    signal_entities: [],
+    signal_source_items: [],
+  });
+
+  assert.equal(signal.summaryZh, 'Enriched summary is available.');
+  assert.deepEqual(signal.whyItMatters, ['Deterministic why-it-matters bullet.']);
+});
+
+test('mapRealContentSignalRowToSignal falls back to deterministic preview fields when enrichment has failed or was skipped', () => {
+  for (const status of ['failed', 'skipped', 'not_requested'] as const) {
+    const signal = mapRealContentSignalRowToSignal({
+      id: `signal-real-enrichment-${status}`,
+      primary_category: 'macro',
+      categories: ['macro'],
+      headline_en: `Policy update ${status}`,
+      headline_zh: null,
+      summary_en: 'Deterministic policy summary.',
+      summary_zh: null,
+      enriched_summary_en: `Enriched summary should not be used when ${status}.`,
+      enriched_summary_zh: `状态为 ${status} 时不应使用增强摘要。`,
+      why_it_matters_en: ['Deterministic policy bullet.'],
+      why_it_matters_zh: [],
+      enriched_why_it_matters_zh: [`状态为 ${status} 时不应使用增强要点。`],
+      summary_status: status,
+      translation_status: status,
+      enrichment_status: status,
+      primary_source_name: 'White House',
+      published_at: '2026-05-21T07:00:00.000Z',
+      overall_score: 64,
+      signal_topics: [],
+      signal_entities: [],
+      signal_source_items: [],
+    });
+
+    assert.equal(signal.summaryZh, 'Deterministic policy summary.');
+    assert.deepEqual(signal.whyItMatters, ['Deterministic policy bullet.']);
+    assert.equal(signal.realContentPreview?.usesEnrichedSummary, false);
+  }
+});
+
 test('realContentFeed adapter remains read-only and contains no frontend write path', () => {
   const source = readFileSync(
     resolve(process.cwd(), 'src/lib/content/realContentFeed.ts'),

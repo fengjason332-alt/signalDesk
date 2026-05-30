@@ -17,6 +17,7 @@ Important boundaries:
 - Task 14A-15 add an explicit ingestion request contract, mixed-request rejection, richer non-AI ingestion diagnostics, bounded scheduled-ingestion enablement that remains off by default, and a controlled Today real-feed rollout path that remains mock-by-default
 - Task 16 adds an operator-safe recurring-ingestion helper and bounded recurring runbook
 - Task 17 adds a dedicated Today real-feed QA and rollout-decision checklist without changing the default feed
+- Task 19 tightens Today real-feed QA hardening, feed-mode diagnostics, and rollout gates without switching the default feed
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -418,6 +419,9 @@ Verify:
 
 ## 11A. Controlled Today Real-Feed Rollout Decision Checklist
 
+- Prerequisites:
+  - `supabase/manual/phase4_preview_read_policies.sql` is applied
+  - at least one preview-safe `intelligence_signals` row exists
 - Set:
   - `VITE_USE_REAL_CONTENT_FEED=true`
   - `VITE_SUPABASE_URL`
@@ -429,10 +433,10 @@ Verify:
 - Confirm AI or OpenAI topic filters match real AI cards.
 - Confirm nonmatching filters show the normal filter-empty state.
 - Confirm zero preview-safe rows show the explicit real-empty state.
-- Confirm a broken Supabase preview read falls back safely to mock.
+- Confirm a broken Supabase preview read or invalid preview env falls back safely to mock.
 - Confirm Radar, Watchlist, and Library remain unchanged.
 - Confirm no secrets or raw internal errors appear in UI copy.
-- Return to mock with `VITE_USE_REAL_CONTENT_FEED=false`.
+- Return to mock with `VITE_USE_REAL_CONTENT_FEED=false`, rebuild, and confirm Today is back on mock.
 
 ## 12. Task 13B DeepSeek Dry-Run
 

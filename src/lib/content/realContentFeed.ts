@@ -143,9 +143,23 @@ export interface LoadTodaySignalsResult {
   signals: Signal[];
   source: 'mock' | 'real';
   feedMode: 'mock' | 'real' | 'fallback_to_mock' | 'real_empty';
+  feedReason:
+    | 'env_disabled'
+    | 'real_loaded'
+    | 'real_zero_rows'
+    | 'fallback_no_client'
+    | 'fallback_read_failed'
+    | 'fallback_all_rows_failed_mapping';
   usedFallback: boolean;
   errorMessage: string | null;
   isEmpty: boolean;
+}
+
+export interface TodayFeedViewState {
+  viewState: 'cards' | 'real_empty' | 'filter_empty' | 'empty';
+  message: string;
+  filterExcludedAllSignals: boolean;
+  feedReason: LoadTodaySignalsResult['feedReason'];
 }
 
 interface PreviewReadDiagnostics {
@@ -800,6 +814,7 @@ const logPreviewDiagnostics = (
 
 const logTodayFeedMode = (
   feedMode: LoadTodaySignalsResult['feedMode'],
+  feedReason: LoadTodaySignalsResult['feedReason'],
   details: {
     signalCount: number;
     usedFallback: boolean;
@@ -807,7 +822,7 @@ const logTodayFeedMode = (
   },
 ) => {
   console.info(
-    `[Phase 4 Today feed] mode=${feedMode} signalCount=${details.signalCount} usedFallback=${details.usedFallback} isEmpty=${details.isEmpty}`,
+    `[Phase 4 Today feed] mode=${feedMode} reason=${feedReason} signalCount=${details.signalCount} usedFallback=${details.usedFallback} isEmpty=${details.isEmpty}`,
   );
 };
 
@@ -854,22 +869,67 @@ export const isRealContentFeedEnabled = resolveRealContentFeedEnabled(
 
 export function getTodayFeedEmptyStateMessage({
   feedMode,
+  feedReason,
   totalFeedSignals,
   filteredSignalCount,
 }: {
   feedMode: LoadTodaySignalsResult['feedMode'];
+  feedReason: LoadTodaySignalsResult['feedReason'];
   totalFeedSignals: number;
   filteredSignalCount: number;
 }) {
+  return resolveTodayFeedViewState({
+    feedMode,
+    feedReason,
+    totalFeedSignals,
+    filteredSignalCount,
+  }).message;
+}
+
+export function resolveTodayFeedViewState({
+  feedMode,
+  feedReason,
+  totalFeedSignals,
+  filteredSignalCount,
+}: {
+  feedMode: LoadTodaySignalsResult['feedMode'];
+  feedReason: LoadTodaySignalsResult['feedReason'];
+  totalFeedSignals: number;
+  filteredSignalCount: number;
+}): TodayFeedViewState {
+  if (filteredSignalCount > 0) {
+    return {
+      viewState: 'cards',
+      message: '',
+      filterExcludedAllSignals: false,
+      feedReason,
+    };
+  }
+
   if (feedMode === 'real_empty' && totalFeedSignals === 0) {
-    return REAL_CONTENT_FEED_EMPTY_MESSAGE;
+    return {
+      viewState: 'real_empty',
+      message: REAL_CONTENT_FEED_EMPTY_MESSAGE,
+      filterExcludedAllSignals: false,
+      feedReason,
+    };
   }
 
-  if (feedMode === 'real' && totalFeedSignals > 0 && filteredSignalCount === 0) {
-    return REAL_CONTENT_FILTER_EMPTY_MESSAGE;
+  if (feedMode === 'real' && totalFeedSignals > 0) {
+    return {
+      viewState: 'filter_empty',
+      message: REAL_CONTENT_FILTER_EMPTY_MESSAGE,
+      filterExcludedAllSignals: true,
+      feedReason,
+    };
   }
 
-  return 'No signals found matching your current filters.';
+  return {
+    viewState: 'empty',
+    message: 'No signals found matching your current filters.',
+    filterExcludedAllSignals: false,
+    feedReason,
+  };
 }
 
 // Phase 4 preview only: this adapter is intentionally deterministic and
@@ -1022,6 +1082,7 @@ export async function loadTodaySignals({
       signals: [...mockSignals],
       source: 'mock',
       feedMode: 'mock',
+      feedReason: 'env_disabled',
       usedFallback: false,
       errorMessage: null,
       isEmpty: false,
@@ -1033,12 +1094,13 @@ export async function loadTodaySignals({
       signals: [...mockSignals],
       source: 'mock',
       feedMode: 'fallback_to_mock',
+      feedReason: 'fallback_no_client',
       usedFallback: true,
       errorMessage:
         '[Phase 4 real content preview] Supabase client is not configured for frontend reads.',
       isEmpty: false,
     };
-    logTodayFeedMode(result.feedMode, {
+    logTodayFeedMode(result.feedMode, result.feedReason, {
       signalCount: result.signals.length,
       usedFallback: result.usedFallback,
       isEmpty: result.isEmpty,
@@ -1054,12 +1116,13 @@ export async function loadTodaySignals({
         signals: [...mockSignals],
         source: 'mock',
         feedMode: 'fallback_to_mock',
+        feedReason: 'fallback_all_rows_failed_mapping',
         usedFallback: true,
         errorMessage:
           `[Phase 4 real content preview] All eligible preview rows failed mapping. rowsFetched=${diagnostics.rowsFetched} skippedRows=${diagnostics.skippedRows}.`,
         isEmpty: false,
       };
-      logTodayFeedMode(result.feedMode, {
+      logTodayFeedMode(result.feedMode, result.feedReason, {
         signalCount: result.signals.length,
         usedFallback: result.usedFallback,
         isEmpty: result.isEmpty,
@@ -1078,11 +1141,12 @@ export async function loadTodaySignals({
       signals,
       source: 'real',
       feedMode: signals.length === 0 ? 'real_empty' : 'real',
+      feedReason: signals.length === 0 ? 'real_zero_rows' : 'real_loaded',
       usedFallback: false,
       errorMessage: emptyDebugMessage,
       isEmpty: signals.length === 0,
     };
-    logTodayFeedMode(result.feedMode, {
+    logTodayFeedMode(result.feedMode, result.feedReason, {
       signalCount: result.signals.length,
       usedFallback: result.usedFallback,
       isEmpty: result.isEmpty,
@@ -1096,6 +1160,7 @@ export async function loadTodaySignals({
       signals: [...mockSignals],
       source: 'mock',
       feedMode: 'fallback_to_mock',
+      feedReason: 'fallback_read_failed',
       usedFallback: true,
       errorMessage:
         error instanceof Error
@@ -1103,7 +1168,7 @@ export async function loadTodaySignals({
           : '[Phase 4 real content preview] Unknown read failure.',
       isEmpty: false,
     };
-    logTodayFeedMode(result.feedMode, {
+    logTodayFeedMode(result.feedMode, result.feedReason, {
       signalCount: result.signals.length,
       usedFallback: result.usedFallback,
       isEmpty: result.isEmpty,

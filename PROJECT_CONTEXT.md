@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-18: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, and a planning-only future X/Grok user-curated source connector path
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-19: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, stronger feed-mode diagnostics and fallback QA hardening, and a planning-only future X/Grok user-curated source connector path
 
 ## Current App Architecture
 
@@ -75,6 +75,12 @@ Phase 4 read path:
   - `real`
   - `fallback_to_mock`
   - `real_empty`
+- feed-mode reasons now also distinguish:
+  - env disabled
+  - real rows loaded
+  - zero preview-safe rows
+  - fallback because preview reads failed
+  - fallback because all eligible rows failed mapping
 - safe Detail preview with provenance and limited-preview messaging when full body content is unavailable
 - optional enrichment-aware summary fallback while full body content still remains unstored
 
@@ -175,6 +181,7 @@ Confirmed current working state:
 - Task 16 adds an operator-safe recurring-ingestion helper, clearer scheduled-run docs, explicit allowlist guidance, and rollback/cadence instructions while keeping actual scheduling disabled by default
 - Task 17 adds a controlled Today real-feed QA checklist plus explicit product/technical criteria for any future real-by-default decision, without changing the default feed
 - Task 18 keeps scheduled non-AI ingestion operator-safe, records the activation/runbook boundary in docs, and adds a planning-only future X/Grok user-curated source connector document
+- Task 19 adds clearer Today real-feed mode diagnostics, stronger enriched-field fallback tests, and explicit rollout-decision gates without changing the default feed
 
 ## Environment And Deployment
 
@@ -228,8 +235,8 @@ Manual SQL assets:
 
 ## Next Recommended Task
 
-Phase 4 Task 19:
-- revisit whether Today should remain mock-by-default or move to a controlled real-by-default rollout only after repeated manual validation of the bounded scheduled-ingestion path and the controlled Today rollout path
+Phase 4 Task 20:
+- only after the Task 19 rollout checklist passes in a real environment, decide whether to implement a separate explicit Today real-by-default rollout task
 - keep Today mock-by-default unless a later explicit task changes that
 - keep Radar, Watchlist, and Library on current behavior
 - keep scheduled AI enrichment out of scope until manual AI write mode is operationally stable

@@ -1,6 +1,6 @@
 # Today Real-Feed Rollout Decision
 
-This document is for Task 17 only. It does not switch Today to real content by default.
+This document is maintained through Task 19. It does not switch Today to real content by default.
 
 Today must remain mock by default until the criteria below are met and the team explicitly approves a later rollout task.
 
@@ -23,6 +23,10 @@ Return to mock:
 
 ## Controlled QA Checklist
 
+Prerequisites:
+- `supabase/manual/phase4_preview_read_policies.sql` is already applied.
+- at least one preview-safe `intelligence_signals` row exists for the chosen environment.
+
 1. Start the app with:
    - `VITE_USE_REAL_CONTENT_FEED=true`
    - `VITE_SUPABASE_URL`
@@ -39,9 +43,12 @@ Return to mock:
 11. Confirm source provenance and safe source links remain visible.
 12. Confirm Radar, Watchlist, and Library remain unchanged.
 13. Confirm no secrets or raw internal errors appear in UI text.
+14. Set `VITE_USE_REAL_CONTENT_FEED=false`, rebuild, and confirm Today returns to mock.
 
 ## Product Criteria Before Real-By-Default
 
+- data freshness acceptable
+- enough source coverage
 - At least a few stable sources are producing usable signals repeatedly.
 - Real cards are readable, useful, and not obviously prototype-only.
 - Empty states are understandable:
@@ -51,15 +58,23 @@ Return to mock:
 - Detail does not pretend to have a full article body if one is not stored.
 - Source provenance is visible and source links are safe.
 - Real cards remain valuable even when AI enrichment is absent.
+- Chinese or bilingual display is acceptable on real cards and Detail.
+- mobile viewport quality remains acceptable.
+- no Radar, Watchlist, or Library real-data coupling is introduced by the Today rollout.
 
 ## Technical Criteria Before Real-By-Default
 
-- Preview read policies applied.
+- Preview read policies applied and RLS or read-policy assumptions confirmed.
 - Supabase anon read works.
 - Ingestion has recent successful runs.
+- fallback path tested
 - Today real-feed preview still falls back safely to mock on read failure.
 - AI enrichment is optional, not required for card rendering.
 - Existing mock fallback remains available until rollout is deliberately changed.
+- no secret exposure
+- no frontend writes
+- manual rollback tested
+- the app remains useful when enrichment is missing, pending, failed, or incomplete.
 
 ## Rollback Plan
 

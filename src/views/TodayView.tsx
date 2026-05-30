@@ -13,6 +13,7 @@ import {
   type RealContentFeedLoaderClient,
   loadTodaySignals,
   REAL_CONTENT_FEED_FALLBACK_MESSAGE,
+  type LoadTodaySignalsResult,
 } from '../lib/content/realContentFeed';
 import { supabase } from '../lib/supabase/client';
 
@@ -32,6 +33,9 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
   const [isLoadingRealFeed, setIsLoadingRealFeed] = useState(isRealContentFeedEnabled);
   const [feedMode, setFeedMode] = useState<'mock' | 'real' | 'fallback_to_mock' | 'real_empty'>(
     isRealContentFeedEnabled ? 'real_empty' : 'mock',
+  );
+  const [feedReason, setFeedReason] = useState<LoadTodaySignalsResult['feedReason']>(
+    isRealContentFeedEnabled ? 'real_zero_rows' : 'env_disabled',
   );
   const realContentClient = supabase as unknown as RealContentFeedLoaderClient | null;
   
@@ -53,6 +57,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
       setFeedSignals(MOCK_SIGNALS);
       setIsLoadingRealFeed(false);
       setFeedMode('mock');
+      setFeedReason('env_disabled');
       return;
     }
 
@@ -72,6 +77,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
         setFeedSignals(result.signals);
         setIsLoadingRealFeed(false);
         setFeedMode(result.feedMode);
+        setFeedReason(result.feedReason);
 
         if (result.usedFallback) {
           console.warn(
@@ -91,6 +97,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
         );
         setFeedSignals(MOCK_SIGNALS);
         setFeedMode('fallback_to_mock');
+        setFeedReason('fallback_read_failed');
         setIsLoadingRealFeed(false);
         prototypeToastRef.current(REAL_CONTENT_FEED_FALLBACK_MESSAGE);
       });
@@ -147,6 +154,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
               <p>
                 {getTodayFeedEmptyStateMessage({
                   feedMode,
+                  feedReason,
                   totalFeedSignals: feedSignals.length,
                   filteredSignalCount: filteredSignals.length,
                 })}

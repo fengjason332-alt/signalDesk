@@ -174,6 +174,17 @@ test('scheduled ingestion docs mention the explicit env gate, bounded scheduled 
   assert.match(manualQaDoc, /code:\s*"ai_scheduled_trigger_not_allowed"/i);
 });
 
+test('README records the Task 19 real-feed diagnostic boundary without switching Today by default', () => {
+  const readme = readFileSync(readmePath, 'utf8');
+
+  assert.match(readme, /Tasks 14A-19/i);
+  assert.match(readme, /feed-mode diagnostics/i);
+  assert.match(readme, /env disabled/i);
+  assert.match(readme, /zero preview-safe rows/i);
+  assert.match(readme, /fallback because the preview read failed/i);
+  assert.match(readme, /Today real-feed mode now reports clearer prototype states/i);
+});
+
 test('App Store readiness doc remains planning-only and does not imply Phase 4 runtime changes', () => {
   const doc = readFileSync(appStoreReadinessDocPath, 'utf8');
 
@@ -201,6 +212,16 @@ test('Today real-feed rollout decision doc captures enablement criteria and roll
   assert.match(doc, /Preview read policies applied/i);
   assert.match(doc, /Supabase anon read works/i);
   assert.match(doc, /Ingestion has recent successful runs/i);
+  assert.match(doc, /data freshness acceptable/i);
+  assert.match(doc, /enough source coverage/i);
+  assert.match(doc, /Chinese or bilingual display is acceptable/i);
+  assert.match(doc, /mobile viewport quality remains acceptable/i);
+  assert.match(doc, /no Radar, Watchlist, or Library real-data coupling/i);
+  assert.match(doc, /RLS or read-policy assumptions confirmed/i);
+  assert.match(doc, /no frontend writes/i);
+  assert.match(doc, /no secret exposure/i);
+  assert.match(doc, /manual rollback tested/i);
+  assert.match(doc, /the app remains useful when enrichment is missing/i);
   assert.match(doc, /Rebuild\/redeploy/i);
 });
 
