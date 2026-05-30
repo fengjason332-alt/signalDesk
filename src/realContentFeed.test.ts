@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import {
   mapRealContentSignalRowToSignal,
   resolveRealContentFeedEnabled,
+  resolveTodayRealFeedRolloutMode,
 } from './lib/content/realContentFeed';
 
 test('resolveRealContentFeedEnabled only enables the preview feed for explicit true values', () => {
@@ -13,6 +14,47 @@ test('resolveRealContentFeedEnabled only enables the preview feed for explicit t
   assert.equal(resolveRealContentFeedEnabled(''), false);
   assert.equal(resolveRealContentFeedEnabled('false'), false);
   assert.equal(resolveRealContentFeedEnabled(' TRUE '), true);
+});
+
+test('resolveTodayRealFeedRolloutMode keeps Today mock by default unless explicitly enabled', () => {
+  assert.equal(
+    resolveTodayRealFeedRolloutMode({
+      envValue: undefined,
+      defaultRealFeedEnabled: false,
+    }),
+    'mock_by_default',
+  );
+  assert.equal(
+    resolveTodayRealFeedRolloutMode({
+      envValue: 'true',
+      defaultRealFeedEnabled: false,
+    }),
+    'real_by_env',
+  );
+  assert.equal(
+    resolveTodayRealFeedRolloutMode({
+      envValue: 'false',
+      defaultRealFeedEnabled: false,
+    }),
+    'rollback_to_mock',
+  );
+});
+
+test('resolveTodayRealFeedRolloutMode preserves an explicit rollback even for a future real-by-default candidate', () => {
+  assert.equal(
+    resolveTodayRealFeedRolloutMode({
+      envValue: undefined,
+      defaultRealFeedEnabled: true,
+    }),
+    'real_by_default_candidate',
+  );
+  assert.equal(
+    resolveTodayRealFeedRolloutMode({
+      envValue: ' false ',
+      defaultRealFeedEnabled: true,
+    }),
+    'rollback_to_mock',
+  );
 });
 
 test('mapRealContentSignalRowToSignal applies safe fallbacks for sparse Supabase rows', () => {

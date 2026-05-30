@@ -1,8 +1,22 @@
 # Today Real-Feed Rollout Decision
 
-This document is maintained through Task 19. It does not switch Today to real content by default.
+This document is maintained through Task 20. It does not switch Today to real content by default.
 
 Today must remain mock by default until the criteria below are met and the team explicitly approves a later rollout task.
+
+## Task 20 Decision
+
+Task 20 keeps Today mock by default.
+
+Why:
+- production-like validation is still required for preview-read availability and rollback behavior
+- current repo tests prove the code path is safe, but they do not prove every deployed environment has recent healthy data
+- the fallback path is ready, but the default switch should remain a separate explicit rollout task after target-environment evidence is collected
+
+This means:
+- `VITE_USE_REAL_CONTENT_FEED=false` remains the default
+- `VITE_USE_REAL_CONTENT_FEED=true` remains the opt-in QA path
+- any future real-by-default change still needs an explicit rollout task
 
 ## Current Boundary
 
@@ -64,6 +78,7 @@ Prerequisites:
 
 ## Technical Criteria Before Real-By-Default
 
+- production-like validation is still required
 - Preview read policies applied and RLS or read-policy assumptions confirmed.
 - Supabase anon read works.
 - Ingestion has recent successful runs.
@@ -87,5 +102,7 @@ Prerequisites:
 
 - This is a QA and rollout-decision document only.
 - It does not approve switching Today to real feed by default.
+- Task 20 decision: keep Today mock by default until target-environment rollout validation is complete.
 - It does not approve Radar, Watchlist, or Library real-data rollout.
 - It does not change any server-side AI scheduling boundary.
+- The next task should be an explicit rollout task, not an implicit default switch.

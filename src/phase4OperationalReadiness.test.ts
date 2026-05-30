@@ -174,15 +174,14 @@ test('scheduled ingestion docs mention the explicit env gate, bounded scheduled 
   assert.match(manualQaDoc, /code:\s*"ai_scheduled_trigger_not_allowed"/i);
 });
 
-test('README records the Task 19 real-feed diagnostic boundary without switching Today by default', () => {
+test('README records the Task 20 real-feed rollout decision without switching Today by default', () => {
   const readme = readFileSync(readmePath, 'utf8');
 
-  assert.match(readme, /Tasks 14A-19/i);
-  assert.match(readme, /feed-mode diagnostics/i);
-  assert.match(readme, /env disabled/i);
-  assert.match(readme, /zero preview-safe rows/i);
-  assert.match(readme, /fallback because the preview read failed/i);
-  assert.match(readme, /Today real-feed mode now reports clearer prototype states/i);
+  assert.match(readme, /Tasks 14A-20/i);
+  assert.match(readme, /Today remains mock by default/i);
+  assert.match(readme, /separate explicit rollout decision/i);
+  assert.match(readme, /VITE_USE_REAL_CONTENT_FEED=false/i);
+  assert.match(readme, /fallback to mock/i);
 });
 
 test('App Store readiness doc remains planning-only and does not imply Phase 4 runtime changes', () => {
@@ -194,9 +193,13 @@ test('App Store readiness doc remains planning-only and does not imply Phase 4 r
   assert.match(doc, /AI enrichment remains manual-only/i);
 });
 
-test('Today real-feed rollout decision doc captures enablement criteria and rollback steps without switching defaults', () => {
+test('Today real-feed rollout decision doc captures Task 20 blockers, enablement criteria, and rollback steps without switching defaults', () => {
   const doc = readFileSync(todayRolloutDecisionDocPath, 'utf8');
 
+  assert.match(doc, /Task 20 decision/i);
+  assert.match(doc, /keep Today mock by default/i);
+  assert.match(doc, /explicit rollout task/i);
+  assert.match(doc, /production-like validation is still required/i);
   assert.match(doc, /VITE_USE_REAL_CONTENT_FEED=true/i);
   assert.match(doc, /VITE_SUPABASE_URL/i);
   assert.match(doc, /VITE_SUPABASE_ANON_KEY/i);

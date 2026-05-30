@@ -612,6 +612,20 @@ test('loadTodaySignals keeps mock feed as the default when preview mode is disab
   assert.deepEqual(result.signals.map(signal => signal.id), MOCK_SIGNALS.map(signal => signal.id));
 });
 
+test('loadTodaySignals preserves an explicit rollback reason when real feed is forced off', async () => {
+  const result = await loadTodaySignals({
+    enableRealContentFeed: false,
+    client: new CountingRealContentFeedLoaderClient() as never,
+    mockSignals: MOCK_SIGNALS,
+    disabledReason: 'rollback_to_mock',
+  });
+
+  assert.equal(result.feedMode, 'mock');
+  assert.equal(result.feedReason, 'rollback_to_mock');
+  assert.equal(result.source, 'mock');
+  assert.equal(result.usedFallback, false);
+});
+
 test('loadTodaySignals returns an explicit real feed mode when preview-safe rows are available', async () => {
   const result = await loadTodaySignals({
     enableRealContentFeed: true,

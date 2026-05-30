@@ -145,6 +145,7 @@ export interface LoadTodaySignalsResult {
   feedMode: 'mock' | 'real' | 'fallback_to_mock' | 'real_empty';
   feedReason:
     | 'env_disabled'
+    | 'rollback_to_mock'
     | 'real_loaded'
     | 'real_zero_rows'
     | 'fallback_no_client'
@@ -161,6 +162,12 @@ export interface TodayFeedViewState {
   filterExcludedAllSignals: boolean;
   feedReason: LoadTodaySignalsResult['feedReason'];
 }
+
+export type TodayRealFeedRolloutMode =
+  | 'mock_by_default'
+  | 'real_by_env'
+  | 'real_by_default_candidate'
+  | 'rollback_to_mock';
 
 interface PreviewReadDiagnostics {
   rowsFetched: number;
@@ -863,9 +870,46 @@ export function resolveRealContentFeedEnabled(value: string | undefined) {
   return value?.trim().toLowerCase() === 'true';
 }
 
-export const isRealContentFeedEnabled = resolveRealContentFeedEnabled(
-  import.meta.env?.VITE_USE_REAL_CONTENT_FEED,
-);
+export function resolveTodayRealFeedRolloutMode({
+  envValue,
+  defaultRealFeedEnabled = false,
+}: {
+  envValue: string | undefined;
+  defaultRealFeedEnabled?: boolean;
+}): TodayRealFeedRolloutMode {
+  const normalizedValue = envValue?.trim().toLowerCase();
+
+  if (normalizedValue === 'false') {
+    return 'rollback_to_mock';
+  }
+
+  if (normalizedValue === 'true') {
+    return 'real_by_env';
+  }
+
+  if (defaultRealFeedEnabled) {
+    return 'real_by_default_candidate';
+  }
+
+  return 'mock_by_default';
+}
+
+export function resolveTodayFeedDisabledReason(
+  rolloutMode: TodayRealFeedRolloutMode,
+): Extract<LoadTodaySignalsResult['feedReason'], 'env_disabled' | 'rollback_to_mock'> {
+  return rolloutMode === 'rollback_to_mock' ? 'rollback_to_mock' : 'env_disabled';
+}
+
+export const todayRealFeedRolloutMode = resolveTodayRealFeedRolloutMode({
+  envValue: import.meta.env?.VITE_USE_REAL_CONTENT_FEED,
+  // Task 20 keeps mock as the default until a later explicit rollout task
+  // decides otherwise with target-environment evidence.
+  defaultRealFeedEnabled: false,
+});
+
+export const isRealContentFeedEnabled =
+  todayRealFeedRolloutMode === 'real_by_env' ||
+  todayRealFeedRolloutMode === 'real_by_default_candidate';
 
 export function getTodayFeedEmptyStateMessage({
   feedMode,
@@ -1072,17 +1116,22 @@ export async function loadTodaySignals({
   enableRealContentFeed,
   client,
   mockSignals,
+  disabledReason = 'env_disabled',
 }: {
   enableRealContentFeed: boolean;
   client: RealContentFeedLoaderClient | null;
   mockSignals: Signal[];
+  disabledReason?: Extract<
+    LoadTodaySignalsResult['feedReason'],
+    'env_disabled' | 'rollback_to_mock'
+  >;
 }): Promise<LoadTodaySignalsResult> {
   if (!enableRealContentFeed) {
     return {
       signals: [...mockSignals],
       source: 'mock',
       feedMode: 'mock',
-      feedReason: 'env_disabled',
+      feedReason: disabledReason,
       usedFallback: false,
       errorMessage: null,
       isEmpty: false,

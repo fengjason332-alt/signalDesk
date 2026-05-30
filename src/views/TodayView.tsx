@@ -10,6 +10,8 @@ import { getTodayFilterOptions, getVisibleTodaySignals } from '../topicPreferenc
 import {
   getTodayFeedEmptyStateMessage,
   isRealContentFeedEnabled,
+  resolveTodayFeedDisabledReason,
+  todayRealFeedRolloutMode,
   type RealContentFeedLoaderClient,
   loadTodaySignals,
   REAL_CONTENT_FEED_FALLBACK_MESSAGE,
@@ -24,6 +26,7 @@ interface TodayViewProps {
 
 export default function TodayView({ onSignalClick, onResultSelect }: TodayViewProps) {
   const { settings, showPrototypeToast } = useApp();
+  const disabledFeedReason = resolveTodayFeedDisabledReason(todayRealFeedRolloutMode);
   const [activeFilter, setActiveFilter] = useState<Category | 'All'>('All');
   const [isAddTopicModalOpen, setIsAddTopicModalOpen] = useState(false);
   const prototypeToastRef = useRef(showPrototypeToast);
@@ -35,7 +38,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
     isRealContentFeedEnabled ? 'real_empty' : 'mock',
   );
   const [feedReason, setFeedReason] = useState<LoadTodaySignalsResult['feedReason']>(
-    isRealContentFeedEnabled ? 'real_zero_rows' : 'env_disabled',
+    isRealContentFeedEnabled ? 'real_zero_rows' : disabledFeedReason,
   );
   const realContentClient = supabase as unknown as RealContentFeedLoaderClient | null;
   
@@ -57,7 +60,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
       setFeedSignals(MOCK_SIGNALS);
       setIsLoadingRealFeed(false);
       setFeedMode('mock');
-      setFeedReason('env_disabled');
+      setFeedReason(disabledFeedReason);
       return;
     }
 
@@ -105,7 +108,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
     return () => {
       isCancelled = true;
     };
-  }, [realContentClient]);
+  }, [disabledFeedReason, realContentClient]);
 
   return (
     <div className="flex flex-col min-h-full">

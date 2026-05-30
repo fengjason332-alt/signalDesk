@@ -18,6 +18,7 @@ Important boundaries:
 - Task 16 adds an operator-safe recurring-ingestion helper and bounded recurring runbook
 - Task 17 adds a dedicated Today real-feed QA and rollout-decision checklist without changing the default feed
 - Task 19 tightens Today real-feed QA hardening, feed-mode diagnostics, and rollout gates without switching the default feed
+- Task 20 keeps Today mock-by-default after reviewing the current rollout gates and makes the rollback step explicit: `VITE_USE_REAL_CONTENT_FEED=false`, rebuild, confirm mock
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -405,6 +406,7 @@ Click a real-content card and verify:
 - a limited-preview message is shown when full body content is unavailable
 
 Use [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md) when deciding whether the current environment is eligible for any later real-by-default Today rollout.
+Task 20 does not switch the default feed; it records that a target-environment pilot is still required before any default change.
 
 ## 11. Mock Fallback By Setting VITE_USE_REAL_CONTENT_FEED=false
 
