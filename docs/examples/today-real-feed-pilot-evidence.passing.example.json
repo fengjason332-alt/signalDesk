@@ -1,0 +1,24 @@
+{
+  "pilotTimestamp": "2026-06-01T10:30:00.000Z",
+  "environmentLabel": "target-preview-passing",
+  "observedFeedMode": "real",
+  "realCardsRendered": true,
+  "realCardsObservedCount": 4,
+  "detailOpenedSafely": true,
+  "provenanceOrSourceLinksVisible": true,
+  "fakeFullArticleBodyAbsent": true,
+  "completedNonEmptyEnrichedContentObserved": true,
+  "completedNonEmptyEnrichedContentWon": true,
+  "incompleteEnrichmentDeterministicFallbackWorked": true,
+  "aiOrOpenAiFilterMatchedWhenApplicable": true,
+  "nonMatchingFiltersShowedNormalFilterEmptyState": true,
+  "realEmptyDistinctFromFilterEmpty": true,
+  "brokenPreviewReadsFellBackSafelyToMock": true,
+  "radarWatchlistLibraryUnchanged": true,
+  "rollbackToMockVerified": true,
+  "blockersFound": [],
+  "reviewerNotes": [
+    "Passing example only. Uses fake data and no real environment identifiers."
+  ],
+  "finalRecommendation": null
+}

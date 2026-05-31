@@ -20,6 +20,7 @@ This means:
 - Task 21 adds `docs/TODAY_REAL_FEED_TARGET_PILOT.md` as the bounded pilot runbook for gathering that evidence
 - Task 22 adds `npm run phase4:today-pilot-check` so operators can confirm the local env contract before opening the app
 - Task 23 adds `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md` so the pilot outcome can be recorded against explicit pass, blocker, and rollback criteria
+- Task 24 adds `npm run phase4:today-evidence-review` plus local example JSON files so pilot evidence can be reviewed conservatively before any future default-switch preparation
 
 ## Current Boundary
 

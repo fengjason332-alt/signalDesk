@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-23: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, stronger feed-mode diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback and blocker docs, a Task 21 target-environment pilot runbook, a Task 22 local pilot helper plus QA hardening, a Task 23 pilot-evidence preparation doc and helper output expansion, and a planning-only future X/Grok user-curated source connector path
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-24: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, stronger feed-mode diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback and blocker docs, a Task 21 target-environment pilot runbook, a Task 22 local pilot helper plus QA hardening, a Task 23 pilot-evidence preparation doc and helper output expansion, Task 24 local pilot-evidence review tooling, and a planning-only future X/Grok user-curated source connector path
 
 ## Current App Architecture
 
@@ -186,6 +186,7 @@ Confirmed current working state:
 - Task 21 adds a dedicated target-environment pilot runbook so operators can validate real-feed behavior and rollback without changing the default
 - Task 22 adds `npm run phase4:today-pilot-check` so operators can confirm `mock_default`, `pilot_ready`, or `pilot_misconfigured` before opening the app
 - Task 23 adds `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md` so target-environment pilot results can be recorded against consistent pass/fail and rollback criteria
+- Task 24 adds `src/lib/content/todayRealFeedPilotEvidence.ts` plus `npm run phase4:today-evidence-review` so local pilot evidence can be reviewed conservatively without contacting Supabase or changing runtime defaults
 
 ## Environment And Deployment
 
@@ -239,8 +240,8 @@ Manual SQL assets:
 
 ## Next Recommended Task
 
-Phase 4 Task 24:
-- review actual target-environment pilot evidence and decide whether Today can move from opt-in real-feed to a controlled default real-feed rollout
+Phase 4 Task 25:
+- prepare the first controlled default-rollout task only if Task 24 pilot evidence is accepted
 - keep Today mock-by-default unless a later explicit task changes that
 - keep Radar, Watchlist, and Library on current behavior
 - keep scheduled AI enrichment out of scope until manual AI write mode is operationally stable

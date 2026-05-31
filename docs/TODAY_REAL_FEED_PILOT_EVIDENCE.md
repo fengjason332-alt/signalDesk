@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is for Phase 4 Task 23. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is for Phase 4 Task 24. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -20,6 +20,8 @@ Client-side env:
 
 Local helper command:
 - `npm run phase4:today-pilot-check`
+- `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
+- The evidence-review command is local-only. It does not call Supabase, does not call AI providers, and does not write content.
 
 Important boundaries:
 - no `SUPABASE_SERVICE_ROLE_KEY` in the frontend
@@ -92,6 +94,38 @@ Important boundaries:
 - one example of `real_empty` if available
 - one example or note proving fallback to mock remains safe
 - one note confirming rollback to mock succeeded
+
+## Recommendation Categories
+
+- `blocked`
+  - one or more critical checks failed
+- `continue_pilot`
+  - evidence is incomplete and more target-environment review is needed
+- `keep_mock_default`
+  - the evidence is valid, but current observations still do not justify a default switch
+- `ready_for_controlled_default_rollout`
+  - all required checks passed and a later explicit rollout-preparation task can be considered
+
+## Local Review Workflow
+
+Use the fake example JSON files first:
+
+```bash
+npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json
+npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.passing.example.json
+npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.blocked.example.json
+```
+
+Then review your own local pilot evidence JSON:
+
+```bash
+npm run phase4:today-evidence-review -- <path-to-local-evidence-json>
+```
+
+Expected conceptually:
+- incomplete example => `continue_pilot`
+- blocked example => `blocked`
+- passing example => `ready_for_controlled_default_rollout`
 
 ## What Would Justify A Future Default Switch
 

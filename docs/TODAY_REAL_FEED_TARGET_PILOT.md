@@ -23,6 +23,7 @@ Local helper command:
 - `npm run phase4:today-pilot-check`
 - This helper is local-only. It does not call Supabase, does not call AI providers, and does not write content.
 - Record pilot outcomes in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`.
+- Review local evidence with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>` after the checklist is complete.
 
 Important boundaries:
 - no `SUPABASE_SERVICE_ROLE_KEY` in the frontend
@@ -66,6 +67,7 @@ To confirm the normal default remains intact:
 4. Start the app with `npm run dev`, or rebuild/redeploy if the target environment needs a build artifact refresh.
 5. Open Today.
 6. Start recording observations in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`.
+7. When the checklist is complete, review the recorded JSON evidence locally with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>`.
 
 Expected:
 - real cards render with the existing style

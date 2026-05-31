@@ -1,0 +1,26 @@
+{
+  "pilotTimestamp": "2026-06-01T11:00:00.000Z",
+  "environmentLabel": "target-preview-blocked",
+  "observedFeedMode": "fallback_to_mock",
+  "realCardsRendered": false,
+  "realCardsObservedCount": 0,
+  "detailOpenedSafely": false,
+  "provenanceOrSourceLinksVisible": false,
+  "fakeFullArticleBodyAbsent": false,
+  "completedNonEmptyEnrichedContentObserved": false,
+  "completedNonEmptyEnrichedContentWon": false,
+  "incompleteEnrichmentDeterministicFallbackWorked": false,
+  "aiOrOpenAiFilterMatchedWhenApplicable": null,
+  "nonMatchingFiltersShowedNormalFilterEmptyState": false,
+  "realEmptyDistinctFromFilterEmpty": false,
+  "brokenPreviewReadsFellBackSafelyToMock": false,
+  "radarWatchlistLibraryUnchanged": false,
+  "rollbackToMockVerified": false,
+  "blockersFound": [
+    "Fallback to mock was not understandable and related tabs looked inconsistent."
+  ],
+  "reviewerNotes": [
+    "Blocked example only. Uses fake content and no real environment identifiers."
+  ],
+  "finalRecommendation": null
+}

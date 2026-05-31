@@ -1,0 +1,24 @@
+{
+  "pilotTimestamp": "2026-06-01T10:00:00.000Z",
+  "environmentLabel": "target-preview-incomplete",
+  "observedFeedMode": "real",
+  "realCardsRendered": true,
+  "realCardsObservedCount": 2,
+  "detailOpenedSafely": true,
+  "provenanceOrSourceLinksVisible": true,
+  "fakeFullArticleBodyAbsent": true,
+  "completedNonEmptyEnrichedContentObserved": null,
+  "completedNonEmptyEnrichedContentWon": null,
+  "incompleteEnrichmentDeterministicFallbackWorked": true,
+  "aiOrOpenAiFilterMatchedWhenApplicable": null,
+  "nonMatchingFiltersShowedNormalFilterEmptyState": true,
+  "realEmptyDistinctFromFilterEmpty": true,
+  "brokenPreviewReadsFellBackSafelyToMock": true,
+  "radarWatchlistLibraryUnchanged": true,
+  "rollbackToMockVerified": null,
+  "blockersFound": [],
+  "reviewerNotes": [
+    "Real cards render, but the pilot still needs completed-enrichment and rollback evidence."
+  ],
+  "finalRecommendation": null
+}
