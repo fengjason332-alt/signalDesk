@@ -15,6 +15,42 @@ export const TODAY_REAL_FEED_PILOT_CHECKS = [
   'Confirm Supabase read failures fallback safely to mock without exposing raw internals.',
 ] as const;
 
+export const TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS = [
+  'Set VITE_USE_REAL_CONTENT_FEED=false.',
+  'Restart locally with npm run dev, or rebuild/redeploy the target environment.',
+  'Open Today and confirm the mock feed is back.',
+  'Confirm no Supabase preview read is attempted in mock mode.',
+  'Confirm Radar, Watchlist, and Library remain unchanged.',
+] as const;
+
+export const TODAY_REAL_FEED_PILOT_PASS_CRITERIA = [
+  'Real cards remain readable and useful.',
+  'Detail opens safely and does not fabricate a full article body.',
+  'Completed and non-empty enriched text wins over deterministic preview text.',
+  'Deterministic fallback stays useful when enrichment is missing, pending, failed, skipped, not requested, or blank.',
+  'AI/OpenAI filters still match real cards when applicable.',
+  'real_empty remains distinguishable from filter_empty.',
+  'Fallback to mock remains safe and understandable.',
+] as const;
+
+export const TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT = [
+  'Capture whether Today loaded real cards, real_empty, or fallback_to_mock.',
+  'Capture at least one safe Detail view with visible provenance and no fake body content.',
+  'Capture one example where completed enriched text is present and wins.',
+  'Capture one example where deterministic fallback appears because enrichment is pending, failed, skipped, not requested, or blank.',
+  'Capture AI/OpenAI filter behavior and a nonmatching filter-empty state.',
+  'Capture the rollback confirmation after returning to mock mode.',
+] as const;
+
+export const TODAY_REAL_FEED_PILOT_BLOCKERS = [
+  'Preview-read fallback is unreliable or confusing.',
+  'Real cards are unreadable, sparse, or obviously prototype-only.',
+  'Detail suggests a full article body exists when it does not.',
+  'Provenance or safe source links disappear unexpectedly.',
+  'The pilot would require frontend secrets, frontend writes, or frontend AI calls.',
+  'Radar, Watchlist, or Library behavior changes unexpectedly.',
+] as const;
+
 type TodayRealFeedRequiredEnvKey = (typeof TODAY_REAL_FEED_REQUIRED_ENV_KEYS)[number];
 
 export interface TodayRealFeedPilotEnv {
@@ -33,6 +69,10 @@ export interface TodayRealFeedPilotCheck {
   };
   warnings: string[];
   checks: readonly string[];
+  rollbackSteps: readonly string[];
+  passCriteria: readonly string[];
+  evidenceToCollect: readonly string[];
+  blockers: readonly string[];
 }
 
 function hasNonEmptyValue(value: string | undefined): boolean {
@@ -60,6 +100,10 @@ export function buildTodayRealFeedPilotCheck(
         'Today remains mock by default until VITE_USE_REAL_CONTENT_FEED=true is explicitly enabled.',
       ],
       checks: TODAY_REAL_FEED_PILOT_CHECKS,
+      rollbackSteps: TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS,
+      passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
+      evidenceToCollect: TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
+      blockers: TODAY_REAL_FEED_PILOT_BLOCKERS,
     };
   }
 
@@ -77,6 +121,10 @@ export function buildTodayRealFeedPilotCheck(
         'The app should fallback to mock safely until the missing env is restored.',
       ],
       checks: TODAY_REAL_FEED_PILOT_CHECKS,
+      rollbackSteps: TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS,
+      passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
+      evidenceToCollect: TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
+      blockers: TODAY_REAL_FEED_PILOT_BLOCKERS,
     };
   }
 
@@ -90,5 +138,9 @@ export function buildTodayRealFeedPilotCheck(
     },
     warnings: [],
     checks: TODAY_REAL_FEED_PILOT_CHECKS,
+    rollbackSteps: TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS,
+    passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
+    evidenceToCollect: TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
+    blockers: TODAY_REAL_FEED_PILOT_BLOCKERS,
   };
 }

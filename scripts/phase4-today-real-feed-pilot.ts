@@ -11,6 +11,7 @@ const result = buildTodayRealFeedPilotCheck({
 
 const lines = [
   'SignalDesk Today real-feed pilot check',
+  'sections:',
   `mode: ${result.mode}`,
   `shouldAttemptRealFeedRead: ${result.shouldAttemptRealFeedRead}`,
   `requiredEnvKeys: ${TODAY_REAL_FEED_REQUIRED_ENV_KEYS.join(', ')}`,
@@ -28,6 +29,26 @@ if (result.warnings.length > 0) {
 lines.push('manual checks:');
 for (const check of result.checks) {
   lines.push(`- ${check}`);
+}
+
+lines.push('rollback steps:');
+for (const step of result.rollbackSteps) {
+  lines.push(`- ${step}`);
+}
+
+lines.push('pass criteria:');
+for (const criterion of result.passCriteria) {
+  lines.push(`- ${criterion}`);
+}
+
+lines.push('evidence to collect:');
+for (const item of result.evidenceToCollect) {
+  lines.push(`- ${item}`);
+}
+
+lines.push('default-switch blockers:');
+for (const blocker of result.blockers) {
+  lines.push(`- ${blocker}`);
 }
 
 process.stdout.write(`${lines.join('\n')}\n`);

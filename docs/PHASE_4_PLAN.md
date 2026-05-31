@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-22
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-23
 
 ### Tasks 0-4: Foundations
 
@@ -233,13 +233,14 @@ Proposed future AI enrichment flow:
 - Task 20 keeps Today mock-by-default after reviewing the rollout gates, adds an explicit default-rollout helper boundary, and records that a target-environment pilot is still required before any default switch
 - Task 21 adds the target-environment pilot runbook, bounded QA checklist, success criteria, stop criteria, and rollback steps without changing runtime defaults
 - Task 22 adds a local Today pilot preflight helper command and ties the operator runbook, rollback path, and env-boundary docs together with regression coverage
+- Task 23 adds a dedicated pilot evidence document plus clearer helper sections for pass criteria, evidence capture, blockers, and rollback recording without changing any runtime defaults
 - there is still no scheduled AI execution
 
 ## Remaining Tasks
 
-### Task 23: Execute Target-Environment Today Real-Feed Pilot
+### Task 24: Review Today Real-Feed Pilot Evidence And Default-Switch Decision
 
-- use the Task 21 pilot runbook plus the Task 22 preflight helper to execute a bounded target-environment pilot toward any later default switch
+- review the evidence gathered with the Task 21 runbook, Task 22 helper, and Task 23 evidence template before considering any later default switch
 - preserve fallback paths and disable paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout
 

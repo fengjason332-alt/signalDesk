@@ -6,7 +6,11 @@ import { resolve } from 'node:path';
 
 import {
   buildTodayRealFeedPilotCheck,
+  TODAY_REAL_FEED_PILOT_BLOCKERS,
   TODAY_REAL_FEED_PILOT_CHECKS,
+  TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
+  TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
+  TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS,
 } from './lib/content/todayRealFeedPilot';
 
 test('buildTodayRealFeedPilotCheck keeps Today mock-by-default when env flag is false or missing', () => {
@@ -28,6 +32,10 @@ test('buildTodayRealFeedPilotCheck keeps Today mock-by-default when env flag is 
         'Today remains mock by default until VITE_USE_REAL_CONTENT_FEED=true is explicitly enabled.',
       ],
       checks: TODAY_REAL_FEED_PILOT_CHECKS,
+      rollbackSteps: TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS,
+      passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
+      evidenceToCollect: TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
+      blockers: TODAY_REAL_FEED_PILOT_BLOCKERS,
     },
   );
 });
@@ -43,6 +51,8 @@ test('buildTodayRealFeedPilotCheck marks the pilot ready only when explicit Supa
   assert.equal(result.shouldAttemptRealFeedRead, true);
   assert.deepEqual(result.missingEnvKeys, []);
   assert.equal(result.warnings.length, 0);
+  assert.ok(result.passCriteria.includes('Real cards remain readable and useful.'));
+  assert.ok(result.evidenceToCollect.includes('Capture whether Today loaded real cards, real_empty, or fallback_to_mock.'));
   assert.ok(
     result.checks.includes('Confirm real_empty is distinguishable from filter_empty.'),
   );
@@ -65,6 +75,7 @@ test('buildTodayRealFeedPilotCheck flags missing Supabase env and warns that the
     result.warnings.join('\n'),
     /fallback to mock/i,
   );
+  assert.deepEqual(result.rollbackSteps, TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS);
 });
 
 test('local Today pilot helper script prints a bounded pilot-ready summary without calling network services', () => {
@@ -85,11 +96,19 @@ test('local Today pilot helper script prints a bounded pilot-ready summary witho
   );
 
   assert.match(output, /mode: pilot_ready/i);
+  assert.match(output, /sections:/i);
   assert.match(output, /shouldAttemptRealFeedRead: true/i);
+  assert.match(output, /rollback steps:/i);
+  assert.match(output, /pass criteria:/i);
+  assert.match(output, /evidence to collect:/i);
+  assert.match(output, /default-switch blockers:/i);
   assert.match(output, /manual checks:/i);
   assert.match(output, /real_empty/i);
+  assert.match(output, /no fake body content/i);
   assert.doesNotMatch(output, /DEEPSEEK_API_KEY/i);
   assert.doesNotMatch(output, /SUPABASE_SERVICE_ROLE_KEY/i);
+  assert.doesNotMatch(output, /https:\/\/example\.supabase\.co/i);
+  assert.doesNotMatch(output, /public-anon-key/i);
 });
 
 test('package.json exposes the bounded local Today pilot helper command', () => {
@@ -102,5 +121,28 @@ test('package.json exposes the bounded local Today pilot helper command', () => 
   assert.equal(
     packageJson.scripts?.['phase4:today-pilot-check'],
     'node --import tsx scripts/phase4-today-real-feed-pilot.ts',
+  );
+});
+
+test('today real-feed pilot contract exposes bounded evidence, rollback, pass criteria, and blockers', () => {
+  assert.ok(
+    TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS.includes(
+      'Set VITE_USE_REAL_CONTENT_FEED=false.',
+    ),
+  );
+  assert.ok(
+    TODAY_REAL_FEED_PILOT_PASS_CRITERIA.includes(
+      'Real cards remain readable and useful.',
+    ),
+  );
+  assert.ok(
+    TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT.includes(
+      'Capture whether Today loaded real cards, real_empty, or fallback_to_mock.',
+    ),
+  );
+  assert.ok(
+    TODAY_REAL_FEED_PILOT_BLOCKERS.includes(
+      'Preview-read fallback is unreliable or confusing.',
+    ),
   );
 });

@@ -22,7 +22,7 @@ Phase 3 did not move content cards or feed data into Supabase.
 
 Phase 4 is the real-content phase. Its purpose is to ingest real information, store raw source items, deduplicate them, generate structured intelligence signals, and eventually feed those results into the Today experience without breaking the mock-first default rollout.
 
-### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-22 Complete
+### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-23 Complete
 
 1. Task 0: content-domain foundation types, additive mappers, and Phase 4 schema draft
 2. Task 1: source registry and RSS ingestion skeleton
@@ -55,6 +55,7 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 29. Task 20: explicit Today real-by-default rollout decision completed with a keep-mock-by-default outcome, explicit rollback path, and target-environment blockers documented
 30. Task 21: target-environment pilot documentation and QA support for Today real-feed mode, still without switching the default feed
 31. Task 22: target-pilot execution support with a local Today preflight helper, operator-facing QA hardening, and rollback-ready documentation without changing the default feed
+32. Task 23: pilot-evidence execution preparation with a dedicated evidence doc, clearer helper sections, and operator-facing pass/fail recording guidance without changing the default feed
 
 ### Current Phase 4 Status
 
@@ -87,9 +88,9 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 23: Execute Target-Environment Today Real-Feed Pilot
+### Task 24: Review Today Real-Feed Pilot Evidence And Default-Switch Decision
 
-- use the Task 21 and Task 22 pilot runbooks and helper to gather concrete evidence from a target environment before any later explicit default switch
+- use the pilot evidence from Task 23 to decide whether a controlled default-switch task is justified
 - preserve fallback paths and disable paths either way
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task

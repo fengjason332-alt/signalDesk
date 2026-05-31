@@ -22,6 +22,7 @@ Client-side pilot env:
 Local helper command:
 - `npm run phase4:today-pilot-check`
 - This helper is local-only. It does not call Supabase, does not call AI providers, and does not write content.
+- Record pilot outcomes in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`.
 
 Important boundaries:
 - no `SUPABASE_SERVICE_ROLE_KEY` in the frontend
@@ -49,10 +50,10 @@ To confirm the normal default remains intact:
 1. Set `VITE_USE_REAL_CONTENT_FEED=false`.
 2. Run `npm run phase4:today-pilot-check`.
 3. Confirm the helper reports `mode: mock_default`.
-2. Start the app with `npm run dev`, or rebuild/redeploy if using a deployed target.
-3. Open Today.
-4. Confirm Today displays the mock feed.
-5. Confirm no real-feed-only empty state appears.
+4. Start the app with `npm run dev`, or rebuild/redeploy if using a deployed target.
+5. Open Today.
+6. Confirm Today displays the mock feed.
+7. Confirm no real-feed-only empty state appears.
 
 ### 2. Enable Real Today Mode
 
@@ -64,6 +65,7 @@ To confirm the normal default remains intact:
 3. Confirm the helper reports `mode: pilot_ready`.
 4. Start the app with `npm run dev`, or rebuild/redeploy if the target environment needs a build artifact refresh.
 5. Open Today.
+6. Start recording observations in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`.
 
 Expected:
 - real cards render with the existing style

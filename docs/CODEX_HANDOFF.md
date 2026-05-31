@@ -36,7 +36,7 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - DeepSeek is now wired as the first optional server-side provider
 - Task 13C adds a guarded manual-only AI write mode
 - Task 13D and Task 13E add additive claim / retry hardening plus sequential one-to-three signal manual batch support
-- Task 14A-22 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, a controlled Today real-feed rollout path that remains mock-by-default, a dedicated rollout-decision checklist before any default-feed change, stronger real-feed diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback guidance, a Task 21 target-environment pilot runbook, a Task 22 local pilot preflight helper, and a planning-only future X or Grok user-curated source path
+- Task 14A-23 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, a controlled Today real-feed rollout path that remains mock-by-default, a dedicated rollout-decision checklist before any default-feed change, stronger real-feed diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback guidance, a Task 21 target-environment pilot runbook, a Task 22 local pilot preflight helper, a Task 23 pilot evidence template, and a planning-only future X or Grok user-curated source path
 - AI writes remain limited to enrichment-ready columns plus additive claim/retry bookkeeping columns on `public.intelligence_signals`
 - scheduled non-AI ingestion now exists behind `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
 - scheduled non-AI ingestion remains disabled by default, keeps AI out of the path entirely, and applies hard caps for:
@@ -61,6 +61,8 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
   - `docs/TODAY_REAL_FEED_TARGET_PILOT.md`
 - Task 22 adds a local Today pilot preflight helper:
   - `npm run phase4:today-pilot-check`
+- Task 23 adds a pilot evidence template:
+  - `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`
 - a planning-only future X or Grok user-curated source path now lives in:
   - `docs/X_GROK_USER_CURATED_SOURCE_PLAN.md`
 
@@ -85,6 +87,7 @@ Before changing code, read:
 - [docs/PHASE_4_MANUAL_QA.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/PHASE_4_MANUAL_QA.md)
 - [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md)
 - [docs/TODAY_REAL_FEED_TARGET_PILOT.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_TARGET_PILOT.md)
+- [docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md)
 - [docs/X_GROK_USER_CURATED_SOURCE_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/X_GROK_USER_CURATED_SOURCE_PLAN.md)
 
 ### Required Client Env
@@ -266,7 +269,7 @@ Do not commit any of these secrets or real values.
 - there is still no scheduled AI execution
 - deploys using `--no-verify-jwt` should treat AI-enabled requests as operator-only
 
-### Latest Task 14A-22 Status
+### Latest Task 14A-23 Status
 
 - non-AI ingestion now uses an explicit endpoint contract:
   - `intent: "ingestion"`
@@ -316,6 +319,10 @@ Do not commit any of these secrets or real values.
   - `npm run phase4:today-pilot-check`
   - a local env preflight that reports `mock_default`, `pilot_ready`, or `pilot_misconfigured`
   - updated README / manual QA / handoff guidance so operators can run the same bounded pilot steps consistently
+- Task 23 now adds:
+  - `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`
+  - explicit sections for pilot objective, manual QA, rollback, pass criteria, blockers, and future default-switch justification
+  - clearer helper output sections for rollback steps, evidence capture, and blocker review
 - Today real-feed mode now keeps the same UI style but returns clearer prototype states:
   - `mock` when preview is disabled
   - `real` when preview-safe rows load
@@ -339,8 +346,8 @@ Do not commit any of these secrets or real values.
 
 ### Exact Next Recommended Task
 
-Phase 4 Task 23:
-- use `docs/TODAY_REAL_FEED_TARGET_PILOT.md` plus `npm run phase4:today-pilot-check` to execute a bounded Today real-feed pilot in a target environment
+Phase 4 Task 24:
+- review the recorded evidence in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md` after a bounded Today real-feed pilot has actually been run
 - keep the real-content path read-only on the client
 - keep Radar on mock
 - keep AI enrichment manual-only while scheduled non-AI ingestion gains more operational validation

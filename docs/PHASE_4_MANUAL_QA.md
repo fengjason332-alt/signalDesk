@@ -21,6 +21,7 @@ Important boundaries:
 - Task 20 keeps Today mock-by-default after reviewing the current rollout gates and makes the rollback step explicit: `VITE_USE_REAL_CONTENT_FEED=false`, rebuild, confirm mock
 - Task 21 adds a dedicated target-environment pilot runbook in `docs/TODAY_REAL_FEED_TARGET_PILOT.md`
 - Task 22 adds a local helper command: `npm run phase4:today-pilot-check`
+- Task 23 adds a dedicated pilot evidence template in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -411,6 +412,7 @@ Use [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3
 Task 20 does not switch the default feed; it records that a target-environment pilot is still required before any default change.
 Use [docs/TODAY_REAL_FEED_TARGET_PILOT.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_TARGET_PILOT.md) when actually running that bounded pilot.
 Run `npm run phase4:today-pilot-check` before opening the app to confirm whether the local env is still in `mock_default`, `pilot_ready`, or `pilot_misconfigured`.
+Record outcomes in [docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md).
 
 ## 11. Mock Fallback By Setting VITE_USE_REAL_CONTENT_FEED=false
 
