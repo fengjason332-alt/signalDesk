@@ -1,3 +1,5 @@
+import { DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH } from './todayRealFeedEvidenceStarter';
+
 export const TODAY_REAL_FEED_REQUIRED_ENV_KEYS = [
   'VITE_USE_REAL_CONTENT_FEED',
   'VITE_SUPABASE_URL',
@@ -51,6 +53,13 @@ export const TODAY_REAL_FEED_PILOT_BLOCKERS = [
   'Radar, Watchlist, or Library behavior changes unexpectedly.',
 ] as const;
 
+export const TODAY_REAL_FEED_PILOT_NEXT_COMMANDS = [
+  'npm run phase4:create-today-evidence',
+  'npm run phase4:today-pilot-check',
+  'npm run dev',
+  `npm run phase4:today-evidence-review -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}`,
+] as const;
+
 type TodayRealFeedRequiredEnvKey = (typeof TODAY_REAL_FEED_REQUIRED_ENV_KEYS)[number];
 
 export interface TodayRealFeedPilotEnv {
@@ -64,6 +73,7 @@ export interface TodayRealFeedPilotCheck {
   shouldAttemptRealFeedRead: boolean;
   missingEnvKeys: TodayRealFeedRequiredEnvKey[];
   requiredEnvKeys: readonly TodayRealFeedRequiredEnvKey[];
+  nextCommands: readonly string[];
   rollbackEnv: {
     VITE_USE_REAL_CONTENT_FEED: 'false';
   };
@@ -93,6 +103,7 @@ export function buildTodayRealFeedPilotCheck(
       shouldAttemptRealFeedRead: false,
       missingEnvKeys: [],
       requiredEnvKeys: TODAY_REAL_FEED_REQUIRED_ENV_KEYS,
+      nextCommands: TODAY_REAL_FEED_PILOT_NEXT_COMMANDS,
       rollbackEnv: {
         VITE_USE_REAL_CONTENT_FEED: 'false',
       },
@@ -113,6 +124,7 @@ export function buildTodayRealFeedPilotCheck(
       shouldAttemptRealFeedRead: false,
       missingEnvKeys,
       requiredEnvKeys: TODAY_REAL_FEED_REQUIRED_ENV_KEYS,
+      nextCommands: TODAY_REAL_FEED_PILOT_NEXT_COMMANDS,
       rollbackEnv: {
         VITE_USE_REAL_CONTENT_FEED: 'false',
       },
@@ -133,6 +145,7 @@ export function buildTodayRealFeedPilotCheck(
     shouldAttemptRealFeedRead: true,
     missingEnvKeys: [],
     requiredEnvKeys: TODAY_REAL_FEED_REQUIRED_ENV_KEYS,
+    nextCommands: TODAY_REAL_FEED_PILOT_NEXT_COMMANDS,
     rollbackEnv: {
       VITE_USE_REAL_CONTENT_FEED: 'false',
     },

@@ -51,6 +51,10 @@ const todayControlledDefaultRolloutPlanDocPath = resolve(
   process.cwd(),
   'docs/TODAY_REAL_FEED_CONTROLLED_DEFAULT_ROLLOUT_PLAN.md',
 );
+const todayPilotOperatorChecklistDocPath = resolve(
+  process.cwd(),
+  'docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md',
+);
 const todayPilotEvidenceExamplePath = resolve(
   process.cwd(),
   'docs/examples/today-real-feed-pilot-evidence.example.json',
@@ -59,6 +63,8 @@ const todayPilotEvidenceTemplatePath = resolve(
   process.cwd(),
   'docs/examples/today-real-feed-pilot-evidence.template.json',
 );
+const docsEvidenceGitkeepPath = resolve(process.cwd(), 'docs/evidence/.gitkeep');
+const gitignorePath = resolve(process.cwd(), '.gitignore');
 const xGrokUserCuratedSourcePlanPath = resolve(
   process.cwd(),
   'docs/X_GROK_USER_CURATED_SOURCE_PLAN.md',
@@ -78,8 +84,10 @@ test('phase 4 manual readiness assets exist for manual SQL rollout', () => {
   assert.equal(existsSync(todayTargetPilotDocPath), true);
   assert.equal(existsSync(todayPilotEvidenceDocPath), true);
   assert.equal(existsSync(todayControlledDefaultRolloutPlanDocPath), true);
+  assert.equal(existsSync(todayPilotOperatorChecklistDocPath), true);
   assert.equal(existsSync(todayPilotEvidenceExamplePath), true);
   assert.equal(existsSync(todayPilotEvidenceTemplatePath), true);
+  assert.equal(existsSync(docsEvidenceGitkeepPath), true);
   assert.equal(existsSync(xGrokUserCuratedSourcePlanPath), true);
 });
 
@@ -199,17 +207,19 @@ test('scheduled ingestion docs mention the explicit env gate, bounded scheduled 
   assert.match(manualQaDoc, /code:\s*"ai_scheduled_trigger_not_allowed"/i);
 });
 
-test('README records the Task 25 real-feed pilot evidence hardening without switching Today by default', () => {
+test('README records the Task 26 manual pilot workflow support without switching Today by default', () => {
   const readme = readFileSync(readmePath, 'utf8');
 
-  assert.match(readme, /Tasks 14A-25/i);
+  assert.match(readme, /Tasks 14A-26/i);
   assert.match(readme, /Today remains mock by default/i);
   assert.match(readme, /separate explicit rollout decision/i);
   assert.match(readme, /VITE_USE_REAL_CONTENT_FEED=false/i);
   assert.match(readme, /fallback to mock/i);
   assert.match(readme, /phase4:today-pilot-check/i);
+  assert.match(readme, /phase4:create-today-evidence/i);
   assert.match(readme, /TODAY_REAL_FEED_PILOT_EVIDENCE/i);
   assert.match(readme, /phase4:today-evidence-review/i);
+  assert.match(readme, /TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST/i);
   assert.match(readme, /TODAY_REAL_FEED_CONTROLLED_DEFAULT_ROLLOUT_PLAN/i);
 });
 
@@ -279,16 +289,19 @@ test('Today real-feed target pilot doc captures pilot-only env, QA, rollback, an
   assert.match(doc, /No frontend AI calls/i);
 });
 
-test('Task 25 docs mention the local Today pilot helper and evidence review commands and keep them bounded to local QA only', () => {
+test('Task 26 docs mention the local Today pilot helper, evidence starter, and evidence review commands while staying bounded to local QA only', () => {
   const readme = readFileSync(readmePath, 'utf8');
   const manualQaDoc = readFileSync(manualQaDocPath, 'utf8');
   const handoffDoc = readFileSync(resolve(process.cwd(), 'docs/CODEX_HANDOFF.md'), 'utf8');
 
   assert.match(readme, /phase4:today-pilot-check/i);
+  assert.match(readme, /phase4:create-today-evidence/i);
   assert.match(readme, /phase4:today-evidence-review/i);
   assert.match(manualQaDoc, /phase4:today-pilot-check/i);
+  assert.match(manualQaDoc, /phase4:create-today-evidence/i);
   assert.match(manualQaDoc, /phase4:today-evidence-review/i);
   assert.match(handoffDoc, /phase4:today-pilot-check/i);
+  assert.match(handoffDoc, /phase4:create-today-evidence/i);
   assert.match(handoffDoc, /phase4:today-evidence-review/i);
   assert.match(handoffDoc, /no frontend ai calls/i);
   assert.match(handoffDoc, /Today remains mock by default/i);
@@ -312,11 +325,32 @@ test('Today real-feed pilot evidence doc records objective env rollback evidence
   assert.match(doc, /No production default switch is made in this task/i);
   assert.match(doc, /phase4:today-evidence-review/i);
   assert.match(doc, /template\.json/i);
+  assert.match(doc, /docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i);
   assert.match(doc, /bilingual/i);
   assert.match(doc, /mobile/i);
   assert.match(doc, /RLS/i);
   assert.match(doc, /no frontend writes/i);
   assert.match(doc, /no frontend AI calls/i);
+});
+
+test('pilot operator checklist doc exists and mentions rollback plus screenshot privacy boundaries', () => {
+  const doc = readFileSync(todayPilotOperatorChecklistDocPath, 'utf8');
+
+  assert.match(doc, /Start from mock mode/i);
+  assert.match(doc, /phase4:today-pilot-check/i);
+  assert.match(doc, /phase4:create-today-evidence/i);
+  assert.match(doc, /phase4:today-evidence-review/i);
+  assert.match(doc, /rollback/i);
+  assert.match(doc, /screenshots/i);
+  assert.match(doc, /Do not upload or share secrets/i);
+  assert.match(doc, /Detail/i);
+});
+
+test('.gitignore protects local and private operator evidence files', () => {
+  const gitignore = readFileSync(gitignorePath, 'utf8');
+
+  assert.match(gitignore, /docs\/evidence\/\*\.local\.json/i);
+  assert.match(gitignore, /docs\/evidence\/\*\.private\.json/i);
 });
 
 test('controlled default rollout plan stays planning-only and preserves rollout boundaries', () => {

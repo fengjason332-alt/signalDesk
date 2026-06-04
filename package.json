@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
+    "phase4:create-today-evidence": "node --import tsx scripts/phase4-create-today-real-feed-evidence.ts",
     "phase4:today-pilot-check": "node --import tsx scripts/phase4-today-real-feed-pilot.ts",
     "phase4:today-evidence-review": "node --import tsx scripts/phase4-today-real-feed-evidence-review.ts"
   },

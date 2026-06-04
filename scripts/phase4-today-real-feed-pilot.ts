@@ -31,6 +31,11 @@ for (const check of result.checks) {
   lines.push(`- ${check}`);
 }
 
+lines.push('next commands:');
+for (const command of result.nextCommands) {
+  lines.push(`- ${command}`);
+}
+
 lines.push('rollback steps:');
 for (const step of result.rollbackSteps) {
   lines.push(`- ${step}`);

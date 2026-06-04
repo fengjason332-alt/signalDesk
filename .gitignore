@@ -6,3 +6,5 @@ coverage/
 *.log
 .env*
 !.env.example
+docs/evidence/*.local.json
+docs/evidence/*.private.json

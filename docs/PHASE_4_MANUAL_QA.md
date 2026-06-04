@@ -24,6 +24,7 @@ Important boundaries:
 - Task 23 adds a dedicated pilot evidence template in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`
 - Task 24 adds a local evidence-review command: `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
 - Task 25 adds a stronger beginner-friendly template at `docs/examples/today-real-feed-pilot-evidence.template.json`
+- Task 26 adds `npm run phase4:create-today-evidence`, a gitignored local evidence file path under `docs/evidence/`, and a dedicated operator checklist in `docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md`
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -295,12 +296,11 @@ Rollback:
 
 After a target-environment Today pilot has been observed manually:
 
-1. Record the bounded observations in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md` or a local JSON file that follows the same fields.
+1. Run `npm run phase4:create-today-evidence`.
+2. Record the bounded observations in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another local JSON file that follows the same fields.
 2. If you want a beginner-friendly starting point, copy:
 
-```bash
-cp docs/examples/today-real-feed-pilot-evidence.template.json /tmp/my-today-pilot-evidence.json
-```
+The starter command does not overwrite your local evidence file unless you explicitly ask it to.
 
 3. Review the fake examples first:
 
@@ -313,7 +313,7 @@ npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evid
 4. Then review your local evidence file with:
 
 ```bash
-npm run phase4:today-evidence-review -- <path-to-local-evidence-json>
+npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json
 ```
 
 Expected conceptually:
@@ -448,7 +448,8 @@ Use [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3
 Task 20 does not switch the default feed; it records that a target-environment pilot is still required before any default change.
 Use [docs/TODAY_REAL_FEED_TARGET_PILOT.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_TARGET_PILOT.md) when actually running that bounded pilot.
 Run `npm run phase4:today-pilot-check` before opening the app to confirm whether the local env is still in `mock_default`, `pilot_ready`, or `pilot_misconfigured`.
-Record outcomes in [docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md).
+Run `npm run phase4:create-today-evidence` to create `docs/evidence/today-real-feed-pilot-evidence.local.json`.
+Record outcomes in [docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md) and [docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md).
 
 ## 11. Mock Fallback By Setting VITE_USE_REAL_CONTENT_FEED=false
 

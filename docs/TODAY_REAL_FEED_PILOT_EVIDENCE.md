@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is for Phase 4 Task 25. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is for Phase 4 Task 26. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -21,8 +21,10 @@ Client-side env:
 
 Local helper command:
 - `npm run phase4:today-pilot-check`
+- `npm run phase4:create-today-evidence`
 - `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
 - The evidence-review command is local-only. It does not call Supabase, does not call AI providers, and does not write content.
+- Local operator evidence should live in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another gitignored local/private JSON path.
 
 Important boundaries:
 - no `SUPABASE_SERVICE_ROLE_KEY` in the frontend
@@ -138,10 +140,21 @@ Expected conceptually:
 Use the beginner-friendly template to start:
 
 ```bash
-cp docs/examples/today-real-feed-pilot-evidence.template.json /tmp/my-today-pilot-evidence.json
+npm run phase4:create-today-evidence
 ```
 
-Then fill in the fields in that copied file and review it locally.
+That command creates `docs/evidence/today-real-feed-pilot-evidence.local.json` unless it already exists.
+It uses `docs/examples/today-real-feed-pilot-evidence.template.json` as the starter template.
+
+Then fill in the fields in that local file and review it locally:
+
+```bash
+npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json
+```
+
+Do not commit local/private evidence files. Keep real operator notes in gitignored files such as:
+- `docs/evidence/*.local.json`
+- `docs/evidence/*.private.json`
 
 ## Template Field Meanings
 

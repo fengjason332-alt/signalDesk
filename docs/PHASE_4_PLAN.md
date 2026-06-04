@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-25
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-26
 
 ### Tasks 0-4: Foundations
 
@@ -236,14 +236,16 @@ Proposed future AI enrichment flow:
 - Task 23 adds a dedicated pilot evidence document plus clearer helper sections for pass criteria, evidence capture, blockers, and rollback recording without changing any runtime defaults
 - Task 24 adds a typed local pilot-evidence contract, a conservative evidence-review script, fake example JSON files, and rollout-decision doc updates without changing runtime defaults or contacting Supabase
 - Task 25 adds a stronger beginner-friendly evidence template, stricter evaluator rules for fallback/provenance/RLS/mobile/bilingual/readiness checks, and a planning-only controlled default-rollout plan without changing runtime defaults
+- Task 26 adds a local evidence-starter command, a gitignored local evidence folder, and a beginner-friendly operator checklist so the pilot can be executed manually without changing runtime defaults
 - there is still no scheduled AI execution
 
 ## Remaining Tasks
 
-### Task 26: Execute The Actual Today Pilot Or Prepare A Tiny Explicit Default Switch Only After Accepted Evidence
+### Task 27: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
 
-- either run the actual target pilot and fill the Task 25 template, or only prepare a tiny explicit default switch if accepted evidence already exists
-- preserve fallback paths and disable paths either way
+- run the actual target pilot with the Task 26 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
+- review that local evidence before any explicit default-switch task is considered
+- preserve fallback paths and rollback paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout
 
 ## Risks To Keep In Mind
