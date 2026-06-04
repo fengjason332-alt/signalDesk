@@ -23,6 +23,7 @@ Important boundaries:
 - Task 22 adds a local helper command: `npm run phase4:today-pilot-check`
 - Task 23 adds a dedicated pilot evidence template in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md`
 - Task 24 adds a local evidence-review command: `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
+- Task 25 adds a stronger beginner-friendly template at `docs/examples/today-real-feed-pilot-evidence.template.json`
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -295,7 +296,13 @@ Rollback:
 After a target-environment Today pilot has been observed manually:
 
 1. Record the bounded observations in `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md` or a local JSON file that follows the same fields.
-2. Review the fake examples first:
+2. If you want a beginner-friendly starting point, copy:
+
+```bash
+cp docs/examples/today-real-feed-pilot-evidence.template.json /tmp/my-today-pilot-evidence.json
+```
+
+3. Review the fake examples first:
 
 ```bash
 npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json
@@ -303,7 +310,7 @@ npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evid
 npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.blocked.example.json
 ```
 
-3. Then review your local evidence file with:
+4. Then review your local evidence file with:
 
 ```bash
 npm run phase4:today-evidence-review -- <path-to-local-evidence-json>

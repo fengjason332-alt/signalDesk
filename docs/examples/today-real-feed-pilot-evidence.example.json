@@ -1,24 +1,68 @@
 {
   "pilotTimestamp": "2026-06-01T10:00:00.000Z",
   "environmentLabel": "target-preview-incomplete",
+  "pilot_environment": "target-preview-incomplete",
+  "tester": "example-operator",
+  "app_url_or_localhost": "http://localhost:3000",
+  "env_flags_checked": [
+    "VITE_USE_REAL_CONTENT_FEED=true",
+    "VITE_SUPABASE_URL set",
+    "VITE_SUPABASE_ANON_KEY set"
+  ],
   "observedFeedMode": "real",
+  "source_count": 2,
   "realCardsRendered": true,
-  "realCardsObservedCount": 2,
+  "real_card_count": 2,
+  "sample_card_ids_or_titles": [
+    "OpenAI launch update",
+    "AI infrastructure funding roundup"
+  ],
+  "detail_checked_count": 1,
   "detailOpenedSafely": true,
-  "provenanceOrSourceLinksVisible": true,
-  "fakeFullArticleBodyAbsent": true,
+  "source_links_visible": true,
+  "no_fake_article_body": true,
   "completedNonEmptyEnrichedContentObserved": null,
   "completedNonEmptyEnrichedContentWon": null,
+  "completed_blank_enriched_content_fallback_worked": null,
   "incompleteEnrichmentDeterministicFallbackWorked": true,
   "aiOrOpenAiFilterMatchedWhenApplicable": null,
   "nonMatchingFiltersShowedNormalFilterEmptyState": true,
   "realEmptyDistinctFromFilterEmpty": true,
   "brokenPreviewReadsFellBackSafelyToMock": true,
+  "no_secrets_or_raw_internals_in_ui": true,
+  "bilingualQualityAcceptable": null,
+  "mobileQualityAcceptable": null,
+  "dataFreshnessAcceptable": null,
+  "sourceCoverageAcceptable": null,
+  "rls_read_policy_confirmed": null,
+  "no_frontend_writes_introduced": true,
+  "no_frontend_ai_calls_introduced": true,
   "radarWatchlistLibraryUnchanged": true,
-  "rollbackToMockVerified": null,
+  "rollback_checked": null,
+  "enriched_summary_cases": [
+    "No completed non-empty enriched example captured yet."
+  ],
+  "deterministic_fallback_cases": [
+    "Pending enrichment fell back to deterministic preview text."
+  ],
+  "filter_checks": [
+    "A nonmatching filter showed the normal filter-empty state."
+  ],
+  "empty_state_checks": [
+    "real_empty stayed distinct from filter_empty in notes, but the real-empty path still needs more evidence."
+  ],
   "blockersFound": [],
   "reviewerNotes": [
     "Real cards render, but the pilot still needs completed-enrichment and rollback evidence."
+  ],
+  "mobile_quality_notes": [
+    "Need one more mobile pass on a narrower viewport."
+  ],
+  "bilingual_quality_notes": [
+    "Need one more bilingual readability check."
+  ],
+  "screenshots_or_notes": [
+    "Saved one screenshot of the Today list with real cards."
   ],
   "finalRecommendation": null
 }

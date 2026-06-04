@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is for Phase 4 Task 24. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is for Phase 4 Task 25. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -17,6 +17,7 @@ Client-side env:
 - `VITE_USE_REAL_CONTENT_FEED=true`
 - `VITE_SUPABASE_URL=<project url>`
 - `VITE_SUPABASE_ANON_KEY=<publishable key>`
+- `VITE_USE_REAL_CONTENT_FEED=false` should also be checked later during rollback verification
 
 Local helper command:
 - `npm run phase4:today-pilot-check`
@@ -28,6 +29,7 @@ Important boundaries:
 - no `DEEPSEEK_API_KEY` in the frontend
 - no `PHASE4_WRITE_AUTH_TOKEN` in the frontend
 - no frontend AI calls
+- no frontend writes
 - no frontend content writes
 
 ## Baseline Mock Check
@@ -57,6 +59,7 @@ Important boundaries:
 - Confirm Detail never fabricates a full article body.
 - Confirm source provenance and safe source links remain visible.
 - Confirm completed and non-empty enriched text wins over deterministic preview text.
+- Confirm completed but blank enriched text falls back safely to deterministic preview text.
 - Confirm deterministic fallback appears when enrichment is missing, pending, failed, skipped, not requested, or blank.
 - Confirm AI/OpenAI filters still match real cards when applicable.
 - Confirm nonmatching filters show the normal filter-empty state.
@@ -64,6 +67,11 @@ Important boundaries:
 - Confirm a broken preview read falls back safely to mock.
 - Confirm Radar, Watchlist, and Library remain unchanged.
 - Confirm no secrets or raw internal errors appear in UI.
+- Confirm bilingual quality is acceptable.
+- Confirm mobile quality is acceptable.
+- Confirm data freshness is acceptable.
+- Confirm source coverage is acceptable.
+- Confirm preview read policies and anon reads are confirmed for the tested environment.
 
 ## Rollback Checklist
 
@@ -126,6 +134,61 @@ Expected conceptually:
 - incomplete example => `continue_pilot`
 - blocked example => `blocked`
 - passing example => `ready_for_controlled_default_rollout`
+
+Use the beginner-friendly template to start:
+
+```bash
+cp docs/examples/today-real-feed-pilot-evidence.template.json /tmp/my-today-pilot-evidence.json
+```
+
+Then fill in the fields in that copied file and review it locally.
+
+## Template Field Meanings
+
+- `pilot_environment`
+  - a short label for where you tested, such as `localhost-preview` or `private-preview`
+- `tested_at`
+  - when you ran the pilot
+- `tester`
+  - who ran the test
+- `app_url_or_localhost`
+  - where the app was opened
+- `env_flags_checked`
+  - which real-feed flags or rollback flags you actually verified
+- `source_count`
+  - how many useful real sources appeared in the pilot environment
+- `real_card_count`
+  - how many real Today cards you actually saw
+- `sample_card_ids_or_titles`
+  - a few example cards that prove the pilot used real data
+- `detail_checked_count`
+  - how many real cards you opened and checked in Detail
+- `source_links_visible`
+  - whether provenance/source links were actually visible
+- `no_fake_article_body`
+  - whether Detail stayed honest about missing full article body content
+- `enriched_summary_cases`
+  - short notes describing where enriched text was shown correctly
+- `deterministic_fallback_cases`
+  - short notes describing where deterministic fallback was shown correctly
+- `filter_checks`
+  - notes about AI/OpenAI filter and nonmatching filter behavior
+- `empty_state_checks`
+  - notes about `real_empty`, `filter_empty`, and fallback behavior
+- `rollback_checked`
+  - whether you really switched back to mock and confirmed it
+- `rls_read_policy_confirmed`
+  - whether preview-read policies were confirmed for the tested environment
+- `mobile_quality_notes`
+  - short notes about the phone-sized experience
+- `bilingual_quality_notes`
+  - short notes about Chinese/English readability
+- `blocker_notes`
+  - anything serious enough to stop rollout
+- `screenshots_or_notes`
+  - paths or notes for supporting evidence
+- `final_operator_recommendation`
+  - the operator's own final recommendation, which may still be reviewed by the local tool
 
 ## What Would Justify A Future Default Switch
 

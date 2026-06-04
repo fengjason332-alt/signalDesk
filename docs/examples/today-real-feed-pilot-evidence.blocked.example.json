@@ -1,26 +1,64 @@
 {
   "pilotTimestamp": "2026-06-01T11:00:00.000Z",
   "environmentLabel": "target-preview-blocked",
+  "pilot_environment": "target-preview-blocked",
+  "tester": "example-operator",
+  "app_url_or_localhost": "http://localhost:3000",
+  "env_flags_checked": [
+    "VITE_USE_REAL_CONTENT_FEED=true"
+  ],
   "observedFeedMode": "fallback_to_mock",
+  "source_count": 1,
   "realCardsRendered": false,
-  "realCardsObservedCount": 0,
+  "real_card_count": 0,
+  "detail_checked_count": 0,
   "detailOpenedSafely": false,
-  "provenanceOrSourceLinksVisible": false,
-  "fakeFullArticleBodyAbsent": false,
+  "source_links_visible": false,
+  "no_fake_article_body": false,
   "completedNonEmptyEnrichedContentObserved": false,
   "completedNonEmptyEnrichedContentWon": false,
+  "completed_blank_enriched_content_fallback_worked": false,
   "incompleteEnrichmentDeterministicFallbackWorked": false,
   "aiOrOpenAiFilterMatchedWhenApplicable": null,
   "nonMatchingFiltersShowedNormalFilterEmptyState": false,
   "realEmptyDistinctFromFilterEmpty": false,
   "brokenPreviewReadsFellBackSafelyToMock": false,
+  "no_secrets_or_raw_internals_in_ui": false,
+  "bilingualQualityAcceptable": false,
+  "mobileQualityAcceptable": false,
+  "dataFreshnessAcceptable": false,
+  "sourceCoverageAcceptable": false,
+  "rls_read_policy_confirmed": false,
+  "no_frontend_writes_introduced": true,
+  "no_frontend_ai_calls_introduced": true,
   "radarWatchlistLibraryUnchanged": false,
-  "rollbackToMockVerified": false,
+  "rollback_checked": false,
+  "enriched_summary_cases": [
+    "Completed enrichment quality was not trustworthy."
+  ],
+  "deterministic_fallback_cases": [
+    "Fallback behavior was inconsistent."
+  ],
+  "filter_checks": [
+    "Filter behavior was unreliable."
+  ],
+  "empty_state_checks": [
+    "real_empty and filter_empty were confusing."
+  ],
   "blockersFound": [
     "Fallback to mock was not understandable and related tabs looked inconsistent."
   ],
   "reviewerNotes": [
     "Blocked example only. Uses fake content and no real environment identifiers."
+  ],
+  "mobile_quality_notes": [
+    "Mobile layout felt too fragile."
+  ],
+  "bilingual_quality_notes": [
+    "Bilingual presentation looked confusing."
+  ],
+  "screenshots_or_notes": [
+    "Saved one screenshot showing the blocked fallback state."
   ],
   "finalRecommendation": null
 }

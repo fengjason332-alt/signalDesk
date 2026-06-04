@@ -37,23 +37,28 @@ try {
   process.exit(1);
 }
 
+function formatList(label: string, values: string[]) {
+  if (values.length === 0) {
+    return `${label}: (none)`;
+  }
+
+  return `${label}:\n- ${values.join('\n- ')}`;
+}
+
 const lines = [
   'SignalDesk Today real-feed evidence review',
-  `recommendation: ${review.recommendation}`,
-  `environmentLabel: ${review.normalizedEvidence.environmentLabel}`,
-  `observedFeedMode: ${review.normalizedEvidence.observedFeedMode}`,
-  `missing required checks: ${
-    review.missingRequiredChecks.length > 0
-      ? review.missingRequiredChecks.join(', ')
-      : '(none)'
-  }`,
-  `failed critical checks: ${
-    review.failedCriticalChecks.length > 0
-      ? review.failedCriticalChecks.join(', ')
-      : '(none)'
-  }`,
-  `warnings: ${review.warnings.length > 0 ? review.warnings.join(' | ') : '(none)'}`,
-  `next action: ${review.nextAction}`,
+  '',
+  `Overall recommendation: ${review.recommendation}`,
+  `Environment label: ${review.normalizedEvidence.environmentLabel}`,
+  `Observed feed mode: ${review.normalizedEvidence.observedFeedMode}`,
+  formatList('Missing required checks', review.missingRequiredChecks),
+  formatList('Failed critical checks', review.failedCriticalChecks),
+  formatList('Warnings', review.warnings),
+  `Next action: ${review.nextAction}`,
+  'Rollback instruction:',
+  '- Set VITE_USE_REAL_CONTENT_FEED=false',
+  '- Restart locally with npm run dev, or rebuild/redeploy the target environment',
+  '- Open Today and confirm the mock feed is back',
 ];
 
 process.stdout.write(`${lines.join('\n')}\n`);

@@ -22,7 +22,7 @@ Phase 3 did not move content cards or feed data into Supabase.
 
 Phase 4 is the real-content phase. Its purpose is to ingest real information, store raw source items, deduplicate them, generate structured intelligence signals, and eventually feed those results into the Today experience without breaking the mock-first default rollout.
 
-### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-24 Complete
+### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-25 Complete
 
 1. Task 0: content-domain foundation types, additive mappers, and Phase 4 schema draft
 2. Task 1: source registry and RSS ingestion skeleton
@@ -57,6 +57,7 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 31. Task 22: target-pilot execution support with a local Today preflight helper, operator-facing QA hardening, and rollback-ready documentation without changing the default feed
 32. Task 23: pilot-evidence execution preparation with a dedicated evidence doc, clearer helper sections, and operator-facing pass/fail recording guidance without changing the default feed
 33. Task 24: local pilot-evidence review tooling, conservative recommendation evaluation, example evidence JSON files, and rollout-decision documentation updates without changing runtime defaults
+34. Task 25: stronger pilot-evidence hardening, a beginner-friendly template JSON, stricter local recommendation checks, and a planning-only controlled default-rollout plan without switching Today by default
 
 ### Current Phase 4 Status
 
@@ -89,9 +90,9 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 25: Controlled Today Default-Rollout Preparation Only After Accepted Pilot Evidence
+### Task 26: Execute The Actual Today Pilot Or Prepare A Tiny Explicit Default Switch Only After Accepted Evidence
 
-- only begin this task if Task 24 pilot evidence is accepted
+- either run the actual target pilot and fill the Task 25 template, or only prepare a tiny explicit default switch if accepted evidence already exists
 - preserve fallback paths and explicit rollback available either way
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task

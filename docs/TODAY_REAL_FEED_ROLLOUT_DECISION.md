@@ -21,6 +21,7 @@ This means:
 - Task 22 adds `npm run phase4:today-pilot-check` so operators can confirm the local env contract before opening the app
 - Task 23 adds `docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md` so the pilot outcome can be recorded against explicit pass, blocker, and rollback criteria
 - Task 24 adds `npm run phase4:today-evidence-review` plus local example JSON files so pilot evidence can be reviewed conservatively before any future default-switch preparation
+- Task 25 adds `docs/TODAY_REAL_FEED_CONTROLLED_DEFAULT_ROLLOUT_PLAN.md` plus a beginner-friendly evidence template so the next rollout step can stay explicit and reversible
 
 ## Current Boundary
 

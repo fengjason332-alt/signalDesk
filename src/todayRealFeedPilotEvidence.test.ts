@@ -22,6 +22,10 @@ const blockedExamplePath = resolve(
   process.cwd(),
   'docs/examples/today-real-feed-pilot-evidence.blocked.example.json',
 );
+const templateExamplePath = resolve(
+  process.cwd(),
+  'docs/examples/today-real-feed-pilot-evidence.template.json',
+);
 const reviewScriptPath = resolve(
   process.cwd(),
   'scripts/phase4-today-real-feed-evidence-review.ts',
@@ -40,15 +44,38 @@ function buildPassingEvidence() {
     fakeFullArticleBodyAbsent: true,
     completedNonEmptyEnrichedContentObserved: true,
     completedNonEmptyEnrichedContentWon: true,
+    completedBlankEnrichedContentFallbackWorked: true,
     incompleteEnrichmentDeterministicFallbackWorked: true,
     aiOrOpenAiFilterMatchedWhenApplicable: true,
     nonMatchingFiltersShowedNormalFilterEmptyState: true,
     realEmptyDistinctFromFilterEmpty: true,
     brokenPreviewReadsFellBackSafelyToMock: true,
+    noSecretsOrRawInternalsInUi: true,
+    bilingualQualityAcceptable: true,
+    mobileQualityAcceptable: true,
+    dataFreshnessAcceptable: true,
+    sourceCoverageAcceptable: true,
+    rlsReadPolicyConfirmed: true,
+    noFrontendWritesIntroduced: true,
+    noFrontendAiCallsIntroduced: true,
     radarWatchlistLibraryUnchanged: true,
     rollbackToMockVerified: true,
+    sourceCount: 3,
+    detailCheckedCount: 2,
+    pilotEnvironment: 'private-preview',
+    tester: 'codex',
+    appUrlOrLocalhost: 'http://localhost:3000',
+    envFlagsChecked: ['VITE_USE_REAL_CONTENT_FEED=true'],
+    sampleCardIdsOrTitles: ['OpenAI launch update', 'AI policy roundup'],
+    enrichedSummaryCases: ['Completed enriched summary wins when non-empty.'],
+    deterministicFallbackCases: ['Pending enrichment falls back to deterministic preview.'],
+    filterChecks: ['AI filter matched OpenAI card.', 'Nonmatching filter showed filter-empty state.'],
+    emptyStateChecks: ['real_empty stayed distinct from filter_empty.'],
     blockersFound: [],
     reviewerNotes: ['Pilot looked stable.'],
+    mobileQualityNotes: ['Mobile layout stayed readable on a narrow viewport.'],
+    bilingualQualityNotes: ['Chinese and English copy remained understandable together.'],
+    screenshotsOrNotes: ['No secrets or raw internal errors appeared in UI.'],
   };
 }
 
@@ -123,6 +150,28 @@ test('blank enriched content should not count as successful enriched content', (
   assert.ok(review.missingRequiredChecks.includes('completedNonEmptyEnrichedContentObserved'));
 });
 
+test('completed but blank enriched text fallback must not pass as good enrichment', () => {
+  const review = evaluateTodayPilotEvidence({
+    ...buildPassingEvidence(),
+    completedBlankEnrichedContentFallbackWorked: false,
+  });
+
+  assert.equal(review.recommendation, 'blocked');
+  assert.ok(review.failedCriticalChecks.includes('completedBlankEnrichedContentFallbackWorked'));
+});
+
+test('contradictory real-card observations block rollout until the evidence is corrected', () => {
+  const review = evaluateTodayPilotEvidence({
+    ...buildPassingEvidence(),
+    observedFeedMode: 'real',
+    realCardsRendered: false,
+    realCardsObservedCount: 2,
+  });
+
+  assert.equal(review.recommendation, 'blocked');
+  assert.ok(review.failedCriticalChecks.includes('realFeedObservationConsistency'));
+});
+
 test('real-empty pilot evidence can conservatively keep Today mock-by-default', () => {
   const review = evaluateTodayPilotEvidence({
     ...createEmptyTodayPilotEvidence({
@@ -132,10 +181,14 @@ test('real-empty pilot evidence can conservatively keep Today mock-by-default', 
     realCardsRendered: false,
     realCardsObservedCount: 0,
     brokenPreviewReadsFellBackSafelyToMock: true,
+    noSecretsOrRawInternalsInUi: true,
+    noFrontendWritesIntroduced: true,
+    noFrontendAiCallsIntroduced: true,
     radarWatchlistLibraryUnchanged: true,
     rollbackToMockVerified: true,
     realEmptyDistinctFromFilterEmpty: true,
     aiOrOpenAiFilterMatchedWhenApplicable: 'not_applicable',
+    rlsReadPolicyConfirmed: true,
     blockersFound: [],
     reviewerNotes: ['Preview-safe rows were absent in this environment.'],
   });
@@ -144,10 +197,31 @@ test('real-empty pilot evidence can conservatively keep Today mock-by-default', 
   assert.deepEqual(review.failedCriticalChecks, []);
 });
 
+test('missing RLS read policy confirmation blocks readiness', () => {
+  const review = evaluateTodayPilotEvidence({
+    ...buildPassingEvidence(),
+    rlsReadPolicyConfirmed: null,
+  });
+
+  assert.notEqual(review.recommendation, 'ready_for_controlled_default_rollout');
+  assert.ok(review.missingRequiredChecks.includes('rlsReadPolicyConfirmed'));
+});
+
+test('failed source provenance blocks readiness', () => {
+  const review = evaluateTodayPilotEvidence({
+    ...buildPassingEvidence(),
+    provenanceOrSourceLinksVisible: false,
+  });
+
+  assert.equal(review.recommendation, 'blocked');
+  assert.ok(review.failedCriticalChecks.includes('provenanceOrSourceLinksVisible'));
+});
+
 test('example evidence json files exist and parse locally', () => {
   assert.equal(existsSync(incompleteExamplePath), true);
   assert.equal(existsSync(passingExamplePath), true);
   assert.equal(existsSync(blockedExamplePath), true);
+  assert.equal(existsSync(templateExamplePath), true);
 
   assert.equal(
     parseTodayPilotEvidence(JSON.parse(readFileSync(incompleteExamplePath, 'utf8'))).environmentLabel,
@@ -163,6 +237,15 @@ test('example evidence json files exist and parse locally', () => {
   );
 });
 
+test('template evidence json is valid JSON and starts as continue_pilot guidance', () => {
+  const parsed = JSON.parse(readFileSync(templateExamplePath, 'utf8'));
+
+  assert.equal(parsed.pilot_environment, 'fill-me-target-environment');
+
+  const review = evaluateTodayPilotEvidence(parseTodayPilotEvidence(parsed));
+  assert.equal(review.recommendation, 'continue_pilot');
+});
+
 test('evidence review script prints a recommendation for a valid example JSON file', () => {
   const output = execFileSync(
     process.execPath,
@@ -173,9 +256,10 @@ test('evidence review script prints a recommendation for a valid example JSON fi
     },
   );
 
-  assert.match(output, /recommendation: ready_for_controlled_default_rollout/i);
+  assert.match(output, /overall recommendation:\s+ready_for_controlled_default_rollout/i);
   assert.match(output, /next action:/i);
   assert.match(output, /failed critical checks:/i);
+  assert.match(output, /rollback instruction:/i);
   assert.doesNotMatch(output, /DEEPSEEK_API_KEY/i);
   assert.doesNotMatch(output, /SUPABASE_SERVICE_ROLE_KEY/i);
   assert.doesNotMatch(output, /https:\/\/[^ ]+supabase/i);
