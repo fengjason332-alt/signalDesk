@@ -240,13 +240,17 @@ Proposed future AI enrichment flow:
 - Task 27 adds optional `--out`, `--output`, `--overwrite`, and `--from-template` support for local evidence creation plus clearer local evidence-review output
 - Task 28 keeps Today mock-by-default while tightening the read-only runtime reasons for invalid env, no-client fallback, mapping fallback, real-empty, and filter-empty states
 - Task 29 consolidates the Phase 4 pilot docs, QA runbooks, and handoff so rollback, local/private evidence, no scheduled AI enrichment, no X/Grok runtime, and no Radar/Watchlist/Library rollout stay explicit
+- Task 30 adds a local evidence-update command
+- Task 31 adds a local pilot-report command
+- Task 32 aligns the operator docs around the full local-only flow
+- Task 33 adds a bounded local help command
 - there is still no scheduled AI execution
 
 ## Remaining Tasks
 
-### Task 30: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
+### Task 34: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
 
-- run the actual target pilot with the Task 29 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
+- run the actual target pilot with the Task 33 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
 - review that local evidence before any explicit default-switch task is considered
 - preserve fallback paths and rollback paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout

@@ -62,6 +62,10 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 36. Task 27: beginner-safe pilot execution guidance and evidence UX improvements, including starter flags and clearer evidence-review output, without changing Today defaults
 37. Task 28: read-only Today real-feed runtime hardening for invalid env, no-client fallback, mapping fallback, real-empty, and filter-empty diagnostics while preserving mock-by-default
 38. Task 29: Phase 4 pilot docs, QA, and handoff consolidation so rollback, local/private evidence, no scheduled AI, no X/Grok runtime, and no Radar/Watchlist/Library rollout stay explicit
+39. Task 30: local Today pilot evidence-update command so operators can fill evidence safely without hand-editing JSON
+40. Task 31: local Today pilot Markdown report generation that stays local-only and does not switch defaults
+41. Task 32: operator-flow doc alignment for create -> check -> run -> update -> review -> report -> rollback
+42. Task 33: bounded local Today pilot help output and no-commit guidance for local/private evidence artifacts
 
 ### Current Phase 4 Status
 
@@ -94,9 +98,9 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 30: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
+### Task 34: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
 
-- run the actual operator pilot with the Task 29 checklist and fill the local evidence file
+- run the actual operator pilot with the Task 33 checklist and fill the local evidence file
 - review that evidence locally before any explicit default-switch task
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task

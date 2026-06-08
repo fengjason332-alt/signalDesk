@@ -1,9 +1,16 @@
 export const DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH =
   'docs/evidence/today-real-feed-pilot-evidence.local.json';
+export const DEFAULT_TODAY_REAL_FEED_REPORT_OUTPUT_PATH =
+  'docs/evidence/today-real-feed-pilot-report.local.md';
 
 export const TODAY_REAL_FEED_EVIDENCE_IGNORE_PATTERNS = [
   'docs/evidence/*.local.json',
   'docs/evidence/*.private.json',
+] as const;
+
+export const TODAY_REAL_FEED_REPORT_IGNORE_PATTERNS = [
+  'docs/evidence/*.local.md',
+  'docs/evidence/*.private.md',
 ] as const;
 
 export interface TodayRealFeedEvidenceStarterPlan {
@@ -56,8 +63,10 @@ export function buildTodayRealFeedEvidenceStarterPlan(
       'Run npm run phase4:today-pilot-check.',
       'Run npm run dev.',
       'Open Today.',
-      `Fill the evidence JSON at ${outputPath} while testing.`,
+      `Fill or update the evidence JSON at ${outputPath} while testing.`,
+      `Use npm run phase4:update-today-evidence -- ${outputPath} to capture local checks safely.`,
       `Run ${reviewCommand}.`,
+      `Generate a local report with npm run phase4:today-pilot-report -- ${outputPath} --out ${DEFAULT_TODAY_REAL_FEED_REPORT_OUTPUT_PATH}.`,
       'Roll back with VITE_USE_REAL_CONTENT_FEED=false.',
     ],
   };

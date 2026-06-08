@@ -1,6 +1,6 @@
 # Today Real-Feed Rollout Decision
 
-This document is maintained through Task 29. It does not switch Today to real content by default.
+This document is maintained through Task 33. It does not switch Today to real content by default.
 
 Today must remain mock by default until the criteria below are met and the team explicitly approves a later rollout task.
 
@@ -26,6 +26,10 @@ This means:
 - Task 27 adds optional evidence-starter flags plus clearer evidence-review output so the real pilot is easier to execute without guessing the next step
 - Task 28 keeps the runtime read-only while distinguishing invalid-env fallback, no-client fallback, mapping fallback, real-empty, and filter-empty states more explicitly
 - Task 29 consolidates the pilot docs so rollback, local/private evidence boundaries, and the no-default-switch rule stay aligned
+- Task 30 adds `npm run phase4:update-today-evidence` so the operator can fill local evidence safely without hand-editing JSON
+- Task 31 adds `npm run phase4:today-pilot-report` so local evidence can be turned into a Markdown report without contacting Supabase
+- Task 32 aligns the docs around a full local operator flow, including rollback and no-commit guidance
+- Task 33 adds `npm run phase4:today-help` so the bounded command flow is easy to rediscover
 
 ## Current Boundary
 
@@ -111,6 +115,7 @@ Prerequisites:
 
 - This is a QA and rollout-decision document only.
 - It does not approve switching Today to real feed by default.
+- It still requires a separate controlled rollout task even if the local evidence review says `ready_for_controlled_default_rollout`.
 - Task 20 decision: keep Today mock by default until target-environment rollout validation is complete.
 - It does not approve Radar, Watchlist, or Library real-data rollout.
 - It does not change any server-side AI scheduling boundary.

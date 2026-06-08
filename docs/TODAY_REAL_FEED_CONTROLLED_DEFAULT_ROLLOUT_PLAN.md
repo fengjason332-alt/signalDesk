@@ -1,6 +1,6 @@
 # Today Real-Feed Controlled Default Rollout Plan
 
-This document is maintained through Phase 4 Task 29. It is planning-only.
+This document is maintained through Phase 4 Task 33. It is planning-only.
 
 It does **not** switch Today to real content by default. It explains what must be true before a later explicit rollout task is allowed to change that default.
 
@@ -131,4 +131,4 @@ A future controlled default rollout is acceptable only if:
 
 This file is a **plan**, not a switch.
 
-Tasks 25 through 29 are only about making the pilot evidence easier to collect, run, judge, and keep aligned with the current safety boundaries. The app still stays mock-by-default after these tasks.
+Tasks 25 through 33 are only about making the pilot evidence easier to collect, update, review, report, and keep aligned with the current safety boundaries. The app still stays mock-by-default after these tasks.

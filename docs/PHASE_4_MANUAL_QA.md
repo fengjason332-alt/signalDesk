@@ -28,6 +28,10 @@ Important boundaries:
 - Task 27 adds beginner-safe local evidence creation flags plus clearer evidence-review output
 - Task 28 keeps Today mock-by-default while hardening the read-only real-feed runtime reasons and fallback diagnostics
 - Task 29 consolidates the pilot docs and handoff so rollback, local/private evidence, and rollout boundaries stay explicit
+- Task 30 adds `npm run phase4:update-today-evidence`
+- Task 31 adds `npm run phase4:today-pilot-report`
+- Task 32 aligns the docs around the full local operator flow
+- Task 33 adds `npm run phase4:today-help`
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -457,7 +461,12 @@ Task 20 does not switch the default feed; it records that a target-environment p
 Use [docs/TODAY_REAL_FEED_TARGET_PILOT.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_TARGET_PILOT.md) when actually running that bounded pilot.
 Run `npm run phase4:today-pilot-check` before opening the app to confirm whether the local env is still in `mock_default`, `pilot_ready`, or `pilot_misconfigured`.
 Run `npm run phase4:create-today-evidence` to create `docs/evidence/today-real-feed-pilot-evidence.local.json`.
+Run `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json ...` while testing if you want a bounded local updater instead of hand-editing JSON.
+Run `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json` after the manual checks are captured.
+Run `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md` to generate a local-only Markdown report.
+Run `npm run phase4:today-help` to reprint the bounded local-only operator flow.
 Record outcomes in [docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md) and [docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md).
+Local/private evidence files and local/private report files should not be committed.
 
 ## 11. Mock Fallback By Setting VITE_USE_REAL_CONTENT_FEED=false
 

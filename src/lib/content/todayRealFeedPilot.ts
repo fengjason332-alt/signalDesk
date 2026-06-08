@@ -1,4 +1,7 @@
-import { DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH } from './todayRealFeedEvidenceStarter';
+import {
+  DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH,
+  DEFAULT_TODAY_REAL_FEED_REPORT_OUTPUT_PATH,
+} from './todayRealFeedEvidenceStarter';
 
 export const TODAY_REAL_FEED_REQUIRED_ENV_KEYS = [
   'VITE_USE_REAL_CONTENT_FEED',
@@ -54,10 +57,22 @@ export const TODAY_REAL_FEED_PILOT_BLOCKERS = [
 ] as const;
 
 export const TODAY_REAL_FEED_PILOT_NEXT_COMMANDS = [
+  'npm run phase4:today-help',
   'npm run phase4:create-today-evidence',
   'npm run phase4:today-pilot-check',
+  `npm run phase4:update-today-evidence -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}`,
   'npm run dev',
   `npm run phase4:today-evidence-review -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}`,
+  `npm run phase4:today-pilot-report -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH} --out ${DEFAULT_TODAY_REAL_FEED_REPORT_OUTPUT_PATH}`,
+] as const;
+
+export const TODAY_REAL_FEED_PILOT_BOUNDARIES = [
+  'Local-only helper flow.',
+  'No Supabase call unless the app is running separately during manual QA.',
+  'No AI call.',
+  'No content write.',
+  'No secret values printed.',
+  'Do not commit local evidence or local pilot reports.',
 ] as const;
 
 type TodayRealFeedRequiredEnvKey = (typeof TODAY_REAL_FEED_REQUIRED_ENV_KEYS)[number];
@@ -83,6 +98,7 @@ export interface TodayRealFeedPilotCheck {
   passCriteria: readonly string[];
   evidenceToCollect: readonly string[];
   blockers: readonly string[];
+  boundaries: readonly string[];
 }
 
 function hasNonEmptyValue(value: string | undefined): boolean {
@@ -115,6 +131,7 @@ export function buildTodayRealFeedPilotCheck(
       passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
       evidenceToCollect: TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
       blockers: TODAY_REAL_FEED_PILOT_BLOCKERS,
+      boundaries: TODAY_REAL_FEED_PILOT_BOUNDARIES,
     };
   }
 
@@ -137,6 +154,7 @@ export function buildTodayRealFeedPilotCheck(
       passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
       evidenceToCollect: TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
       blockers: TODAY_REAL_FEED_PILOT_BLOCKERS,
+      boundaries: TODAY_REAL_FEED_PILOT_BOUNDARIES,
     };
   }
 
@@ -155,5 +173,6 @@ export function buildTodayRealFeedPilotCheck(
     passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
     evidenceToCollect: TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
     blockers: TODAY_REAL_FEED_PILOT_BLOCKERS,
+    boundaries: TODAY_REAL_FEED_PILOT_BOUNDARIES,
   };
 }

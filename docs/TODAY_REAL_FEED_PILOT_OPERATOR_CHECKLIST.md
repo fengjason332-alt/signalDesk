@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Operator Checklist
 
-This document is maintained through Phase 4 Task 29.
+This document is maintained through Phase 4 Task 33.
 
 It is a beginner-friendly manual checklist for running the Today real-feed pilot without changing the default product behavior.
 
@@ -20,8 +20,11 @@ You will use:
 - `npm run phase4:today-pilot-check`
 - `npm run phase4:create-today-evidence`
 - optional: `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
+- `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true`
 - `npm run dev`
 - `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json`
+- `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
+- `npm run phase4:today-help`
 
 Your local evidence file should live at:
 - `docs/evidence/today-real-feed-pilot-evidence.local.json`
@@ -63,13 +66,20 @@ That file is meant to stay local and should not be committed.
    - restart or rebuild as needed
    - confirm Today is back on mock
 21. Fill the evidence JSON while testing.
-22. Run:
+22. If you do not want to hand-edit JSON, use `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json ...`.
+23. Run:
 
 ```bash
 npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json
 ```
 
-23. Record the recommendation:
+24. Generate a local Markdown report:
+
+```bash
+npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md
+```
+
+25. Record the recommendation:
    - `continue_pilot`
    - `keep_mock_default`
    - `ready_for_controlled_default_rollout`
@@ -107,6 +117,7 @@ npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evid
 - Do not upload or share secrets.
 - Do not include publishable keys, service-role keys, DeepSeek keys, or write tokens in screenshots.
 - Do not commit your local/private evidence files.
+- Do not commit your local/private pilot report files either.
 
 ## Rollback Reminder
 

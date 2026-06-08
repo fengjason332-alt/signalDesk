@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is maintained through Phase 4 Task 29. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is maintained through Phase 4 Task 33. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -22,10 +22,15 @@ Client-side env:
 Local helper command:
 - `npm run phase4:today-pilot-check`
 - `npm run phase4:create-today-evidence`
+- `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true`
 - `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
+- `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
+- `npm run phase4:today-help`
 - `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
 - The evidence-review command is local-only. It does not call Supabase, does not call AI providers, and does not write content.
+- The evidence-update and pilot-report commands are also local-only. They do not call Supabase, do not call AI providers, and do not write app content.
 - Local operator evidence should live in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another gitignored local/private JSON path.
+- Local operator reports should live in `docs/evidence/today-real-feed-pilot-report.local.md` or another gitignored local/private Markdown path.
 
 Important boundaries:
 - no `SUPABASE_SERVICE_ROLE_KEY` in the frontend
@@ -154,9 +159,27 @@ Then fill in the fields in that local file and review it locally:
 npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json
 ```
 
+If you prefer not to hand-edit JSON, update the file incrementally:
+
+```bash
+npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true --detail-opened-safely true
+```
+
+Generate a local Markdown report after review:
+
+```bash
+npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md
+```
+
 Do not commit local/private evidence files. Keep real operator notes in gitignored files such as:
 - `docs/evidence/*.local.json`
 - `docs/evidence/*.private.json`
+- `docs/evidence/*.local.md`
+- `docs/evidence/*.private.md`
+
+The local evidence file and local report file should not be committed.
+
+Even a passing local report does not switch Today by default. A separate controlled rollout task is still required.
 
 ## Template Field Meanings
 

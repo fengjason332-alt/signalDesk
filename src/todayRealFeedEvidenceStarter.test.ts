@@ -9,6 +9,7 @@ import {
   buildTodayRealFeedEvidenceStarterPlan,
   DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH,
   TODAY_REAL_FEED_EVIDENCE_IGNORE_PATTERNS,
+  TODAY_REAL_FEED_REPORT_IGNORE_PATTERNS,
 } from './lib/content/todayRealFeedEvidenceStarter';
 import {
   evaluateTodayPilotEvidence,
@@ -163,6 +164,10 @@ test('package ignore patterns protect local and private evidence files', () => {
   assert.deepEqual(TODAY_REAL_FEED_EVIDENCE_IGNORE_PATTERNS, [
     'docs/evidence/*.local.json',
     'docs/evidence/*.private.json',
+  ]);
+  assert.deepEqual(TODAY_REAL_FEED_REPORT_IGNORE_PATTERNS, [
+    'docs/evidence/*.local.md',
+    'docs/evidence/*.private.md',
   ]);
 });
 

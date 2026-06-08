@@ -36,6 +36,11 @@ for (const command of result.nextCommands) {
   lines.push(`- ${command}`);
 }
 
+lines.push('boundaries:');
+for (const boundary of result.boundaries) {
+  lines.push(`- ${boundary}`);
+}
+
 lines.push('rollback steps:');
 for (const step of result.rollbackSteps) {
   lines.push(`- ${step}`);

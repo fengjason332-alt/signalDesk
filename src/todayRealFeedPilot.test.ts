@@ -7,6 +7,7 @@ import { resolve } from 'node:path';
 import {
   buildTodayRealFeedPilotCheck,
   TODAY_REAL_FEED_PILOT_BLOCKERS,
+  TODAY_REAL_FEED_PILOT_BOUNDARIES,
   TODAY_REAL_FEED_PILOT_CHECKS,
   TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
   TODAY_REAL_FEED_PILOT_NEXT_COMMANDS,
@@ -38,12 +39,13 @@ test('buildTodayRealFeedPilotCheck keeps Today mock-by-default when env flag is 
       passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,
       evidenceToCollect: TODAY_REAL_FEED_PILOT_EVIDENCE_TO_COLLECT,
       blockers: TODAY_REAL_FEED_PILOT_BLOCKERS,
+      boundaries: TODAY_REAL_FEED_PILOT_BOUNDARIES,
     },
   );
 });
 
 test('buildTodayRealFeedPilotCheck marks the pilot ready only when explicit Supabase env is present', () => {
-  const result = buildTodayRealFeedPilotCheck({
+const result = buildTodayRealFeedPilotCheck({
     VITE_USE_REAL_CONTENT_FEED: 'true',
     VITE_SUPABASE_URL: 'https://example.supabase.co',
     VITE_SUPABASE_ANON_KEY: 'public-anon-key',
@@ -103,12 +105,16 @@ test('local Today pilot helper script prints a bounded pilot-ready summary witho
   assert.match(output, /shouldAttemptRealFeedRead: true/i);
   assert.match(output, /next commands:/i);
   assert.match(output, /phase4:create-today-evidence/i);
+  assert.match(output, /phase4:update-today-evidence/i);
   assert.match(output, /phase4:today-evidence-review -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i);
+  assert.match(output, /phase4:today-pilot-report -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json --out docs\/evidence\/today-real-feed-pilot-report\.local\.md/i);
   assert.match(output, /npm run dev/i);
   assert.match(output, /rollback steps:/i);
   assert.match(output, /pass criteria:/i);
   assert.match(output, /evidence to collect:/i);
   assert.match(output, /default-switch blockers:/i);
+  assert.match(output, /no ai call/i);
+  assert.match(output, /no content write/i);
   assert.match(output, /manual checks:/i);
   assert.match(output, /real_empty/i);
   assert.match(output, /no fake body content/i);
@@ -128,6 +134,27 @@ test('package.json exposes the bounded local Today pilot helper command', () => 
   assert.equal(
     packageJson.scripts?.['phase4:today-pilot-check'],
     'node --import tsx scripts/phase4-today-real-feed-pilot.ts',
+  );
+});
+
+test('package.json exposes the local Today pilot update, report, and help commands', () => {
+  const packageJson = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'package.json'), 'utf8'),
+  ) as {
+    scripts?: Record<string, string>;
+  };
+
+  assert.equal(
+    packageJson.scripts?.['phase4:update-today-evidence'],
+    'node --import tsx scripts/phase4-update-today-real-feed-evidence.ts',
+  );
+  assert.equal(
+    packageJson.scripts?.['phase4:today-pilot-report'],
+    'node --import tsx scripts/phase4-today-real-feed-pilot-report.ts',
+  );
+  assert.equal(
+    packageJson.scripts?.['phase4:today-help'],
+    'node --import tsx scripts/phase4-today-real-feed-help.ts',
   );
 });
 
@@ -152,4 +179,27 @@ test('today real-feed pilot contract exposes bounded evidence, rollback, pass cr
       'Preview-read fallback is unreliable or confusing.',
     ),
   );
+});
+
+test('local Today help command prints the full bounded operator flow', () => {
+  const scriptPath = resolve(process.cwd(), 'scripts/phase4-today-real-feed-help.ts');
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', scriptPath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.match(output, /phase4:create-today-evidence/i);
+  assert.match(output, /phase4:today-pilot-check/i);
+  assert.match(output, /phase4:update-today-evidence/i);
+  assert.match(output, /phase4:today-evidence-review/i);
+  assert.match(output, /phase4:today-pilot-report/i);
+  assert.match(output, /rollback/i);
+  assert.match(output, /do not commit local evidence or local pilot reports/i);
+  assert.match(output, /no ai call/i);
+  assert.match(output, /no content write/i);
+  assert.match(output, /no supabase call unless the app is running separately/i);
 });

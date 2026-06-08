@@ -8,3 +8,5 @@ coverage/
 !.env.example
 docs/evidence/*.local.json
 docs/evidence/*.private.json
+docs/evidence/*.local.md
+docs/evidence/*.private.md

@@ -23,6 +23,9 @@ Local helper command:
 - `npm run phase4:today-pilot-check`
 - `npm run phase4:create-today-evidence`
 - `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
+- `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true`
+- `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
+- `npm run phase4:today-help`
 - This helper is local-only. It does not call Supabase, does not call AI providers, and does not write content.
 - Record pilot outcomes in `docs/evidence/today-real-feed-pilot-evidence.local.json`.
 - Keep local/private evidence files uncommitted.
@@ -75,7 +78,9 @@ To confirm the normal default remains intact:
 5. Open Today.
 6. Run `npm run phase4:create-today-evidence`.
 7. Start recording observations in `docs/evidence/today-real-feed-pilot-evidence.local.json`.
-8. When the checklist is complete, review the recorded JSON evidence locally with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>`.
+8. Update the local evidence file while testing with `npm run phase4:update-today-evidence -- <path-to-local-evidence-json> ...` if you do not want to hand-edit JSON.
+9. When the checklist is complete, review the recorded JSON evidence locally with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>`.
+10. Generate a local Markdown report with `npm run phase4:today-pilot-report -- <path-to-local-evidence-json> --out docs/evidence/today-real-feed-pilot-report.local.md`.
 
 Expected:
 - real cards render with the existing style
@@ -161,3 +166,4 @@ Stop the pilot and revert to mock immediately if any of these happen:
 - Do not add frontend content writes.
 - Do not add X/Grok runtime.
 - Do not add App Store or Capacitor runtime changes.
+- Do not commit local/private evidence or local/private report files.
