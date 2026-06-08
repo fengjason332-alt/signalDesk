@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Operator Checklist
 
-This document is for Phase 4 Task 26.
+This document is maintained through Phase 4 Task 29.
 
 It is a beginner-friendly manual checklist for running the Today real-feed pilot without changing the default product behavior.
 
@@ -19,6 +19,7 @@ Today still remains mock-by-default.
 You will use:
 - `npm run phase4:today-pilot-check`
 - `npm run phase4:create-today-evidence`
+- optional: `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
 - `npm run dev`
 - `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 
@@ -105,7 +106,7 @@ npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evid
 
 - Do not upload or share secrets.
 - Do not include publishable keys, service-role keys, DeepSeek keys, or write tokens in screenshots.
-- Do not commit your local evidence file if it contains private notes.
+- Do not commit your local/private evidence files.
 
 ## Rollback Reminder
 

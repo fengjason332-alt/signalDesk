@@ -1,6 +1,6 @@
 # Today Real-Feed Rollout Decision
 
-This document is maintained through Task 20. It does not switch Today to real content by default.
+This document is maintained through Task 29. It does not switch Today to real content by default.
 
 Today must remain mock by default until the criteria below are met and the team explicitly approves a later rollout task.
 
@@ -23,6 +23,9 @@ This means:
 - Task 24 adds `npm run phase4:today-evidence-review` plus local example JSON files so pilot evidence can be reviewed conservatively before any future default-switch preparation
 - Task 25 adds `docs/TODAY_REAL_FEED_CONTROLLED_DEFAULT_ROLLOUT_PLAN.md` plus a beginner-friendly evidence template so the next rollout step can stay explicit and reversible
 - Task 26 adds `npm run phase4:create-today-evidence` plus `docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md` so a beginner operator can create a local evidence file and run the pilot more safely
+- Task 27 adds optional evidence-starter flags plus clearer evidence-review output so the real pilot is easier to execute without guessing the next step
+- Task 28 keeps the runtime read-only while distinguishing invalid-env fallback, no-client fallback, mapping fallback, real-empty, and filter-empty states more explicitly
+- Task 29 consolidates the pilot docs so rollback, local/private evidence boundaries, and the no-default-switch rule stay aligned
 
 ## Current Boundary
 

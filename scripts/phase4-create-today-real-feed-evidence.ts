@@ -6,10 +6,9 @@ import {
   DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH,
 } from '../src/lib/content/todayRealFeedEvidenceStarter';
 
-const TEMPLATE_PATH = 'docs/examples/today-real-feed-pilot-evidence.template.json';
-
 function parseArgs(argv: string[]) {
   let outputPath = DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH;
+  let templatePath = 'docs/examples/today-real-feed-pilot-evidence.template.json';
   let overwrite = false;
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -20,33 +19,54 @@ function parseArgs(argv: string[]) {
       continue;
     }
 
-    if (current === '--output') {
+    if (current === '--output' || current === '--out') {
       const nextValue = argv[index + 1];
       if (!nextValue) {
-        process.stderr.write('Error: --output requires a path value.\n');
+        process.stderr.write(`Error: ${current} requires a path value.\n`);
         process.exit(1);
       }
       outputPath = nextValue;
       index += 1;
+      continue;
+    }
+
+    if (current === '--from-template') {
+      const nextValue = argv[index + 1];
+      if (!nextValue) {
+        process.stderr.write('Error: --from-template requires a path value.\n');
+        process.exit(1);
+      }
+      templatePath = nextValue;
+      index += 1;
     }
   }
 
-  return { outputPath, overwrite };
+  return { outputPath, templatePath, overwrite };
 }
 
 const args = parseArgs(process.argv.slice(2));
-const templatePath = resolve(process.cwd(), TEMPLATE_PATH);
 const resolvedOutputPath = resolve(process.cwd(), args.outputPath);
+const resolvedTemplatePath = resolve(process.cwd(), args.templatePath);
 const fileAlreadyExists = existsSync(resolvedOutputPath);
 const plan = buildTodayRealFeedEvidenceStarterPlan({
   fileAlreadyExists,
   outputPath: args.outputPath,
+  templatePath: args.templatePath,
   overwrite: args.overwrite,
 });
 
 if (plan.shouldWrite) {
+  let templateContents = '';
+
+  try {
+    templateContents = readFileSync(resolvedTemplatePath, 'utf8');
+  } catch {
+    process.stderr.write('Error: could not read the evidence template file.\n');
+    process.exit(1);
+  }
+
   mkdirSync(dirname(resolvedOutputPath), { recursive: true });
-  writeFileSync(resolvedOutputPath, readFileSync(templatePath, 'utf8'), 'utf8');
+  writeFileSync(resolvedOutputPath, templateContents, 'utf8');
 }
 
 const lines = [
@@ -61,6 +81,7 @@ if (!plan.shouldWrite) {
   lines.push('Use --overwrite only if you intentionally want to replace your local notes.');
 }
 
+lines.push(`Template used: ${plan.templatePath}`);
 lines.push('Next steps:');
 for (const step of plan.nextSteps) {
   lines.push(`- ${step}`);

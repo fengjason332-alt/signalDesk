@@ -25,6 +25,9 @@ Important boundaries:
 - Task 24 adds a local evidence-review command: `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
 - Task 25 adds a stronger beginner-friendly template at `docs/examples/today-real-feed-pilot-evidence.template.json`
 - Task 26 adds `npm run phase4:create-today-evidence`, a gitignored local evidence file path under `docs/evidence/`, and a dedicated operator checklist in `docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md`
+- Task 27 adds beginner-safe local evidence creation flags plus clearer evidence-review output
+- Task 28 keeps Today mock-by-default while hardening the read-only real-feed runtime reasons and fallback diagnostics
+- Task 29 consolidates the pilot docs and handoff so rollback, local/private evidence, and rollout boundaries stay explicit
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -298,11 +301,15 @@ After a target-environment Today pilot has been observed manually:
 
 1. Run `npm run phase4:create-today-evidence`.
 2. Record the bounded observations in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another local JSON file that follows the same fields.
-2. If you want a beginner-friendly starting point, copy:
+3. If you want a beginner-friendly starting point, create a custom local copy:
+
+```bash
+npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json
+```
 
 The starter command does not overwrite your local evidence file unless you explicitly ask it to.
 
-3. Review the fake examples first:
+4. Review the fake examples first:
 
 ```bash
 npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json
@@ -310,7 +317,7 @@ npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evid
 npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.blocked.example.json
 ```
 
-4. Then review your local evidence file with:
+5. Then review your local evidence file with:
 
 ```bash
 npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json
@@ -323,6 +330,7 @@ Expected conceptually:
 - no Supabase calls
 - no AI provider calls
 - no content writes
+- local/private evidence files should not be committed
 
 SQL inspection snippets:
 

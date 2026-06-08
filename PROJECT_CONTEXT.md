@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-26: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, stronger feed-mode diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback and blocker docs, a Task 21 target-environment pilot runbook, a Task 22 local pilot helper plus QA hardening, a Task 23 pilot-evidence preparation doc and helper output expansion, Task 24 local pilot-evidence review tooling, Task 25 stricter pilot-evidence hardening plus a controlled default-rollout preparation plan, Task 26 local manual-pilot execution support with a local evidence-starter command and operator checklist, and a planning-only future X/Grok user-curated source connector path
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-29: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, stronger feed-mode diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback and blocker docs, a Task 21 target-environment pilot runbook, a Task 22 local pilot helper plus QA hardening, a Task 23 pilot-evidence preparation doc and helper output expansion, Task 24 local pilot-evidence review tooling, Task 25 stricter pilot-evidence hardening plus a controlled default-rollout preparation plan, Task 26 local manual-pilot execution support with a local evidence-starter command and operator checklist, Task 27 beginner-safe pilot execution guidance/evidence UX improvements, Task 28 read-only real-feed runtime hardening, Task 29 docs and handoff consolidation, and a planning-only future X/Grok user-curated source connector path
 
 ## Current App Architecture
 
@@ -76,9 +76,13 @@ Phase 4 read path:
   - `fallback_to_mock`
   - `real_empty`
 - feed-mode reasons now also distinguish:
-  - env disabled
+  - mock default
+  - rollback to mock
   - real rows loaded
   - zero preview-safe rows
+  - filter-empty after a successful real load
+  - fallback because frontend Supabase env is missing or invalid
+  - fallback because the preview client is unavailable
   - fallback because preview reads failed
   - fallback because all eligible rows failed mapping
 - safe Detail preview with provenance and limited-preview messaging when full body content is unavailable
@@ -189,6 +193,9 @@ Confirmed current working state:
 - Task 24 adds `src/lib/content/todayRealFeedPilotEvidence.ts` plus `npm run phase4:today-evidence-review` so local pilot evidence can be reviewed conservatively without contacting Supabase or changing runtime defaults
 - Task 25 adds a stronger user-fillable template JSON, stricter rollout-readiness checks, and a planning-only controlled default-rollout doc without changing any runtime default
 - Task 26 adds `npm run phase4:create-today-evidence`, a gitignored local evidence folder, and a beginner-friendly operator checklist so the real Today pilot is easier to run manually without changing defaults
+- Task 27 adds optional evidence-starter flags plus clearer evidence-review output so a beginner operator can create and review local pilot evidence without guesswork
+- Task 28 keeps Today mock-by-default while tightening the read-only runtime reasons for invalid env, no-client fallback, mapping fallback, real-empty, and filter-empty diagnostics
+- Task 29 consolidates the pilot docs and handoff so rollback, local/private evidence, no scheduled AI enrichment, no X/Grok runtime, and no Radar/Watchlist/Library rollout stay explicit
 
 ## Environment And Deployment
 
@@ -242,8 +249,8 @@ Manual SQL assets:
 
 ## Next Recommended Task
 
-Phase 4 Task 27:
-- run the actual target-environment Today pilot with the Task 26 checklist and fill the local evidence file
+Phase 4 Task 30:
+- run the actual target-environment Today pilot with the Task 29 checklist and fill the local evidence file
 - review that local evidence before any explicit default-switch task is considered
 - keep Today mock-by-default unless a later explicit task changes that
 - keep Radar, Watchlist, and Library on current behavior

@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
 import {
   createEmptyTodayPilotEvidence,
@@ -258,6 +259,7 @@ test('evidence review script prints a recommendation for a valid example JSON fi
 
   assert.match(output, /overall recommendation:\s+ready_for_controlled_default_rollout/i);
   assert.match(output, /next action:/i);
+  assert.match(output, /what to fix next:/i);
   assert.match(output, /failed critical checks:/i);
   assert.match(output, /rollback instruction:/i);
   assert.doesNotMatch(output, /DEEPSEEK_API_KEY/i);
@@ -277,4 +279,41 @@ test('evidence review script returns a clear error for a missing file', () => {
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr || result.stdout, /could not read evidence file/i);
+});
+
+test('evidence review script does not print env values or secrets when reviewing local evidence', () => {
+  const result = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', reviewScriptPath, templateExamplePath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+      },
+    },
+  );
+
+  assert.equal(result.status, 0);
+  assert.doesNotMatch(result.stdout, /VITE_SUPABASE_URL=/i);
+  assert.doesNotMatch(result.stdout, /VITE_SUPABASE_ANON_KEY=/i);
+});
+
+test('evidence review script returns a clear error for invalid evidence JSON', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-invalid-evidence-'));
+  const invalidPath = resolve(tempDir, 'invalid-evidence.json');
+
+  writeFileSync(invalidPath, '{"pilot_environment":123', 'utf8');
+
+  const result = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', reviewScriptPath, invalidPath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr || result.stdout, /evidence file is invalid|could not read evidence file/i);
 });

@@ -45,6 +45,22 @@ type SupabaseErrorLike = {
   code?: string | null;
 };
 
+export type TodayRealFeedRuntimeReason =
+  | 'mock_default'
+  | 'rollback_to_mock'
+  | 'real_loaded'
+  | 'real_empty'
+  | 'filter_empty'
+  | 'fallback_no_client'
+  | 'fallback_read_failed'
+  | 'fallback_mapping_failed'
+  | 'fallback_invalid_env';
+
+export type TodayRealFeedClientStatus =
+  | 'ready'
+  | 'invalid_env'
+  | 'no_client';
+
 export interface RealContentFeedTopicRow {
   relevance_score?: number | null;
   topic_id?: string | null;
@@ -143,14 +159,7 @@ export interface LoadTodaySignalsResult {
   signals: Signal[];
   source: 'mock' | 'real';
   feedMode: 'mock' | 'real' | 'fallback_to_mock' | 'real_empty';
-  feedReason:
-    | 'env_disabled'
-    | 'rollback_to_mock'
-    | 'real_loaded'
-    | 'real_zero_rows'
-    | 'fallback_no_client'
-    | 'fallback_read_failed'
-    | 'fallback_all_rows_failed_mapping';
+  feedReason: Exclude<TodayRealFeedRuntimeReason, 'filter_empty'>;
   usedFallback: boolean;
   errorMessage: string | null;
   isEmpty: boolean;
@@ -160,7 +169,7 @@ export interface TodayFeedViewState {
   viewState: 'cards' | 'real_empty' | 'filter_empty' | 'empty';
   message: string;
   filterExcludedAllSignals: boolean;
-  feedReason: LoadTodaySignalsResult['feedReason'];
+  feedReason: TodayRealFeedRuntimeReason;
 }
 
 export type TodayRealFeedRolloutMode =
@@ -896,8 +905,22 @@ export function resolveTodayRealFeedRolloutMode({
 
 export function resolveTodayFeedDisabledReason(
   rolloutMode: TodayRealFeedRolloutMode,
-): Extract<LoadTodaySignalsResult['feedReason'], 'env_disabled' | 'rollback_to_mock'> {
-  return rolloutMode === 'rollback_to_mock' ? 'rollback_to_mock' : 'env_disabled';
+): Extract<LoadTodaySignalsResult['feedReason'], 'mock_default' | 'rollback_to_mock'> {
+  return rolloutMode === 'rollback_to_mock' ? 'rollback_to_mock' : 'mock_default';
+}
+
+export function resolveTodayRealFeedClientStatus({
+  client,
+  isFrontendSupabaseConfigured,
+}: {
+  client: RealContentFeedLoaderClient | null;
+  isFrontendSupabaseConfigured: boolean;
+}): TodayRealFeedClientStatus {
+  if (client) {
+    return 'ready';
+  }
+
+  return isFrontendSupabaseConfigured ? 'no_client' : 'invalid_env';
 }
 
 export const todayRealFeedRolloutMode = resolveTodayRealFeedRolloutMode({
@@ -941,12 +964,19 @@ export function resolveTodayFeedViewState({
   totalFeedSignals: number;
   filteredSignalCount: number;
 }): TodayFeedViewState {
+  const runtimeReason = resolveTodayFeedRuntimeReason({
+    feedMode,
+    feedReason,
+    totalFeedSignals,
+    filteredSignalCount,
+  });
+
   if (filteredSignalCount > 0) {
     return {
       viewState: 'cards',
       message: '',
       filterExcludedAllSignals: false,
-      feedReason,
+      feedReason: runtimeReason,
     };
   }
 
@@ -955,7 +985,7 @@ export function resolveTodayFeedViewState({
       viewState: 'real_empty',
       message: REAL_CONTENT_FEED_EMPTY_MESSAGE,
       filterExcludedAllSignals: false,
-      feedReason,
+      feedReason: runtimeReason,
     };
   }
 
@@ -964,7 +994,7 @@ export function resolveTodayFeedViewState({
       viewState: 'filter_empty',
       message: REAL_CONTENT_FILTER_EMPTY_MESSAGE,
       filterExcludedAllSignals: true,
-      feedReason,
+      feedReason: runtimeReason,
     };
   }
 
@@ -972,8 +1002,30 @@ export function resolveTodayFeedViewState({
     viewState: 'empty',
     message: 'No signals found matching your current filters.',
     filterExcludedAllSignals: false,
-    feedReason,
+    feedReason: runtimeReason,
   };
+}
+
+export function resolveTodayFeedRuntimeReason({
+  feedMode,
+  feedReason,
+  totalFeedSignals,
+  filteredSignalCount,
+}: {
+  feedMode: LoadTodaySignalsResult['feedMode'];
+  feedReason: LoadTodaySignalsResult['feedReason'];
+  totalFeedSignals: number;
+  filteredSignalCount: number;
+}): TodayRealFeedRuntimeReason {
+  if (filteredSignalCount <= 0 && feedMode === 'real' && totalFeedSignals > 0) {
+    return 'filter_empty';
+  }
+
+  if (filteredSignalCount <= 0 && feedMode === 'real_empty' && totalFeedSignals === 0) {
+    return 'real_empty';
+  }
+
+  return feedReason;
 }
 
 // Phase 4 preview only: this adapter is intentionally deterministic and
@@ -1116,14 +1168,16 @@ export async function loadTodaySignals({
   enableRealContentFeed,
   client,
   mockSignals,
-  disabledReason = 'env_disabled',
+  clientStatus = client ? 'ready' : 'no_client',
+  disabledReason = 'mock_default',
 }: {
   enableRealContentFeed: boolean;
   client: RealContentFeedLoaderClient | null;
+  clientStatus?: TodayRealFeedClientStatus;
   mockSignals: Signal[];
   disabledReason?: Extract<
     LoadTodaySignalsResult['feedReason'],
-    'env_disabled' | 'rollback_to_mock'
+    'mock_default' | 'rollback_to_mock'
   >;
 }): Promise<LoadTodaySignalsResult> {
   if (!enableRealContentFeed) {
@@ -1139,14 +1193,16 @@ export async function loadTodaySignals({
   }
 
   if (!client) {
+    const invalidEnv = clientStatus === 'invalid_env';
     const result: LoadTodaySignalsResult = {
       signals: [...mockSignals],
       source: 'mock',
       feedMode: 'fallback_to_mock',
-      feedReason: 'fallback_no_client',
+      feedReason: invalidEnv ? 'fallback_invalid_env' : 'fallback_no_client',
       usedFallback: true,
-      errorMessage:
-        '[Phase 4 real content preview] Supabase client is not configured for frontend reads.',
+      errorMessage: invalidEnv
+        ? '[Phase 4 real content preview] Frontend Supabase env is missing or invalid for preview reads.'
+        : '[Phase 4 real content preview] Supabase client is not configured for frontend reads.',
       isEmpty: false,
     };
     logTodayFeedMode(result.feedMode, result.feedReason, {
@@ -1165,7 +1221,7 @@ export async function loadTodaySignals({
         signals: [...mockSignals],
         source: 'mock',
         feedMode: 'fallback_to_mock',
-        feedReason: 'fallback_all_rows_failed_mapping',
+        feedReason: 'fallback_mapping_failed',
         usedFallback: true,
         errorMessage:
           `[Phase 4 real content preview] All eligible preview rows failed mapping. rowsFetched=${diagnostics.rowsFetched} skippedRows=${diagnostics.skippedRows}.`,
@@ -1190,7 +1246,7 @@ export async function loadTodaySignals({
       signals,
       source: 'real',
       feedMode: signals.length === 0 ? 'real_empty' : 'real',
-      feedReason: signals.length === 0 ? 'real_zero_rows' : 'real_loaded',
+      feedReason: signals.length === 0 ? 'real_empty' : 'real_loaded',
       usedFallback: false,
       errorMessage: emptyDebugMessage,
       isEmpty: signals.length === 0,

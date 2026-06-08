@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is for Phase 4 Task 26. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is maintained through Phase 4 Task 29. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -23,6 +23,7 @@ Local helper command:
 - `npm run phase4:today-pilot-check`
 - `npm run phase4:create-today-evidence`
 - `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
+- `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
 - The evidence-review command is local-only. It does not call Supabase, does not call AI providers, and does not write content.
 - Local operator evidence should live in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another gitignored local/private JSON path.
 
@@ -145,6 +146,7 @@ npm run phase4:create-today-evidence
 
 That command creates `docs/evidence/today-real-feed-pilot-evidence.local.json` unless it already exists.
 It uses `docs/examples/today-real-feed-pilot-evidence.template.json` as the starter template.
+You can also pass `--out`, `--output`, `--overwrite`, or `--from-template` for a bounded local-only workflow.
 
 Then fill in the fields in that local file and review it locally:
 

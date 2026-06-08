@@ -16,15 +16,30 @@ export const resolveSupabaseClientConfig = ({
 }) => {
   const normalizedUrl = normalizeSupabaseEnvValue(url);
   const normalizedAnonKey = normalizeSupabaseEnvValue(anonKey);
+  let hasValidUrl = false;
+
+  if (normalizedUrl) {
+    try {
+      const parsedUrl = new URL(normalizedUrl);
+      hasValidUrl =
+        parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:';
+    } catch {
+      hasValidUrl = false;
+    }
+  }
+
+  const hasRequiredValues = Boolean(normalizedUrl && normalizedAnonKey);
 
   return {
     url: normalizedUrl,
     anonKey: normalizedAnonKey,
-    isConfigured: Boolean(normalizedUrl && normalizedAnonKey),
+    hasRequiredValues,
+    hasValidUrl,
+    isConfigured: hasRequiredValues && hasValidUrl,
   };
 };
 
-const supabaseConfig = resolveSupabaseClientConfig({
+export const supabaseConfig = resolveSupabaseClientConfig({
   url: import.meta.env?.VITE_SUPABASE_URL,
   anonKey: import.meta.env?.VITE_SUPABASE_ANON_KEY,
 });

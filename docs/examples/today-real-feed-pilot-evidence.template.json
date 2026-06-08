@@ -1,4 +1,15 @@
 {
+  "_template_notes": [
+    "Fill this file locally after running the Today real-feed pilot.",
+    "Use true/false only after you have manually checked the behavior.",
+    "Keep local/private evidence files out of git."
+  ],
+  "_starter_commands": [
+    "npm run phase4:create-today-evidence",
+    "npm run phase4:today-pilot-check",
+    "npm run dev",
+    "npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json"
+  ],
   "pilot_environment": "fill-me-target-environment",
   "tested_at": "2026-06-01T00:00:00.000Z",
   "tester": "your-name",

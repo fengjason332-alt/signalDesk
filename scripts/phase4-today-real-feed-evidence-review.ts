@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import {
   evaluateTodayPilotEvidence,
   parseTodayPilotEvidence,
+  type TodayPilotEvidenceEvaluation,
 } from '../src/lib/content/todayRealFeedPilotEvidence';
 
 const evidencePathArg = process.argv[2];
@@ -45,6 +46,30 @@ function formatList(label: string, values: string[]) {
   return `${label}:\n- ${values.join('\n- ')}`;
 }
 
+function buildWhatToFixNext(review: TodayPilotEvidenceEvaluation) {
+  if (review.failedCriticalChecks.length > 0) {
+    return review.failedCriticalChecks.map(
+      fieldName => `Resolve the critical check: ${fieldName}.`,
+    );
+  }
+
+  if (review.missingRequiredChecks.length > 0) {
+    return review.missingRequiredChecks.map(
+      fieldName => `Capture and confirm the missing check: ${fieldName}.`,
+    );
+  }
+
+  if (review.warnings.length > 0) {
+    return review.warnings.map(warning => `Follow up on the warning: ${warning}`);
+  }
+
+  return [
+    'No immediate fixes are required. Keep Today mock-by-default until the rollout evidence is explicitly accepted.',
+  ];
+}
+
+const whatToFixNext = buildWhatToFixNext(review);
+
 const lines = [
   'SignalDesk Today real-feed evidence review',
   '',
@@ -55,6 +80,7 @@ const lines = [
   formatList('Failed critical checks', review.failedCriticalChecks),
   formatList('Warnings', review.warnings),
   `Next action: ${review.nextAction}`,
+  formatList('What to fix next', whatToFixNext),
   'Rollback instruction:',
   '- Set VITE_USE_REAL_CONTENT_FEED=false',
   '- Restart locally with npm run dev, or rebuild/redeploy the target environment',

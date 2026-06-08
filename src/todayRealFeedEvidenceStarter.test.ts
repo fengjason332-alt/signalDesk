@@ -59,6 +59,26 @@ test('create evidence script generates a valid local evidence file that starts a
   assert.match(output, /npm run phase4:today-evidence-review/i);
 });
 
+test('create evidence script supports --out as a custom output path alias', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-today-evidence-out-'));
+  const outputPath = resolve(tempDir, 'custom-evidence.local.json');
+
+  execFileSync(
+    process.execPath,
+    ['--import', 'tsx', createEvidenceScriptPath, '--out', outputPath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const parsed = parseTodayPilotEvidence(
+    JSON.parse(readFileSync(outputPath, 'utf8')),
+  );
+
+  assert.equal(parsed.environmentLabel, 'fill-me-target-environment');
+});
+
 test('create evidence script does not overwrite an existing local evidence file without --overwrite', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-today-evidence-no-overwrite-'));
   const outputPath = resolve(tempDir, 'today-real-feed-pilot-evidence.local.json');
@@ -78,6 +98,65 @@ test('create evidence script does not overwrite an existing local evidence file 
   assert.equal(readFileSync(outputPath, 'utf8'), originalContent);
   assert.match(output, /already exists/i);
   assert.match(output, /--overwrite/i);
+});
+
+test('create evidence script overwrites an existing local evidence file only with --overwrite', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-today-evidence-overwrite-'));
+  const outputPath = resolve(tempDir, 'today-real-feed-pilot-evidence.local.json');
+
+  writeFileSync(outputPath, '{"keep":"old-notes"}\n', 'utf8');
+
+  execFileSync(
+    process.execPath,
+    ['--import', 'tsx', createEvidenceScriptPath, '--output', outputPath, '--overwrite'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const parsed = parseTodayPilotEvidence(
+    JSON.parse(readFileSync(outputPath, 'utf8')),
+  );
+  assert.equal(parsed.environmentLabel, 'fill-me-target-environment');
+});
+
+test('create evidence script supports a custom template file with --from-template', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-today-evidence-template-'));
+  const outputPath = resolve(tempDir, 'today-real-feed-pilot-evidence.local.json');
+  const customTemplatePath = resolve(tempDir, 'custom-template.json');
+
+  writeFileSync(
+    customTemplatePath,
+    JSON.stringify({
+      pilot_environment: 'custom-template-env',
+      tested_at: '2026-06-04T00:00:00.000Z',
+      observed_feed_mode: 'unknown',
+    }),
+    'utf8',
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      createEvidenceScriptPath,
+      '--output',
+      outputPath,
+      '--from-template',
+      customTemplatePath,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const parsed = parseTodayPilotEvidence(
+    JSON.parse(readFileSync(outputPath, 'utf8')),
+  );
+  assert.equal(parsed.environmentLabel, 'custom-template-env');
 });
 
 test('package ignore patterns protect local and private evidence files', () => {

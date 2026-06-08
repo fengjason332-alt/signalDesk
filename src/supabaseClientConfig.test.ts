@@ -30,6 +30,8 @@ test('resolveSupabaseClientConfig marks config as enabled only when both env var
     {
       url: 'https://example.supabase.co',
       anonKey: 'anon-key',
+      hasRequiredValues: true,
+      hasValidUrl: true,
       isConfigured: true,
     },
   );
@@ -42,6 +44,24 @@ test('resolveSupabaseClientConfig marks config as enabled only when both env var
     {
       url: 'https://example.supabase.co',
       anonKey: undefined,
+      hasRequiredValues: false,
+      hasValidUrl: true,
+      isConfigured: false,
+    },
+  );
+});
+
+test('resolveSupabaseClientConfig treats malformed Supabase URLs as invalid frontend config', () => {
+  assert.deepEqual(
+    resolveSupabaseClientConfig({
+      url: ' not-a-url ',
+      anonKey: ' anon-key ',
+    }),
+    {
+      url: 'not-a-url',
+      anonKey: 'anon-key',
+      hasRequiredValues: true,
+      hasValidUrl: false,
       isConfigured: false,
     },
   );

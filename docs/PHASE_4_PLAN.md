@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-26
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-29
 
 ### Tasks 0-4: Foundations
 
@@ -237,13 +237,16 @@ Proposed future AI enrichment flow:
 - Task 24 adds a typed local pilot-evidence contract, a conservative evidence-review script, fake example JSON files, and rollout-decision doc updates without changing runtime defaults or contacting Supabase
 - Task 25 adds a stronger beginner-friendly evidence template, stricter evaluator rules for fallback/provenance/RLS/mobile/bilingual/readiness checks, and a planning-only controlled default-rollout plan without changing runtime defaults
 - Task 26 adds a local evidence-starter command, a gitignored local evidence folder, and a beginner-friendly operator checklist so the pilot can be executed manually without changing runtime defaults
+- Task 27 adds optional `--out`, `--output`, `--overwrite`, and `--from-template` support for local evidence creation plus clearer local evidence-review output
+- Task 28 keeps Today mock-by-default while tightening the read-only runtime reasons for invalid env, no-client fallback, mapping fallback, real-empty, and filter-empty states
+- Task 29 consolidates the Phase 4 pilot docs, QA runbooks, and handoff so rollback, local/private evidence, no scheduled AI enrichment, no X/Grok runtime, and no Radar/Watchlist/Library rollout stay explicit
 - there is still no scheduled AI execution
 
 ## Remaining Tasks
 
-### Task 27: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
+### Task 30: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
 
-- run the actual target pilot with the Task 26 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
+- run the actual target pilot with the Task 29 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
 - review that local evidence before any explicit default-switch task is considered
 - preserve fallback paths and rollback paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout

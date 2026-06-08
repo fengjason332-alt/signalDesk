@@ -22,8 +22,10 @@ Client-side pilot env:
 Local helper command:
 - `npm run phase4:today-pilot-check`
 - `npm run phase4:create-today-evidence`
+- `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
 - This helper is local-only. It does not call Supabase, does not call AI providers, and does not write content.
 - Record pilot outcomes in `docs/evidence/today-real-feed-pilot-evidence.local.json`.
+- Keep local/private evidence files uncommitted.
 - Review local evidence with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>` after the checklist is complete.
 - A beginner-friendly starter file now exists at `docs/examples/today-real-feed-pilot-evidence.template.json`.
 - Use [docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md) if you want a click-by-click walkthrough.
@@ -34,6 +36,8 @@ Important boundaries:
 - no `PHASE4_WRITE_AUTH_TOKEN` in the frontend
 - No frontend writes
 - No frontend AI calls
+- No scheduled AI enrichment
+- No X/Grok runtime
 
 To confirm the normal default remains intact:
 - set `VITE_USE_REAL_CONTENT_FEED=false`

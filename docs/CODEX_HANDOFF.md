@@ -1,6 +1,6 @@
 # SignalDesk Codex Handoff
 
-## Latest Handoff: 2026-05-30
+## Latest Handoff: 2026-06-04
 
 This handoff supersedes older Phase 4 notes. Use this section first before touching code.
 
@@ -36,7 +36,7 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - DeepSeek is now wired as the first optional server-side provider
 - Task 13C adds a guarded manual-only AI write mode
 - Task 13D and Task 13E add additive claim / retry hardening plus sequential one-to-three signal manual batch support
-- Task 14A-26 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, a controlled Today real-feed rollout path that remains mock-by-default, a dedicated rollout-decision checklist before any default-feed change, stronger real-feed diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback guidance, a Task 21 target-environment pilot runbook, a Task 22 local pilot preflight helper, a Task 23 pilot evidence template, Task 24 local evidence-review tooling, Task 25 stricter evidence hardening plus a controlled default-rollout preparation plan, Task 26 local evidence-starter and operator checklist support, and a planning-only future X or Grok user-curated source path
+- Task 14A-29 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, a controlled Today real-feed rollout path that remains mock-by-default, a dedicated rollout-decision checklist before any default-feed change, stronger real-feed diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback guidance, a Task 21 target-environment pilot runbook, a Task 22 local pilot preflight helper, a Task 23 pilot evidence template, Task 24 local evidence-review tooling, Task 25 stricter evidence hardening plus a controlled default-rollout preparation plan, Task 26 local evidence-starter and operator checklist support, Task 27 beginner-safe pilot execution UX improvements, Task 28 read-only real-feed reason hardening, Task 29 docs and handoff consolidation, and a planning-only future X or Grok user-curated source path
 - AI writes remain limited to enrichment-ready columns plus additive claim/retry bookkeeping columns on `public.intelligence_signals`
 - scheduled non-AI ingestion now exists behind `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
 - scheduled non-AI ingestion remains disabled by default, keeps AI out of the path entirely, and applies hard caps for:
@@ -72,6 +72,15 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
   - `npm run phase4:create-today-evidence`
   - `docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md`
   - a gitignored local evidence file path under `docs/evidence/`
+- Task 27 adds:
+  - `--out`, `--output`, `--overwrite`, and `--from-template` support for `npm run phase4:create-today-evidence`
+  - clearer `phase4:today-evidence-review` output with recommendation, next action, and what-to-fix-next sections
+- Task 28 adds:
+  - read-only Today runtime reasons for `mock_default`, `rollback_to_mock`, `real_loaded`, `real_empty`, `filter_empty`, `fallback_invalid_env`, `fallback_no_client`, `fallback_read_failed`, and `fallback_mapping_failed`
+  - a distinct invalid-env fallback instead of merging all null-client cases together
+- Task 29 adds:
+  - handoff and rollout-doc consolidation so local/private evidence stays explicitly uncommitted
+  - clearer guidance that controlled default rollout is blocked until accepted evidence exists
 - a planning-only future X or Grok user-curated source path now lives in:
   - `docs/X_GROK_USER_CURATED_SOURCE_PLAN.md`
 
@@ -284,7 +293,7 @@ Do not commit any of these secrets or real values.
 - there is still no scheduled AI execution
 - deploys using `--no-verify-jwt` should treat AI-enabled requests as operator-only
 
-### Latest Task 14A-25 Status
+### Latest Task 14A-29 Status
 
 - non-AI ingestion now uses an explicit endpoint contract:
   - `intent: "ingestion"`
@@ -357,6 +366,14 @@ Do not commit any of these secrets or real values.
   - `npm run phase4:create-today-evidence`
   - `docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md`
   - clearer local/private evidence guidance so operator notes are easier to collect without committing them
+- Task 27 now adds:
+  - `--out`, `--output`, `--overwrite`, and `--from-template` support for the local evidence starter
+  - clearer local evidence-review output with recommendation, next action, and what-to-fix-next sections
+- Task 28 now adds:
+  - explicit read-only Today runtime reasons for mock default, real loaded, real empty, filter empty, invalid-env fallback, no-client fallback, read-failure fallback, and mapping-failure fallback
+  - continued calm UI copy with no raw Supabase internals exposed to users
+- Task 29 now adds:
+  - Phase 4 pilot doc consolidation around mock-by-default, rollback, local/private evidence, no scheduled AI enrichment, no Radar/Watchlist/Library rollout, and no X/Grok runtime
 - Today real-feed mode now keeps the same UI style but returns clearer prototype states:
   - `mock` when preview is disabled
   - `real` when preview-safe rows load
@@ -380,8 +397,8 @@ Do not commit any of these secrets or real values.
 
 ### Exact Next Recommended Task
 
-Phase 4 Task 27:
-- run the actual target pilot with the Task 26 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
+Phase 4 Task 30:
+- run the actual target pilot with the Task 29 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
 - review that local evidence before any explicit default-switch task is considered
 - keep the real-content path read-only on the client
 - keep Radar on mock

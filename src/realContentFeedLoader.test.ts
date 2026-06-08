@@ -5,6 +5,8 @@ import {
   getTodayFeedEmptyStateMessage,
   loadTodaySignals,
   loadRealContentFeedPreview,
+  resolveTodayFeedRuntimeReason,
+  resolveTodayRealFeedClientStatus,
   resolveTodayFeedViewState,
   type RealContentFeedLoaderClient,
 } from './lib/content/realContentFeed';
@@ -605,7 +607,7 @@ test('loadTodaySignals keeps mock feed as the default when preview mode is disab
 
   assert.equal(client.selectCalls, 0);
   assert.equal(result.feedMode, 'mock');
-  assert.equal(result.feedReason, 'env_disabled');
+  assert.equal(result.feedReason, 'mock_default');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, false);
   assert.equal(result.errorMessage, null);
@@ -663,6 +665,23 @@ test('loadTodaySignals falls back to mock feed when Supabase is unavailable', as
   const result = await loadTodaySignals({
     enableRealContentFeed: true,
     client: null,
+    clientStatus: 'invalid_env',
+    mockSignals: MOCK_SIGNALS,
+  });
+
+  assert.equal(result.feedMode, 'fallback_to_mock');
+  assert.equal(result.feedReason, 'fallback_invalid_env');
+  assert.equal(result.source, 'mock');
+  assert.equal(result.usedFallback, true);
+  assert.match(result.errorMessage ?? '', /frontend supabase env/i);
+  assert.deepEqual(result.signals.map(signal => signal.id), MOCK_SIGNALS.map(signal => signal.id));
+});
+
+test('loadTodaySignals still uses fallback_no_client when env is valid but no client instance is available', async () => {
+  const result = await loadTodaySignals({
+    enableRealContentFeed: true,
+    client: null,
+    clientStatus: 'no_client',
     mockSignals: MOCK_SIGNALS,
   });
 
@@ -670,8 +689,6 @@ test('loadTodaySignals falls back to mock feed when Supabase is unavailable', as
   assert.equal(result.feedReason, 'fallback_no_client');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, true);
-  assert.match(result.errorMessage ?? '', /not configured/i);
-  assert.deepEqual(result.signals.map(signal => signal.id), MOCK_SIGNALS.map(signal => signal.id));
 });
 
 test('loadTodaySignals keeps the read failure reason for preview-mode fallback logging', async () => {
@@ -735,7 +752,7 @@ test('loadTodaySignals falls back to mock feed when all preview rows are malform
   });
 
   assert.equal(result.feedMode, 'fallback_to_mock');
-  assert.equal(result.feedReason, 'fallback_all_rows_failed_mapping');
+  assert.equal(result.feedReason, 'fallback_mapping_failed');
   assert.equal(result.source, 'mock');
   assert.equal(result.usedFallback, true);
   assert.equal(result.isEmpty, false);
@@ -751,7 +768,7 @@ test('loadTodaySignals returns a real empty state without forcing a mock fallbac
   });
 
   assert.equal(result.feedMode, 'real_empty');
-  assert.equal(result.feedReason, 'real_zero_rows');
+  assert.equal(result.feedReason, 'real_empty');
   assert.equal(result.source, 'real');
   assert.equal(result.usedFallback, false);
   assert.equal(result.isEmpty, true);
@@ -763,7 +780,7 @@ test('getTodayFeedEmptyStateMessage explains the real preview-safe empty state w
   assert.equal(
     getTodayFeedEmptyStateMessage({
       feedMode: 'real_empty',
-      feedReason: 'real_zero_rows',
+      feedReason: 'real_empty',
       totalFeedSignals: 0,
       filteredSignalCount: 0,
     }),
@@ -787,7 +804,7 @@ test('resolveTodayFeedViewState distinguishes real-empty from filter-empty and p
   assert.deepEqual(
     resolveTodayFeedViewState({
       feedMode: 'real_empty',
-      feedReason: 'real_zero_rows',
+      feedReason: 'real_empty',
       totalFeedSignals: 0,
       filteredSignalCount: 0,
     }),
@@ -795,7 +812,7 @@ test('resolveTodayFeedViewState distinguishes real-empty from filter-empty and p
       viewState: 'real_empty',
       message: 'Real-content preview is enabled, but no preview-safe signals were found yet.',
       filterExcludedAllSignals: false,
-      feedReason: 'real_zero_rows',
+      feedReason: 'real_empty',
     },
   );
 
@@ -810,7 +827,54 @@ test('resolveTodayFeedViewState distinguishes real-empty from filter-empty and p
       viewState: 'filter_empty',
       message: 'No real-content signals found matching your current filters yet.',
       filterExcludedAllSignals: true,
-      feedReason: 'real_loaded',
+      feedReason: 'filter_empty',
     },
+  );
+});
+
+test('resolveTodayFeedRuntimeReason normalizes loader and view-state reasons for Task 28 diagnostics', () => {
+  assert.equal(
+    resolveTodayFeedRuntimeReason({
+      feedMode: 'mock',
+      feedReason: 'mock_default',
+      totalFeedSignals: 5,
+      filteredSignalCount: 5,
+    }),
+    'mock_default',
+  );
+  assert.equal(
+    resolveTodayFeedRuntimeReason({
+      feedMode: 'real',
+      feedReason: 'real_loaded',
+      totalFeedSignals: 2,
+      filteredSignalCount: 0,
+    }),
+    'filter_empty',
+  );
+  assert.equal(
+    resolveTodayFeedRuntimeReason({
+      feedMode: 'fallback_to_mock',
+      feedReason: 'fallback_mapping_failed',
+      totalFeedSignals: 5,
+      filteredSignalCount: 5,
+    }),
+    'fallback_mapping_failed',
+  );
+});
+
+test('resolveTodayRealFeedClientStatus distinguishes invalid env from missing client', () => {
+  assert.equal(
+    resolveTodayRealFeedClientStatus({
+      client: null,
+      isFrontendSupabaseConfigured: false,
+    }),
+    'invalid_env',
+  );
+  assert.equal(
+    resolveTodayRealFeedClientStatus({
+      client: null,
+      isFrontendSupabaseConfigured: true,
+    }),
+    'no_client',
   );
 });

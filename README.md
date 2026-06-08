@@ -19,7 +19,7 @@ Completed phases and tasks:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-26: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, a bounded scheduled non-AI ingestion contract that remains disabled by default, a controlled Today real-feed rollout path that is still mock-by-default, an operator-safe recurring scheduled-ingestion helper/runbook for bounded non-AI automation, an explicit Today real-feed QA and rollout-decision checklist without changing the default feed, Task 19 feed-mode diagnostics and fallback hardening for future rollout readiness, Task 20 explicit real-by-default decision gating that still keeps Today mock-by-default, Task 21 target-environment pilot runbook coverage, Task 22 target-pilot execution support with a local helper command, Task 23 pilot-evidence execution preparation with a dedicated evidence doc, Task 24 local evidence-review tooling and typed review logic, Task 25 stricter pilot-evidence hardening plus a controlled default-rollout preparation plan, Task 26 operator-safe manual pilot execution support with a local evidence-starter command, checklist, and gitignored local evidence folder, and planning-only support for a future X/Grok user-curated source track
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-29: content foundation, RSS ingestion pipeline, deterministic normalization/dedupe/mapping/scoring, Supabase content persistence, controlled smoke-test tooling, read-only Today preview, preview hardening, enrichment-ready schema/read contracts, server-only AI enrichment preflight contracts, a guarded DeepSeek dry-run provider path, a manual-only guarded AI enrichment write mode, additive lease/retry hardening for one-to-three signal manual batches, explicit non-AI ingestion intent/trigger guardrails, stronger ingestion observability, a bounded scheduled non-AI ingestion contract that remains disabled by default, a controlled Today real-feed rollout path that is still mock-by-default, an operator-safe recurring scheduled-ingestion helper/runbook for bounded non-AI automation, an explicit Today real-feed QA and rollout-decision checklist without changing the default feed, Task 19 feed-mode diagnostics and fallback hardening for future rollout readiness, Task 20 explicit real-by-default decision gating that still keeps Today mock-by-default, Task 21 target-environment pilot runbook coverage, Task 22 target-pilot execution support with a local helper command, Task 23 pilot-evidence execution preparation with a dedicated evidence doc, Task 24 local evidence-review tooling and typed review logic, Task 25 stricter pilot-evidence hardening plus a controlled default-rollout preparation plan, Task 26 operator-safe manual pilot execution support with a local evidence-starter command, checklist, and gitignored local evidence folder, Task 27 beginner-safe pilot execution guidance and evidence UX improvements, Task 28 read-only Today real-feed runtime reason hardening, Task 29 docs and handoff consolidation, and planning-only support for a future X/Grok user-curated source track
 
 Current confirmed project state:
 - Phase 3 user-state sync works and must be preserved
@@ -39,9 +39,13 @@ Current confirmed project state:
   - `fallback_to_mock`
   - `real_empty`
 - Today real-feed diagnostics now also distinguish why a mode was chosen:
-  - env disabled
+  - mock default
+  - rollback to mock
   - real rows loaded
   - zero preview-safe rows
+  - filter-empty after a successful real load
+  - fallback because frontend Supabase env is missing or invalid
+  - fallback because the preview client is unavailable
   - fallback because the preview read failed
   - fallback because all eligible rows failed mapping
 - the non-AI ingestion endpoint now uses a single-intent contract:
@@ -76,8 +80,21 @@ Today:
 - Task 24 adds `npm run phase4:today-evidence-review` so pilot evidence can be reviewed locally without contacting Supabase
 - Task 25 adds a beginner-friendly template JSON plus [docs/TODAY_REAL_FEED_CONTROLLED_DEFAULT_ROLLOUT_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_CONTROLLED_DEFAULT_ROLLOUT_PLAN.md) for a future explicit default-rollout task
 - Task 26 adds `npm run phase4:create-today-evidence` plus a dedicated operator checklist so a beginner can create a local evidence file and walk through the pilot safely
+- Task 27 adds optional `--out`, `--output`, `--overwrite`, and `--from-template` support to the local evidence starter plus clearer evidence-review output
+- Task 28 keeps Today mock-by-default while tightening the read-only real-feed runtime reasons:
+  - `mock_default`
+  - `rollback_to_mock`
+  - `real_loaded`
+  - `real_empty`
+  - `filter_empty`
+  - `fallback_invalid_env`
+  - `fallback_no_client`
+  - `fallback_read_failed`
+  - `fallback_mapping_failed`
+- Task 29 consolidates the Phase 4 pilot docs so the next meaningful step is still the actual target-environment pilot, not a default switch
 - when real preview is enabled, completed enriched fields are preferred
 - when enrichment is missing, pending, failed, or incomplete, Today falls back to deterministic preview fields
+- when completed enrichment fields are blank, Today and Detail still fall back safely to deterministic preview fields
 - when real preview returns zero preview-safe rows, Today shows a clear real-feed empty state instead of looking broken
 - when real preview reads fail, Today falls back safely to mock with a lightweight prototype diagnostic
 
@@ -165,6 +182,44 @@ npm run phase4:create-today-evidence
 
 This command creates `docs/evidence/today-real-feed-pilot-evidence.local.json` unless that local file already exists. It does not overwrite your notes by default.
 
+Optional starter flags:
+- `npm run phase4:create-today-evidence -- --out docs/evidence/custom.local.json`
+- `npm run phase4:create-today-evidence -- --from-template docs/examples/today-real-feed-pilot-evidence.template.json`
+- `npm run phase4:create-today-evidence -- --overwrite`
+
+## How To Run The Today Real-Feed Pilot
+
+1. Create a local evidence file:
+
+```bash
+npm run phase4:create-today-evidence
+```
+
+2. Check the local pilot contract:
+
+```bash
+npm run phase4:today-pilot-check
+```
+
+3. Start the app:
+
+```bash
+npm run dev
+```
+
+4. Review the evidence locally after the manual QA pass:
+
+```bash
+npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json
+```
+
+Rollback:
+- set `VITE_USE_REAL_CONTENT_FEED=false`
+- restart locally or rebuild/redeploy
+- confirm Today returns to mock
+
+Do not commit local/private evidence files such as `docs/evidence/*.local.json` or `docs/evidence/*.private.json`.
+
 ## Client Environment Variables
 
 Client-safe env vars:
@@ -173,7 +228,7 @@ Client-safe env vars:
 - `VITE_USE_REAL_CONTENT_FEED=false` by default
 
 Notes:
-- if the Supabase client env vars are missing, the app must remain safe in local-only mode
+- if the Supabase client env vars are missing or invalid, the app must remain safe in local-only mode
 - the default Today experience must remain mock unless `VITE_USE_REAL_CONTENT_FEED=true`
 - do not commit `.env` or secrets
 
@@ -186,7 +241,7 @@ See [docs/TODAY_REAL_FEED_CONTROLLED_DEFAULT_ROLLOUT_PLAN.md](/Users/jasonfeng/D
 See [docs/examples/today-real-feed-pilot-evidence.passing.example.json](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/examples/today-real-feed-pilot-evidence.passing.example.json) for a fake local example that can be reviewed with `npm run phase4:today-evidence-review`.
 See [docs/examples/today-real-feed-pilot-evidence.template.json](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/examples/today-real-feed-pilot-evidence.template.json) for a beginner-friendly file you can copy and fill in manually.
 Local private evidence files under `docs/evidence/*.local.json` or `docs/evidence/*.private.json` should not be committed.
-The next explicit rollout step after Task 26 is to run the actual operator pilot, fill the local evidence file, and review that evidence before any default-switch task is considered.
+The next explicit rollout step after Task 29 is to run the actual operator pilot, fill the local evidence file, and review that evidence before any default-switch task is considered.
 See [docs/X_GROK_USER_CURATED_SOURCE_PLAN.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/X_GROK_USER_CURATED_SOURCE_PLAN.md) for the planning-only future X or Grok user-curated source model.
 Task 20 keeps the rollback path explicit: set `VITE_USE_REAL_CONTENT_FEED=false`, rebuild/redeploy, and confirm Today returns to mock.
 

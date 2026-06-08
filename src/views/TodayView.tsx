@@ -10,6 +10,7 @@ import { getTodayFilterOptions, getVisibleTodaySignals } from '../topicPreferenc
 import {
   getTodayFeedEmptyStateMessage,
   isRealContentFeedEnabled,
+  resolveTodayRealFeedClientStatus,
   resolveTodayFeedDisabledReason,
   todayRealFeedRolloutMode,
   type RealContentFeedLoaderClient,
@@ -17,7 +18,7 @@ import {
   REAL_CONTENT_FEED_FALLBACK_MESSAGE,
   type LoadTodaySignalsResult,
 } from '../lib/content/realContentFeed';
-import { supabase } from '../lib/supabase/client';
+import { isSupabaseConfigured, supabase } from '../lib/supabase/client';
 
 interface TodayViewProps {
   onSignalClick: (signal: Signal) => void;
@@ -38,9 +39,13 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
     isRealContentFeedEnabled ? 'real_empty' : 'mock',
   );
   const [feedReason, setFeedReason] = useState<LoadTodaySignalsResult['feedReason']>(
-    isRealContentFeedEnabled ? 'real_zero_rows' : disabledFeedReason,
+    isRealContentFeedEnabled ? 'real_empty' : disabledFeedReason,
   );
   const realContentClient = supabase as unknown as RealContentFeedLoaderClient | null;
+  const realContentClientStatus = resolveTodayRealFeedClientStatus({
+    client: realContentClient,
+    isFrontendSupabaseConfigured: isSupabaseConfigured,
+  });
   
   const filters = getTodayFilterOptions(settings.preferredTopics);
   const filteredSignals = getVisibleTodaySignals(feedSignals, settings, activeFilter);
@@ -70,6 +75,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
     void loadTodaySignals({
       enableRealContentFeed: true,
       client: realContentClient,
+      clientStatus: realContentClientStatus,
       mockSignals: MOCK_SIGNALS,
     })
       .then(result => {
@@ -108,7 +114,7 @@ export default function TodayView({ onSignalClick, onResultSelect }: TodayViewPr
     return () => {
       isCancelled = true;
     };
-  }, [disabledFeedReason, realContentClient]);
+  }, [disabledFeedReason, realContentClient, realContentClientStatus]);
 
   return (
     <div className="flex flex-col min-h-full">

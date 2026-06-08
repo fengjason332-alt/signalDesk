@@ -9,6 +9,7 @@ export const TODAY_REAL_FEED_EVIDENCE_IGNORE_PATTERNS = [
 export interface TodayRealFeedEvidenceStarterPlan {
   createCommand: string;
   outputPath: string;
+  templatePath: string;
   overwrite: boolean;
   reviewCommand: string;
   shouldWrite: boolean;
@@ -18,6 +19,7 @@ export interface TodayRealFeedEvidenceStarterPlan {
 export interface BuildTodayRealFeedEvidenceStarterPlanOptions {
   fileAlreadyExists: boolean;
   outputPath?: string;
+  templatePath?: string;
   overwrite?: boolean;
 }
 
@@ -33,6 +35,10 @@ export function buildTodayRealFeedEvidenceStarterPlan(
   options: BuildTodayRealFeedEvidenceStarterPlanOptions,
 ): TodayRealFeedEvidenceStarterPlan {
   const outputPath = normalizeOutputPath(options.outputPath);
+  const templatePath =
+    typeof options.templatePath === 'string' && options.templatePath.trim().length > 0
+      ? options.templatePath.trim()
+      : 'docs/examples/today-real-feed-pilot-evidence.template.json';
   const overwrite = options.overwrite === true;
   const shouldWrite = overwrite || !options.fileAlreadyExists;
   const reviewCommand = `npm run phase4:today-evidence-review -- ${outputPath}`;
@@ -40,6 +46,7 @@ export function buildTodayRealFeedEvidenceStarterPlan(
   return {
     createCommand: 'npm run phase4:create-today-evidence',
     outputPath,
+    templatePath,
     overwrite,
     reviewCommand,
     shouldWrite,
