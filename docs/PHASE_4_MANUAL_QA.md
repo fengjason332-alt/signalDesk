@@ -32,6 +32,8 @@ Important boundaries:
 - Task 31 adds `npm run phase4:today-pilot-report`
 - Task 32 aligns the docs around the full local operator flow
 - Task 33 adds `npm run phase4:today-help`
+- Task 35 hardens the local evidence/report path guards and clarifies that `pilot_ready` is only an env-presence preflight
+- Task 36 adds a sanitized committed pilot summary doc while keeping local/private evidence uncommitted
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -460,8 +462,10 @@ Use [docs/TODAY_REAL_FEED_ROLLOUT_DECISION.md](/Users/jasonfeng/Desktop/project3
 Task 20 does not switch the default feed; it records that a target-environment pilot is still required before any default change.
 Use [docs/TODAY_REAL_FEED_TARGET_PILOT.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_TARGET_PILOT.md) when actually running that bounded pilot.
 Run `npm run phase4:today-pilot-check` before opening the app to confirm whether the local env is still in `mock_default`, `pilot_ready`, or `pilot_misconfigured`.
+Treat `pilot_ready` as an env-presence preflight only. Wrong-project wiring, preview-read policy failures, or zero preview-safe rows can still show up later in-browser as `fallback_to_mock` or `real_empty`.
 Run `npm run phase4:create-today-evidence` to create `docs/evidence/today-real-feed-pilot-evidence.local.json`.
 Run `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json ...` while testing if you want a bounded local updater instead of hand-editing JSON.
+The create, update, and report helpers now refuse non-gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default unless `--allow-any-path` is passed intentionally.
 Run `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json` after the manual checks are captured.
 Run `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md` to generate a local-only Markdown report.
 Run `npm run phase4:today-help` to reprint the bounded local-only operator flow.

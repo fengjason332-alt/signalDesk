@@ -167,7 +167,10 @@ export function buildTodayRealFeedPilotCheck(
     rollbackEnv: {
       VITE_USE_REAL_CONTENT_FEED: 'false',
     },
-    warnings: [],
+    warnings: [
+      'This preflight only checks local env presence; it does not verify preview-read policies, dataset freshness, or whether the selected Supabase project has preview-safe rows yet.',
+      'A browser run can still end in fallback_to_mock or real_empty even when this helper says pilot_ready.',
+    ],
     checks: TODAY_REAL_FEED_PILOT_CHECKS,
     rollbackSteps: TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS,
     passCriteria: TODAY_REAL_FEED_PILOT_PASS_CRITERIA,

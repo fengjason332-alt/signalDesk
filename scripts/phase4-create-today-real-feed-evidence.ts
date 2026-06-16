@@ -5,14 +5,21 @@ import {
   buildTodayRealFeedEvidenceStarterPlan,
   DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH,
 } from '../src/lib/content/todayRealFeedEvidenceStarter';
+import { assertTodayPilotEvidencePathSafe } from '../src/lib/content/todayRealFeedEvidenceUpdater';
 
 function parseArgs(argv: string[]) {
   let outputPath = DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH;
   let templatePath = 'docs/examples/today-real-feed-pilot-evidence.template.json';
   let overwrite = false;
+  let allowAnyPath = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const current = argv[index];
+
+    if (current === '--allow-any-path') {
+      allowAnyPath = true;
+      continue;
+    }
 
     if (current === '--overwrite') {
       overwrite = true;
@@ -41,12 +48,22 @@ function parseArgs(argv: string[]) {
     }
   }
 
-  return { outputPath, templatePath, overwrite };
+  return { outputPath, templatePath, overwrite, allowAnyPath };
 }
 
 const args = parseArgs(process.argv.slice(2));
 const resolvedOutputPath = resolve(process.cwd(), args.outputPath);
 const resolvedTemplatePath = resolve(process.cwd(), args.templatePath);
+
+try {
+  assertTodayPilotEvidencePathSafe(resolvedOutputPath, args.allowAnyPath);
+} catch (error) {
+  process.stderr.write(
+    `Error: ${error instanceof Error ? error.message : 'Unsafe evidence path.'}\n`,
+  );
+  process.exit(1);
+}
+
 const fileAlreadyExists = existsSync(resolvedOutputPath);
 const plan = buildTodayRealFeedEvidenceStarterPlan({
   fileAlreadyExists,

@@ -40,7 +40,7 @@ It should not drift into:
 - Phase 1.5: topic personalization
 - Phase 2: PWA install support
 - Phase 3: local-first persistence with optional Supabase user-state sync
-- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-33: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, stronger feed-mode diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback and blocker docs, a Task 21 target-environment pilot runbook, a Task 22 local pilot helper plus QA hardening, a Task 23 pilot-evidence preparation doc and helper output expansion, Task 24 local pilot-evidence review tooling, Task 25 stricter pilot-evidence hardening plus a controlled default-rollout preparation plan, Task 26 local manual-pilot execution support with a local evidence-starter command and operator checklist, Task 27 beginner-safe pilot execution guidance/evidence UX improvements, Task 28 read-only real-feed runtime hardening, Task 29 docs and handoff consolidation, Task 30 local evidence-update tooling, Task 31 local pilot-report generation, Task 32 operator-flow doc alignment, Task 33 local pilot help output, and a planning-only future X/Grok user-curated source connector path
+- Phase 4 Tasks 0-12 plus Task 13-preflight, Tasks 13B-13E, and Tasks 14A-36: content pipeline foundation, RSS ingestion/write path, deterministic mapping and scoring, smoke-test tooling, real-content Today preview, preview-detail hardening, enrichment-ready schema/read support, server-only AI enrichment preflight planning/contracts, guarded DeepSeek dry-run integration, a manual-only guarded DeepSeek enrichment write path, additive lease/retry hardening for one-to-three signal manual batches, single-intent non-AI ingestion hardening plus bounded scheduled-ingestion readiness, controlled Today real-feed rollout hardening, an operator-safe recurring-ingestion contract/helper for bounded non-AI automation, an explicit rollout-decision checklist for any later Today real-by-default decision, stronger feed-mode diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback and blocker docs, a Task 21 target-environment pilot runbook, a Task 22 local pilot helper plus QA hardening, a Task 23 pilot-evidence preparation doc and helper output expansion, Task 24 local pilot-evidence review tooling, Task 25 stricter pilot-evidence hardening plus a controlled default-rollout preparation plan, Task 26 local manual-pilot execution support with a local evidence-starter command and operator checklist, Task 27 beginner-safe pilot execution guidance/evidence UX improvements, Task 28 read-only real-feed runtime hardening, Task 29 docs and handoff consolidation, Task 30 local evidence-update tooling, Task 31 local pilot-report generation, Task 32 operator-flow doc alignment, Task 33 local pilot help output, Task 34 actual local pilot execution, Task 35 operator-tooling hardening from pilot friction, Task 36 a sanitized committed pilot summary, and a planning-only future X/Grok user-curated source connector path
 
 ## Current App Architecture
 
@@ -200,6 +200,9 @@ Confirmed current working state:
 - Task 31 adds `npm run phase4:today-pilot-report` so local evidence can be turned into a Markdown report without changing runtime defaults
 - Task 32 aligns the docs around the full local operator flow: create evidence, check env, run app, update evidence, review evidence, generate report, rollback
 - Task 33 adds `npm run phase4:today-help` and repeats the no-Supabase-call, no-AI-call, no-content-write boundaries for local operator tooling
+- Task 34 executes the bounded local pilot and confirms real cards, safe Detail, filter-empty behavior, fallback-to-mock, and rollback-to-mock without changing defaults
+- Task 35 hardens create/update/report so they default to gitignored local/private evidence paths and makes the pilot preflight more explicit about its env-only scope
+- Task 36 adds a committed sanitized pilot summary doc while keeping local/private evidence and report artifacts uncommitted
 
 ## Environment And Deployment
 
@@ -253,9 +256,9 @@ Manual SQL assets:
 
 ## Next Recommended Task
 
-Phase 4 Task 34:
-- run the actual target-environment Today pilot with the Task 33 checklist and fill the local evidence file
-- review that local evidence before any explicit default-switch task is considered
+Phase 4 Task 37:
+- continue the Today pilot only after capturing the still-missing evidence, especially a genuine `real_empty` case and one completed non-empty enriched-content win in the target environment
+- keep Today mock-by-default until that additional evidence is reviewed
 - keep Today mock-by-default unless a later explicit task changes that
 - keep Radar, Watchlist, and Library on current behavior
 - keep scheduled AI enrichment out of scope until manual AI write mode is operationally stable

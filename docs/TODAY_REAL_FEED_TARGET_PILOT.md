@@ -27,6 +27,7 @@ Local helper command:
 - `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
 - `npm run phase4:today-help`
 - This helper is local-only. It does not call Supabase, does not call AI providers, and does not write content.
+- The create, update, and report helpers only accept gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default unless `--allow-any-path` is passed intentionally.
 - Record pilot outcomes in `docs/evidence/today-real-feed-pilot-evidence.local.json`.
 - Keep local/private evidence files uncommitted.
 - Review local evidence with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>` after the checklist is complete.
@@ -79,6 +80,14 @@ To confirm the normal default remains intact:
 6. Run `npm run phase4:create-today-evidence`.
 7. Start recording observations in `docs/evidence/today-real-feed-pilot-evidence.local.json`.
 8. Update the local evidence file while testing with `npm run phase4:update-today-evidence -- <path-to-local-evidence-json> ...` if you do not want to hand-edit JSON.
+   - The updater now covers the common pilot fields:
+     - observed feed mode
+     - detail check count
+     - env flags checked
+     - sample cards
+     - fallback/rollback booleans
+     - final recommendation
+   - Hand-edit JSON only if you want to fill a rarer field the updater still does not expose.
 9. When the checklist is complete, review the recorded JSON evidence locally with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>`.
 10. Generate a local Markdown report with `npm run phase4:today-pilot-report -- <path-to-local-evidence-json> --out docs/evidence/today-real-feed-pilot-report.local.md`.
 
@@ -120,7 +129,9 @@ Expected:
    - use an invalid publishable key in a non-production environment, or
    - remove preview read access in a non-production environment, or
    - point the client env at a project that lacks the preview-read setup
-2. Run `npm run phase4:today-pilot-check` and confirm the helper reports `mode: pilot_misconfigured` if the env is now incomplete.
+2. Run `npm run phase4:today-pilot-check`.
+   - If the env is now blank or malformed, the helper should report `mode: pilot_misconfigured`.
+   - If the env keys are still present but preview-read access or project wiring is broken, the helper may still report `mode: pilot_ready`; that is expected because the helper only checks local env presence.
 3. Reload Today.
 4. Confirm fallback to mock occurs safely.
 5. Confirm the app does not crash.

@@ -98,10 +98,12 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 34: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
+### Task 37: Capture The Missing Today Pilot Evidence Before Any Default Switch
 
-- run the actual operator pilot with the Task 33 checklist and fill the local evidence file
-- review that evidence locally before any explicit default-switch task
+- keep Today mock-by-default
+- capture a genuine `real_empty` observation in a suitable target environment if one is available
+- capture at least one completed, non-empty enriched-content win in the target environment
+- review the refreshed local evidence before any explicit default-switch task
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task
 

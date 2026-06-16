@@ -15,6 +15,7 @@ function parseArgs(argv: string[]) {
   let evidencePath = '';
   let outputPath: string | null = null;
   let overwrite = false;
+  let allowAnyPath = false;
 
   for (let index = 0; index < argv.length; index += 1) {
     const current = argv[index];
@@ -26,6 +27,11 @@ function parseArgs(argv: string[]) {
 
     if (current === '--overwrite') {
       overwrite = true;
+      continue;
+    }
+
+    if (current === '--allow-any-path') {
+      allowAnyPath = true;
       continue;
     }
 
@@ -44,6 +50,7 @@ function parseArgs(argv: string[]) {
     evidencePath,
     outputPath,
     overwrite,
+    allowAnyPath,
   };
 }
 
@@ -96,7 +103,7 @@ if (args.outputPath) {
   const resolvedOutputPath = resolve(process.cwd(), chosenOutputPath);
 
   try {
-    assertTodayPilotEvidencePathSafe(resolvedOutputPath);
+    assertTodayPilotEvidencePathSafe(resolvedOutputPath, args.allowAnyPath, 'report');
   } catch (error) {
     process.stderr.write(
       `Error: ${error instanceof Error ? error.message : 'Unsafe report path.'}\n`,

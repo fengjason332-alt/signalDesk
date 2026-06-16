@@ -1,6 +1,6 @@
 # Today Real-Feed Rollout Decision
 
-This document is maintained through Task 33. It does not switch Today to real content by default.
+This document is maintained through Task 36. It does not switch Today to real content by default.
 
 Today must remain mock by default until the criteria below are met and the team explicitly approves a later rollout task.
 

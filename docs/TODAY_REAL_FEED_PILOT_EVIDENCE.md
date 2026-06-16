@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is maintained through Phase 4 Task 33. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is maintained through Phase 4 Task 36. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -31,6 +31,7 @@ Local helper command:
 - The evidence-update and pilot-report commands are also local-only. They do not call Supabase, do not call AI providers, and do not write app content.
 - Local operator evidence should live in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another gitignored local/private JSON path.
 - Local operator reports should live in `docs/evidence/today-real-feed-pilot-report.local.md` or another gitignored local/private Markdown path.
+- The helper commands now refuse non-gitignored evidence/report paths by default unless `--allow-any-path` is passed intentionally.
 
 Important boundaries:
 - no `SUPABASE_SERVICE_ROLE_KEY` in the frontend
@@ -58,6 +59,7 @@ Important boundaries:
 3. Confirm the helper reports:
    - `mode: pilot_ready`
    - `shouldAttemptRealFeedRead: true`
+   - note: `pilot_ready` only means the local env keys are present; preview-read policy failures, empty datasets, or wrong-project wiring can still surface later in-browser as `fallback_to_mock` or `real_empty`
 4. Open Today and confirm real cards load with the existing style.
 
 ## Manual QA Checklist
@@ -164,6 +166,8 @@ If you prefer not to hand-edit JSON, update the file incrementally:
 ```bash
 npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true --detail-opened-safely true
 ```
+
+The updater covers the common pilot fields such as observed feed mode, detail count, env flags checked, sample cards, fallback checks, rollback checks, and final recommendation. Hand-edit the JSON only if you need a rarer field that is still not exposed as a flag.
 
 Generate a local Markdown report after review:
 

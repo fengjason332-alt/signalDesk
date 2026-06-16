@@ -114,6 +114,52 @@ test('pilot report generator can write a local report file with explicit overwri
   assert.match(written, /ready_for_controlled_default_rollout/i);
 });
 
+test('pilot report generator refuses a tracked-looking docs/evidence markdown path without explicit override', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-pilot-report-unsafe-'));
+  const outputPath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-report.md');
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+
+  const result = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', reportScriptPath, incompleteExamplePath, '--out', outputPath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr || result.stdout, /non-gitignored report path/i);
+});
+
+test('pilot report generator allows an explicit tracked-looking report path only with --allow-any-path', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-pilot-report-allow-any-path-'));
+  const outputPath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-report.md');
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+
+  const stdout = execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      reportScriptPath,
+      incompleteExamplePath,
+      '--out',
+      outputPath,
+      '--allow-any-path',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.match(stdout, /wrote local pilot report/i);
+  assert.match(readFileSync(outputPath, 'utf8'), /continue_pilot/i);
+});
+
 test('pilot report generator does not print secret-looking env values', () => {
   const output = execFileSync(
     process.execPath,

@@ -1,29 +1,68 @@
 import { resolve } from 'node:path';
 
 import { parseTodayPilotEvidence } from './todayRealFeedPilotEvidence';
+import {
+  TODAY_REAL_FEED_EVIDENCE_IGNORE_PATTERNS,
+  TODAY_REAL_FEED_REPORT_IGNORE_PATTERNS,
+} from './todayRealFeedEvidenceStarter';
 
 export type TodayPilotQualityValue = 'acceptable' | 'needs_work' | 'not_tested';
+export type TodayPilotObservedFeedModeValue =
+  | 'mock'
+  | 'real'
+  | 'fallback_to_mock'
+  | 'real_empty'
+  | 'unknown';
+export type TodayPilotRecommendationValue =
+  | 'keep_mock_default'
+  | 'continue_pilot'
+  | 'ready_for_controlled_default_rollout'
+  | 'blocked';
 
 export interface UpdateTodayPilotEvidenceOptions {
   allowAnyPath?: boolean;
+  pilotTimestamp?: string;
+  environmentLabel?: string;
+  pilotEnvironment?: string;
+  tester?: string;
+  appUrlOrLocalhost?: string;
+  observedFeedMode?: string;
   realCardsRendered?: string;
+  sourceCount?: string;
   realCardCount?: string;
+  detailCheckedCount?: string;
   detailOpenedSafely?: string;
   provenanceVisible?: string;
   sourceLinksVisible?: string;
   noFakeArticleBody?: string;
+  completedEnrichedTextObserved?: string;
   completedEnrichedTextWins?: string;
   blankEnrichmentFallback?: string;
   incompleteEnrichmentFallback?: string;
   aiOpenAiFilterWorks?: string;
   nonmatchingFilterEmpty?: string;
   realEmptyDistinct?: string;
+  brokenPreviewFallback?: string;
+  noSecretsInUi?: string;
   rollbackTested?: string;
   previewReadPoliciesConfirmed?: string;
+  noFrontendWritesIntroduced?: string;
+  noFrontendAiCallsIntroduced?: string;
+  radarWatchlistLibraryUnchanged?: string;
   mobileQuality?: string;
   bilingualQuality?: string;
   freshness?: string;
   sourceCoverage?: string;
+  finalRecommendation?: string;
+  envFlags?: string[];
+  sampleCards?: string[];
+  enrichedSummaryCases?: string[];
+  deterministicFallbackCases?: string[];
+  filterChecks?: string[];
+  emptyStateChecks?: string[];
+  blockerNotes?: string[];
+  mobileQualityNotes?: string[];
+  bilingualQualityNotes?: string[];
   operatorNotes?: string[];
   screenshotNotes?: string[];
 }
@@ -31,6 +70,12 @@ export interface UpdateTodayPilotEvidenceOptions {
 type JsonRecord = Record<string, unknown>;
 
 const DOCS_EVIDENCE_SEGMENTS = ['docs', 'evidence'] as const;
+const SAFE_EVIDENCE_SUFFIXES = TODAY_REAL_FEED_EVIDENCE_IGNORE_PATTERNS.map((pattern) =>
+  pattern.replace('docs/evidence/*', ''),
+);
+const SAFE_REPORT_SUFFIXES = TODAY_REAL_FEED_REPORT_IGNORE_PATTERNS.map((pattern) =>
+  pattern.replace('docs/evidence/*', ''),
+);
 
 function hasDocsEvidenceSegment(pathValue: string): boolean {
   const segments = resolve(pathValue)
@@ -47,6 +92,10 @@ function hasDocsEvidenceSegment(pathValue: string): boolean {
   }
 
   return false;
+}
+
+function matchesSafeSuffix(pathValue: string, suffixes: readonly string[]): boolean {
+  return suffixes.some((suffix) => pathValue.endsWith(suffix));
 }
 
 function readBooleanFlag(flagName: string, value: string | undefined): boolean | undefined {
@@ -101,6 +150,47 @@ function readQualityFlag(
   throw new Error(`Invalid quality value for ${flagName}: ${value}`);
 }
 
+function readObservedFeedModeFlag(
+  flagName: string,
+  value: string | undefined,
+): TodayPilotObservedFeedModeValue | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (
+    value === 'mock' ||
+    value === 'real' ||
+    value === 'fallback_to_mock' ||
+    value === 'real_empty' ||
+    value === 'unknown'
+  ) {
+    return value;
+  }
+
+  throw new Error(`Invalid observed feed mode for ${flagName}: ${value}`);
+}
+
+function readRecommendationFlag(
+  flagName: string,
+  value: string | undefined,
+): TodayPilotRecommendationValue | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (
+    value === 'keep_mock_default' ||
+    value === 'continue_pilot' ||
+    value === 'ready_for_controlled_default_rollout' ||
+    value === 'blocked'
+  ) {
+    return value;
+  }
+
+  throw new Error(`Invalid recommendation value for ${flagName}: ${value}`);
+}
+
 function readStringNote(flagName: string, value: string): string {
   if (value.trim().length === 0) {
     throw new Error(`Invalid empty note for ${flagName}.`);
@@ -131,6 +221,7 @@ function setIfDefined(raw: JsonRecord, key: string, value: unknown) {
 export function assertTodayPilotEvidencePathSafe(
   evidencePath: string,
   allowAnyPath = false,
+  kind: 'evidence' | 'report' = 'evidence',
 ) {
   if (allowAnyPath) {
     return;
@@ -139,6 +230,15 @@ export function assertTodayPilotEvidencePathSafe(
   if (!hasDocsEvidenceSegment(evidencePath)) {
     throw new Error(
       'Refusing to update a file outside docs/evidence without --allow-any-path.',
+    );
+  }
+
+  const safeSuffixes = kind === 'report' ? SAFE_REPORT_SUFFIXES : SAFE_EVIDENCE_SUFFIXES;
+  if (!matchesSafeSuffix(evidencePath, safeSuffixes)) {
+    throw new Error(
+      `Refusing to use a non-gitignored ${kind} path. Use a docs/evidence/*${safeSuffixes
+        .join(' or docs/evidence/*')
+        .trim()} path, or pass --allow-any-path intentionally.`,
     );
   }
 }
@@ -151,6 +251,49 @@ export function applyTodayPilotEvidenceUpdates(
 
   setIfDefined(
     updated,
+    'pilotTimestamp',
+    options.pilotTimestamp?.trim()
+      ? readStringNote('--pilot-timestamp', options.pilotTimestamp)
+      : undefined,
+  );
+  setIfDefined(
+    updated,
+    'environmentLabel',
+    options.environmentLabel?.trim()
+      ? readStringNote('--environment-label', options.environmentLabel)
+      : undefined,
+  );
+  setIfDefined(
+    updated,
+    'pilot_environment',
+    options.pilotEnvironment?.trim()
+      ? readStringNote('--pilot-environment', options.pilotEnvironment)
+      : undefined,
+  );
+  setIfDefined(
+    updated,
+    'tester',
+    options.tester?.trim() ? readStringNote('--tester', options.tester) : undefined,
+  );
+  setIfDefined(
+    updated,
+    'source_count',
+    readIntegerFlag('--source-count', options.sourceCount),
+  );
+  setIfDefined(
+    updated,
+    'appUrlOrLocalhost',
+    options.appUrlOrLocalhost?.trim()
+      ? readStringNote('--app-url', options.appUrlOrLocalhost)
+      : undefined,
+  );
+  setIfDefined(
+    updated,
+    'observed_feed_mode',
+    readObservedFeedModeFlag('--observed-feed-mode', options.observedFeedMode),
+  );
+  setIfDefined(
+    updated,
     'realCardsRendered',
     readBooleanFlag('--real-cards-rendered', options.realCardsRendered),
   );
@@ -158,6 +301,11 @@ export function applyTodayPilotEvidenceUpdates(
     updated,
     'real_card_count',
     readIntegerFlag('--real-card-count', options.realCardCount),
+  );
+  setIfDefined(
+    updated,
+    'detail_checked_count',
+    readIntegerFlag('--detail-checked-count', options.detailCheckedCount),
   );
   setIfDefined(
     updated,
@@ -183,6 +331,14 @@ export function applyTodayPilotEvidenceUpdates(
     updated,
     'no_fake_article_body',
     readBooleanFlag('--no-fake-article-body', options.noFakeArticleBody),
+  );
+  setIfDefined(
+    updated,
+    'completedNonEmptyEnrichedContentObserved',
+    readBooleanFlag(
+      '--completed-enriched-text-observed',
+      options.completedEnrichedTextObserved,
+    ),
   );
   setIfDefined(
     updated,
@@ -228,6 +384,16 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
+    'brokenPreviewReadsFellBackSafelyToMock',
+    readBooleanFlag('--broken-preview-fallback', options.brokenPreviewFallback),
+  );
+  setIfDefined(
+    updated,
+    'noSecretsOrRawInternalsInUi',
+    readBooleanFlag('--no-secrets-in-ui', options.noSecretsInUi),
+  );
+  setIfDefined(
+    updated,
     'rollback_checked',
     readBooleanFlag('--rollback-tested', options.rollbackTested),
   );
@@ -237,6 +403,30 @@ export function applyTodayPilotEvidenceUpdates(
     readBooleanFlag(
       '--preview-read-policies-confirmed',
       options.previewReadPoliciesConfirmed,
+    ),
+  );
+  setIfDefined(
+    updated,
+    'no_frontend_writes_introduced',
+    readBooleanFlag(
+      '--no-frontend-writes-introduced',
+      options.noFrontendWritesIntroduced,
+    ),
+  );
+  setIfDefined(
+    updated,
+    'no_frontend_ai_calls_introduced',
+    readBooleanFlag(
+      '--no-frontend-ai-calls-introduced',
+      options.noFrontendAiCallsIntroduced,
+    ),
+  );
+  setIfDefined(
+    updated,
+    'radarWatchlistLibraryUnchanged',
+    readBooleanFlag(
+      '--radar-watchlist-library-unchanged',
+      options.radarWatchlistLibraryUnchanged,
     ),
   );
   setIfDefined(
@@ -258,6 +448,67 @@ export function applyTodayPilotEvidenceUpdates(
     updated,
     'sourceCoverageAcceptable',
     readQualityFlag('--source-coverage', options.sourceCoverage),
+  );
+  setIfDefined(
+    updated,
+    'finalRecommendation',
+    readRecommendationFlag('--final-recommendation', options.finalRecommendation),
+  );
+
+  appendNoteArray(
+    updated,
+    'env_flags_checked',
+    (options.envFlags ?? []).map((flag) => readStringNote('--env-flag', flag)),
+  );
+  appendNoteArray(
+    updated,
+    'sample_card_ids_or_titles',
+    (options.sampleCards ?? []).map((sample) => readStringNote('--sample-card', sample)),
+  );
+  appendNoteArray(
+    updated,
+    'enriched_summary_cases',
+    (options.enrichedSummaryCases ?? []).map((value) =>
+      readStringNote('--enriched-case', value),
+    ),
+  );
+  appendNoteArray(
+    updated,
+    'deterministic_fallback_cases',
+    (options.deterministicFallbackCases ?? []).map((value) =>
+      readStringNote('--deterministic-fallback-case', value),
+    ),
+  );
+  appendNoteArray(
+    updated,
+    'filter_checks',
+    (options.filterChecks ?? []).map((value) => readStringNote('--filter-check', value)),
+  );
+  appendNoteArray(
+    updated,
+    'empty_state_checks',
+    (options.emptyStateChecks ?? []).map((value) =>
+      readStringNote('--empty-state-check', value),
+    ),
+  );
+  appendNoteArray(
+    updated,
+    'blocker_notes',
+    (options.blockerNotes ?? []).map((value) => readStringNote('--blocker', value)),
+  );
+  appendNoteArray(
+    updated,
+    'mobile_quality_notes',
+    (options.mobileQualityNotes ?? []).map((value) =>
+      readStringNote('--mobile-note', value),
+    ),
+  );
+  appendNoteArray(
+    updated,
+    'bilingual_quality_notes',
+    (options.bilingualQualityNotes ?? []).map((value) =>
+      readStringNote('--bilingual-note', value),
+    ),
   );
 
   appendNoteArray(

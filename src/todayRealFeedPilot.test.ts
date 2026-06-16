@@ -45,7 +45,7 @@ test('buildTodayRealFeedPilotCheck keeps Today mock-by-default when env flag is 
 });
 
 test('buildTodayRealFeedPilotCheck marks the pilot ready only when explicit Supabase env is present', () => {
-const result = buildTodayRealFeedPilotCheck({
+  const result = buildTodayRealFeedPilotCheck({
     VITE_USE_REAL_CONTENT_FEED: 'true',
     VITE_SUPABASE_URL: 'https://example.supabase.co',
     VITE_SUPABASE_ANON_KEY: 'public-anon-key',
@@ -54,7 +54,14 @@ const result = buildTodayRealFeedPilotCheck({
   assert.equal(result.mode, 'pilot_ready');
   assert.equal(result.shouldAttemptRealFeedRead, true);
   assert.deepEqual(result.missingEnvKeys, []);
-  assert.equal(result.warnings.length, 0);
+  assert.match(
+    result.warnings.join('\n'),
+    /only checks local env presence/i,
+  );
+  assert.match(
+    result.warnings.join('\n'),
+    /fallback_to_mock|real_empty/i,
+  );
   assert.deepEqual(result.nextCommands, TODAY_REAL_FEED_PILOT_NEXT_COMMANDS);
   assert.ok(result.passCriteria.includes('Real cards remain readable and useful.'));
   assert.ok(result.evidenceToCollect.includes('Capture whether Today loaded real cards, real_empty, or fallback_to_mock.'));

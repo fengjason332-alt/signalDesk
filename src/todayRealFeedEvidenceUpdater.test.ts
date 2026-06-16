@@ -46,10 +46,42 @@ test('update evidence command can update a generated local evidence file', () =>
       'tsx',
       updateEvidenceScriptPath,
       outputPath,
+      '--pilot-timestamp',
+      '2026-06-08T00:00:00.000Z',
+      '--environment-label',
+      'localhost-preview-pilot',
+      '--pilot-environment',
+      'localhost-preview-pilot',
+      '--tester',
+      'codex-local-operator',
+      '--app-url',
+      'http://localhost:3000',
       '--real-cards-rendered',
       'true',
+      '--observed-feed-mode',
+      'real',
+      '--source-count',
+      '1',
       '--real-card-count',
       '3',
+      '--detail-checked-count',
+      '1',
+      '--env-flag',
+      'VITE_USE_REAL_CONTENT_FEED=true',
+      '--sample-card',
+      "The next phase of OpenAI's Education for Countries",
+      '--broken-preview-fallback',
+      'true',
+      '--no-secrets-in-ui',
+      'true',
+      '--no-frontend-writes-introduced',
+      'true',
+      '--no-frontend-ai-calls-introduced',
+      'true',
+      '--radar-watchlist-library-unchanged',
+      'true',
+      '--final-recommendation',
+      'continue_pilot',
       '--rollback-tested',
       'true',
       '--operator-note',
@@ -67,7 +99,25 @@ test('update evidence command can update a generated local evidence file', () =>
   const parsed = parseTodayPilotEvidence(raw);
 
   assert.equal(parsed.realCardsRendered, true);
+  assert.equal(parsed.pilotTimestamp, '2026-06-08T00:00:00.000Z');
+  assert.equal(parsed.environmentLabel, 'localhost-preview-pilot');
+  assert.equal(parsed.pilotEnvironment, 'localhost-preview-pilot');
+  assert.equal(parsed.tester, 'codex-local-operator');
+  assert.equal(parsed.appUrlOrLocalhost, 'http://localhost:3000');
+  assert.equal(parsed.observedFeedMode, 'real');
+  assert.equal(parsed.sourceCount, 1);
   assert.equal(parsed.realCardsObservedCount, 3);
+  assert.equal(parsed.detailCheckedCount, 1);
+  assert.ok(parsed.envFlagsChecked.includes('VITE_USE_REAL_CONTENT_FEED=true'));
+  assert.deepEqual(parsed.sampleCardIdsOrTitles, [
+    "The next phase of OpenAI's Education for Countries",
+  ]);
+  assert.equal(parsed.brokenPreviewReadsFellBackSafelyToMock, true);
+  assert.equal(parsed.noSecretsOrRawInternalsInUi, true);
+  assert.equal(parsed.noFrontendWritesIntroduced, true);
+  assert.equal(parsed.noFrontendAiCallsIntroduced, true);
+  assert.equal(parsed.radarWatchlistLibraryUnchanged, true);
+  assert.equal(parsed.finalRecommendation, 'continue_pilot');
   assert.equal(parsed.rollbackToMockVerified, true);
   assert.match(JSON.stringify(raw), /updated_at/i);
   assert.ok(parsed.reviewerNotes.includes('Observed three real cards.'));
@@ -149,6 +199,30 @@ test('update evidence command rejects invalid enum values', () => {
   assert.match(result.stderr || result.stdout, /invalid quality value/i);
 });
 
+test('update evidence command rejects invalid observed feed modes', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-feed-mode-'));
+  const outputPath = createLocalEvidenceFile(tempDir);
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--observed-feed-mode',
+      'pilot_ready',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr || result.stdout, /invalid observed feed mode/i);
+});
+
 test('update evidence command refuses unsafe output paths unless explicitly allowed', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-unsafe-'));
   const unsafePath = resolve(tempDir, 'outside.json');
@@ -166,6 +240,66 @@ test('update evidence command refuses unsafe output paths unless explicitly allo
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr || result.stdout, /outside docs\/evidence/i);
+});
+
+test('update evidence command refuses tracked-looking docs/evidence json paths unless explicitly allowed', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-tracked-'));
+  const unsafePath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-evidence.json');
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  writeFileSync(unsafePath, '{}', 'utf8');
+
+  const result = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', updateEvidenceScriptPath, unsafePath, '--rollback-tested', 'true'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr || result.stdout, /non-gitignored evidence path/i);
+});
+
+test('update evidence command allows an explicit tracked-looking docs/evidence json path only with --allow-any-path', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-allow-any-path-'));
+  const outputPath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-evidence.json');
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  writeFileSync(
+    outputPath,
+    JSON.stringify({
+      pilot_environment: 'manual-pilot',
+      tested_at: '2026-06-08T00:00:00.000Z',
+      observed_feed_mode: 'unknown',
+    }),
+    'utf8',
+  );
+
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--allow-any-path',
+      '--rollback-tested',
+      'true',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const parsed = parseTodayPilotEvidence(
+    JSON.parse(readFileSync(outputPath, 'utf8')),
+  );
+
+  assert.equal(parsed.rollbackToMockVerified, true);
+  assert.match(output, /updated local today pilot evidence/i);
 });
 
 test('update evidence command does not overwrite malformed JSON', () => {

@@ -36,7 +36,7 @@ This handoff supersedes older Phase 4 notes. Use this section first before touch
 - DeepSeek is now wired as the first optional server-side provider
 - Task 13C adds a guarded manual-only AI write mode
 - Task 13D and Task 13E add additive claim / retry hardening plus sequential one-to-three signal manual batch support
-- Task 14A-33 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, a controlled Today real-feed rollout path that remains mock-by-default, a dedicated rollout-decision checklist before any default-feed change, stronger real-feed diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback guidance, a Task 21 target-environment pilot runbook, a Task 22 local pilot preflight helper, a Task 23 pilot evidence template, Task 24 local evidence-review tooling, Task 25 stricter evidence hardening plus a controlled default-rollout preparation plan, Task 26 local evidence-starter and operator checklist support, Task 27 beginner-safe pilot execution UX improvements, Task 28 read-only real-feed reason hardening, Task 29 docs and handoff consolidation, Task 30 local evidence-update tooling, Task 31 local pilot-report tooling, Task 32 operator-flow doc alignment, Task 33 bounded pilot help output, and a planning-only future X or Grok user-curated source path
+- Task 14A-36 add a single-intent non-AI ingestion contract, mixed-request rejection, explicit requested/resolved source-id diagnostics, bounded scheduled-ingestion enablement, confirmation that AI enrichment still rejects scheduled trigger mode, a controlled Today real-feed rollout path that remains mock-by-default, a dedicated rollout-decision checklist before any default-feed change, stronger real-feed diagnostics and fallback QA hardening, a Task 20 keep-mock-by-default decision with explicit rollback guidance, a Task 21 target-environment pilot runbook, a Task 22 local pilot preflight helper, a Task 23 pilot evidence template, Task 24 local evidence-review tooling, Task 25 stricter evidence hardening plus a controlled default-rollout preparation plan, Task 26 local evidence-starter and operator checklist support, Task 27 beginner-safe pilot execution UX improvements, Task 28 read-only real-feed reason hardening, Task 29 docs and handoff consolidation, Task 30 local evidence-update tooling, Task 31 local pilot-report tooling, Task 32 operator-flow doc alignment, Task 33 bounded pilot help output, Task 34 actual local pilot execution, Task 35 operator-tooling hardening from real pilot friction, Task 36 a sanitized committed pilot summary, and a planning-only future X or Grok user-curated source path
 - AI writes remain limited to enrichment-ready columns plus additive claim/retry bookkeeping columns on `public.intelligence_signals`
 - scheduled non-AI ingestion now exists behind `PHASE4_ENABLE_SCHEDULED_INGESTION=true`
 - scheduled non-AI ingestion remains disabled by default, keeps AI out of the path entirely, and applies hard caps for:
@@ -121,8 +121,10 @@ Before changing code, read:
 Enable preview only when intentionally testing:
 - `VITE_USE_REAL_CONTENT_FEED=true`
 - run `npm run phase4:today-pilot-check` before opening the app to confirm whether the env is still `mock_default`, `pilot_ready`, or `pilot_misconfigured`
+- remember that `pilot_ready` only checks whether the local env keys are present; wrong-project wiring, empty preview rows, or preview-read policy failures can still show up later in-browser as `fallback_to_mock` or `real_empty`
 - run `npm run phase4:create-today-evidence` to create `docs/evidence/today-real-feed-pilot-evidence.local.json`
 - run `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json ...` while testing if you do not want to hand-edit JSON
+- the create, update, and report helpers now refuse non-gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default unless `--allow-any-path` is passed intentionally
 - after recording pilot results, run `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json` or another local evidence file to review rollout readiness locally
 - run `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md` to generate a local Markdown report
 - run `npm run phase4:today-help` to print the bounded local-only command flow again
@@ -385,6 +387,13 @@ Do not commit any of these secrets or real values.
   - the full create -> check -> run -> update -> review -> report -> rollback operator flow in docs
 - Task 33 now adds:
   - `npm run phase4:today-help`
+- Task 34 now adds:
+  - actual local pilot observations for real cards, safe Detail, filter behavior, fallback-to-mock, and rollback-to-mock
+- Task 35 now adds:
+  - stricter gitignored local/private path guards for create/update/report helpers
+  - clearer pilot-check wording that `pilot_ready` is only an env-presence preflight
+- Task 36 now adds:
+  - [docs/TODAY_REAL_FEED_PILOT_SANITIZED_SUMMARY.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_SANITIZED_SUMMARY.md)
 - Today real-feed mode now keeps the same UI style but returns clearer prototype states:
   - `mock` when preview is disabled
   - `real` when preview-safe rows load
@@ -408,9 +417,9 @@ Do not commit any of these secrets or real values.
 
 ### Exact Next Recommended Task
 
-Phase 4 Task 34:
-- run the actual target pilot with the Task 33 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
-- review that local evidence before any explicit default-switch task is considered
+Phase 4 Task 37:
+- continue the Today pilot only after capturing the still-missing evidence, especially a genuine `real_empty` observation and one completed, non-empty enriched-content win
+- review that refreshed local evidence before any explicit default-switch task is considered
 - keep the real-content path read-only on the client
 - keep Radar on mock
 - keep AI enrichment manual-only while scheduled non-AI ingestion gains more operational validation

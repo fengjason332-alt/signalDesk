@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Operator Checklist
 
-This document is maintained through Phase 4 Task 33.
+This document is maintained through Phase 4 Task 36.
 
 It is a beginner-friendly manual checklist for running the Today real-feed pilot without changing the default product behavior.
 
@@ -25,6 +25,7 @@ You will use:
 - `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
 - `npm run phase4:today-help`
+- these helpers only accept gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default unless `--allow-any-path` is passed intentionally
 
 Your local evidence file should live at:
 - `docs/evidence/today-real-feed-pilot-evidence.local.json`
@@ -45,6 +46,8 @@ That file is meant to stay local and should not be committed.
    - `VITE_SUPABASE_ANON_KEY`
 8. Run `npm run phase4:today-pilot-check` again.
 9. Confirm the helper reports `mode: pilot_ready`.
+   - this only proves the local env keys are present
+   - preview-read policy failures or wrong-project wiring can still show up later in-browser as `fallback_to_mock` or `real_empty`
 10. Start the app with `npm run dev`.
 11. Open Today.
 12. Check whether real cards appear with the existing style.
@@ -67,6 +70,8 @@ That file is meant to stay local and should not be committed.
    - confirm Today is back on mock
 21. Fill the evidence JSON while testing.
 22. If you do not want to hand-edit JSON, use `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json ...`.
+   - it now covers the common pilot fields such as observed feed mode, detail count, env flags, sample cards, fallback checks, rollback checks, and final recommendation
+   - hand-edit JSON only if you need a rarer field that is still not exposed as a flag
 23. Run:
 
 ```bash

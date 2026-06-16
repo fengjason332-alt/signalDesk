@@ -248,10 +248,12 @@ Proposed future AI enrichment flow:
 
 ## Remaining Tasks
 
-### Task 34: Execute The Actual Today Pilot And Review The Local Evidence Before Any Default Switch
+### Task 37: Capture The Missing Today Pilot Evidence Before Any Default Switch
 
-- run the actual target pilot with the Task 33 checklist and fill `docs/evidence/today-real-feed-pilot-evidence.local.json`
-- review that local evidence before any explicit default-switch task is considered
+- keep Today mock-by-default
+- capture a genuine `real_empty` observation in a suitable target environment if available
+- capture at least one completed and non-empty enriched-content win in the target environment
+- review the refreshed local evidence before any explicit default-switch task is considered
 - preserve fallback paths and rollback paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout
 
