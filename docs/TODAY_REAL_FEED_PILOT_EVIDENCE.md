@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is maintained through Phase 4 Task 36. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is maintained through Phase 4 Task 39. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -24,14 +24,19 @@ Local helper command:
 - `npm run phase4:create-today-evidence`
 - `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true`
 - `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
+- `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
 - `npm run phase4:today-help`
 - `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
 - The evidence-review command is local-only. It does not call Supabase, does not call AI providers, and does not write content.
 - The evidence-update and pilot-report commands are also local-only. They do not call Supabase, do not call AI providers, and do not write app content.
+- The evidence-next command is also local-only. It does not call Supabase, does not call AI providers, and does not write content.
 - Local operator evidence should live in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another gitignored local/private JSON path.
 - Local operator reports should live in `docs/evidence/today-real-feed-pilot-report.local.md` or another gitignored local/private Markdown path.
-- The helper commands now refuse non-gitignored evidence/report paths by default unless `--allow-any-path` is passed intentionally.
+- The create/update helpers only accept gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default.
+- The review/next/report readers also accept the shipped `docs/examples/today-real-feed-pilot-evidence*.json` files for local practice.
+- Pass `--allow-any-path` only when you intentionally need to bypass those local-only path guards.
+- Keep updating one local/private evidence file across multiple pilot passes. Do not split a `real_empty` pass and a successful real-card pass into separate committed files.
 
 Important boundaries:
 - no `SUPABASE_SERVICE_ROLE_KEY` in the frontend
@@ -113,6 +118,32 @@ Important boundaries:
 - one example or note proving fallback to mock remains safe
 - one note confirming rollback to mock succeeded
 
+## Task 37 Missing Evidence Map
+
+The current evidence review still remains `continue_pilot` until the following gaps are filled:
+
+- genuine `real_empty`
+  - record `observedFeedMode=real_empty` during the session where you saw it
+  - set `realEmptyDistinctFromFilterEmpty=true`
+  - add one `emptyStateChecks` note describing why the result was a true `real_empty` state and not an invalid env or generic fallback case
+- completed and non-empty enriched content wins
+  - set `completedNonEmptyEnrichedContentObserved=true`
+  - set `completedNonEmptyEnrichedContentWon=true`
+  - add one `enrichedSummaryCases` note describing which card showed the enriched-content win
+- completed but blank enrichment fallback
+  - set `completedBlankEnrichedContentFallbackWorked=true`
+  - add one `deterministicFallbackCases` note describing which card fell back safely
+- mobile quality
+  - set `mobileQualityAcceptable=true` only after a real narrow/mobile viewport pass
+  - add one `mobileQualityNotes` note with the tested viewport/device
+- freshness
+  - set `dataFreshnessAcceptable=true` only after checking publish dates or acceptable recency
+  - add one `freshnessNotes` note summarizing the observed freshness evidence
+- source coverage
+  - set `sourceCoverageAcceptable=true` only after checking the breadth of stable observed sources
+  - update `sourceCount`
+  - add one `sourceCoverageNotes` note summarizing the observed source mix
+
 ## Recommendation Categories
 
 - `blocked`
@@ -161,13 +192,19 @@ Then fill in the fields in that local file and review it locally:
 npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json
 ```
 
+If the review still returns `continue_pilot`, ask the local next-step helper what to capture next:
+
+```bash
+npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json
+```
+
 If you prefer not to hand-edit JSON, update the file incrementally:
 
 ```bash
 npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true --detail-opened-safely true
 ```
 
-The updater covers the common pilot fields such as observed feed mode, detail count, env flags checked, sample cards, fallback checks, rollback checks, and final recommendation. Hand-edit the JSON only if you need a rarer field that is still not exposed as a flag.
+The updater covers the common pilot fields such as observed feed mode, detail count, env flags checked, sample cards, fallback checks, rollback checks, freshness notes, source-coverage notes, and final recommendation. Hand-edit the JSON only if you need a rarer field that is still not exposed as a flag.
 
 Generate a local Markdown report after review:
 
@@ -182,54 +219,61 @@ Do not commit local/private evidence files. Keep real operator notes in gitignor
 - `docs/evidence/*.private.md`
 
 The local evidence file and local report file should not be committed.
+The template and example files now use canonical camelCase keys. The local parser still accepts older alias keys for backwards-compatible local evidence only.
 
 Even a passing local report does not switch Today by default. A separate controlled rollout task is still required.
 
 ## Template Field Meanings
 
-- `pilot_environment`
-  - a short label for where you tested, such as `localhost-preview` or `private-preview`
-- `tested_at`
+- `pilotEnvironment`
+  - compatibility mirror of the environment label; keep it aligned with `environmentLabel` for local evidence unless you have a very specific reason not to
+- `environmentLabel`
+  - the canonical short label used by the local review/report helpers, such as `localhost-preview` or `private-preview`
+- `pilotTimestamp`
   - when you ran the pilot
 - `tester`
   - who ran the test
-- `app_url_or_localhost`
+- `appUrlOrLocalhost`
   - where the app was opened
-- `env_flags_checked`
+- `envFlagsChecked`
   - which real-feed flags or rollback flags you actually verified
-- `source_count`
+- `sourceCount`
   - how many useful real sources appeared in the pilot environment
-- `real_card_count`
+- `realCardsObservedCount`
   - how many real Today cards you actually saw
-- `sample_card_ids_or_titles`
+- `sampleCardIdsOrTitles`
   - a few example cards that prove the pilot used real data
-- `detail_checked_count`
+- `detailCheckedCount`
   - how many real cards you opened and checked in Detail
-- `source_links_visible`
+- `provenanceOrSourceLinksVisible`
   - whether provenance/source links were actually visible
-- `no_fake_article_body`
+- `fakeFullArticleBodyAbsent`
   - whether Detail stayed honest about missing full article body content
-- `enriched_summary_cases`
+- `enrichedSummaryCases`
   - short notes describing where enriched text was shown correctly
-- `deterministic_fallback_cases`
+- `deterministicFallbackCases`
   - short notes describing where deterministic fallback was shown correctly
-- `filter_checks`
+- `filterChecks`
   - notes about AI/OpenAI filter and nonmatching filter behavior
-- `empty_state_checks`
+- `emptyStateChecks`
   - notes about `real_empty`, `filter_empty`, and fallback behavior
-- `rollback_checked`
+- `rollbackToMockVerified`
   - whether you really switched back to mock and confirmed it
-- `rls_read_policy_confirmed`
+- `rlsReadPolicyConfirmed`
   - whether preview-read policies were confirmed for the tested environment
-- `mobile_quality_notes`
+- `mobileQualityNotes`
   - short notes about the phone-sized experience
-- `bilingual_quality_notes`
+- `bilingualQualityNotes`
   - short notes about Chinese/English readability
-- `blocker_notes`
+- `freshnessNotes`
+  - short notes about publish-date freshness or acceptable recency
+- `sourceCoverageNotes`
+  - short notes about the observed source mix and whether the breadth felt sufficient
+- `blockersFound`
   - anything serious enough to stop rollout
-- `screenshots_or_notes`
+- `screenshotsOrNotes`
   - paths or notes for supporting evidence
-- `final_operator_recommendation`
+- `finalRecommendation`
   - the operator's own final recommendation, which may still be reviewed by the local tool
 
 ## What Would Justify A Future Default Switch
@@ -241,6 +285,7 @@ Even a passing local report does not switch Today by default. A separate control
 - preview-read policies and anon reads are reliable in the target environment
 - AI enrichment is optional and not required for card rendering
 - rollback has been tested and remains simple
+- the missing Task 37 evidence no longer leaves the review result at `continue_pilot`
 
 ## What Would Block A Default Switch
 

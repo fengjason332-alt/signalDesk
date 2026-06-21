@@ -1,59 +1,97 @@
 {
-  "_template_notes": [
+  "_templateNotes": [
     "Fill this file locally after running the Today real-feed pilot.",
-    "Use true/false only after you have manually checked the behavior.",
+    "Use the canonical camelCase keys shown here. The parser still accepts older alias keys, but new local evidence should stay in this normalized format.",
     "Keep local/private evidence files out of git."
   ],
-  "_starter_commands": [
+  "_starterCommands": [
     "npm run phase4:create-today-evidence",
     "npm run phase4:today-pilot-check",
     "npm run dev",
-    "npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json"
+    "npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json",
+    "npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json"
   ],
-  "pilot_environment": "fill-me-target-environment",
-  "tested_at": "2026-06-01T00:00:00.000Z",
+  "_mergeGuidance": [
+    "Keep updating one local/private evidence file across multiple pilot passes.",
+    "If you capture a real_empty run and a separate real-card run, merge both observations into the same local/private evidence file instead of committing multiple files.",
+    "Use emptyStateChecks, enrichedSummaryCases, deterministicFallbackCases, freshnessNotes, and sourceCoverageNotes to record evidence gathered across separate sessions."
+  ],
+  "_missingEvidencePrompts": {
+    "realEmptyDistinctFromFilterEmpty": [
+      "Only mark this true after you intentionally observe a real_empty state that is clearly different from a normal filter-empty state.",
+      "Capture one screenshot or note describing why it was a genuine real_empty result and not an invalid env or generic fallback case.",
+      "Recommended updater flags: --observed-feed-mode real_empty --real-empty-distinct true --empty-state-check \"Describe the genuine real_empty observation here.\""
+    ],
+    "completedNonEmptyEnrichedContentObservedAndWon": [
+      "Only mark these true after you observe a real card where completed and non-empty enriched text is visibly present and clearly beats the deterministic preview text.",
+      "Capture which card you used and what the enriched text improved.",
+      "Recommended updater flags: --completed-enriched-text-observed true --completed-enriched-text-wins true --enriched-case \"Describe the winning enriched-content example here.\""
+    ],
+    "completedBlankEnrichedContentFallbackWorked": [
+      "Only mark this true after you observe a completed-but-blank enrichment case that safely falls back to deterministic preview text.",
+      "Capture which card you used and what deterministic text remained visible.",
+      "Recommended updater flags: --blank-enrichment-fallback true --deterministic-fallback-case \"Describe the blank-enrichment fallback example here.\""
+    ],
+    "mobileQualityAcceptable": [
+      "Check Today and Detail on at least one narrow/mobile viewport and record whether cards, chips, and provenance stayed readable.",
+      "Recommended updater flags: --mobile-quality acceptable --mobile-note \"Describe the tested viewport and result here.\""
+    ],
+    "dataFreshnessAcceptable": [
+      "Record whether the real cards looked fresh enough for this pilot, such as recent publish dates or clearly acceptable recency for the tested sources.",
+      "Recommended updater flags: --freshness acceptable --freshness-note \"Describe the publish-date freshness evidence here.\""
+    ],
+    "sourceCoverageAcceptable": [
+      "Record whether the observed real cards came from a broad enough mix of stable sources to justify future rollout discussion.",
+      "Recommended updater flags: --source-coverage acceptable --source-count 2 --source-coverage-note \"Describe the observed source mix here.\""
+    ]
+  },
+  "pilotTimestamp": "2026-06-01T00:00:00.000Z",
+  "environmentLabel": "fill-me-target-environment",
+  "pilotEnvironment": "fill-me-target-environment",
   "tester": "your-name",
-  "app_url_or_localhost": "http://localhost:3000",
-  "env_flags_checked": [
+  "appUrlOrLocalhost": "http://localhost:3000",
+  "envFlagsChecked": [
     "VITE_USE_REAL_CONTENT_FEED=true",
     "VITE_SUPABASE_URL set",
     "VITE_SUPABASE_ANON_KEY set"
   ],
-  "observed_feed_mode": "unknown",
-  "source_count": null,
+  "observedFeedMode": "unknown",
+  "sourceCount": null,
   "realCardsRendered": null,
-  "real_card_count": null,
-  "sample_card_ids_or_titles": [],
-  "detail_checked_count": null,
+  "realCardsObservedCount": null,
+  "sampleCardIdsOrTitles": [],
+  "detailCheckedCount": null,
   "detailOpenedSafely": null,
-  "source_links_visible": null,
-  "no_fake_article_body": null,
+  "provenanceOrSourceLinksVisible": null,
+  "fakeFullArticleBodyAbsent": null,
   "completedNonEmptyEnrichedContentObserved": null,
   "completedNonEmptyEnrichedContentWon": null,
-  "completed_blank_enriched_content_fallback_worked": null,
+  "completedBlankEnrichedContentFallbackWorked": null,
   "incompleteEnrichmentDeterministicFallbackWorked": null,
-  "ai_or_openai_filter_matched_when_applicable": null,
+  "aiOrOpenAiFilterMatchedWhenApplicable": null,
   "nonMatchingFiltersShowedNormalFilterEmptyState": null,
   "realEmptyDistinctFromFilterEmpty": null,
   "brokenPreviewReadsFellBackSafelyToMock": null,
-  "no_secrets_or_raw_internals_in_ui": null,
+  "noSecretsOrRawInternalsInUi": null,
   "bilingualQualityAcceptable": null,
   "mobileQualityAcceptable": null,
   "dataFreshnessAcceptable": null,
   "sourceCoverageAcceptable": null,
-  "rls_read_policy_confirmed": null,
-  "no_frontend_writes_introduced": null,
-  "no_frontend_ai_calls_introduced": null,
+  "rlsReadPolicyConfirmed": null,
+  "noFrontendWritesIntroduced": null,
+  "noFrontendAiCallsIntroduced": null,
   "radarWatchlistLibraryUnchanged": null,
-  "rollback_checked": null,
-  "enriched_summary_cases": [],
-  "deterministic_fallback_cases": [],
-  "filter_checks": [],
-  "empty_state_checks": [],
-  "blocker_notes": [],
+  "rollbackToMockVerified": null,
+  "enrichedSummaryCases": [],
+  "deterministicFallbackCases": [],
+  "filterChecks": [],
+  "emptyStateChecks": [],
+  "blockersFound": [],
   "reviewerNotes": [],
-  "mobile_quality_notes": [],
-  "bilingual_quality_notes": [],
-  "screenshots_or_notes": [],
-  "final_operator_recommendation": null
+  "mobileQualityNotes": [],
+  "bilingualQualityNotes": [],
+  "freshnessNotes": [],
+  "sourceCoverageNotes": [],
+  "screenshotsOrNotes": [],
+  "finalRecommendation": null
 }

@@ -1,70 +1,76 @@
 {
   "pilotTimestamp": "2026-06-01T10:30:00.000Z",
   "environmentLabel": "target-preview-passing",
-  "pilot_environment": "target-preview-passing",
+  "pilotEnvironment": "target-preview-passing",
   "tester": "example-operator",
-  "app_url_or_localhost": "http://localhost:3000",
-  "env_flags_checked": [
+  "appUrlOrLocalhost": "http://localhost:3000",
+  "envFlagsChecked": [
     "VITE_USE_REAL_CONTENT_FEED=true",
     "VITE_SUPABASE_URL set",
     "VITE_SUPABASE_ANON_KEY set",
     "VITE_USE_REAL_CONTENT_FEED=false rollback tested"
   ],
   "observedFeedMode": "real",
-  "source_count": 4,
+  "sourceCount": 4,
   "realCardsRendered": true,
-  "real_card_count": 4,
-  "sample_card_ids_or_titles": [
+  "realCardsObservedCount": 4,
+  "sampleCardIdsOrTitles": [
     "OpenAI launch update",
     "AI policy roundup",
     "Chip market note"
   ],
-  "detail_checked_count": 2,
+  "detailCheckedCount": 2,
   "detailOpenedSafely": true,
-  "source_links_visible": true,
-  "no_fake_article_body": true,
+  "provenanceOrSourceLinksVisible": true,
+  "fakeFullArticleBodyAbsent": true,
   "completedNonEmptyEnrichedContentObserved": true,
   "completedNonEmptyEnrichedContentWon": true,
-  "completed_blank_enriched_content_fallback_worked": true,
+  "completedBlankEnrichedContentFallbackWorked": true,
   "incompleteEnrichmentDeterministicFallbackWorked": true,
   "aiOrOpenAiFilterMatchedWhenApplicable": true,
   "nonMatchingFiltersShowedNormalFilterEmptyState": true,
   "realEmptyDistinctFromFilterEmpty": true,
   "brokenPreviewReadsFellBackSafelyToMock": true,
-  "no_secrets_or_raw_internals_in_ui": true,
+  "noSecretsOrRawInternalsInUi": true,
   "bilingualQualityAcceptable": true,
   "mobileQualityAcceptable": true,
   "dataFreshnessAcceptable": true,
   "sourceCoverageAcceptable": true,
-  "rls_read_policy_confirmed": true,
-  "no_frontend_writes_introduced": true,
-  "no_frontend_ai_calls_introduced": true,
+  "rlsReadPolicyConfirmed": true,
+  "noFrontendWritesIntroduced": true,
+  "noFrontendAiCallsIntroduced": true,
   "radarWatchlistLibraryUnchanged": true,
-  "rollback_checked": true,
-  "enriched_summary_cases": [
+  "rollbackToMockVerified": true,
+  "enrichedSummaryCases": [
     "Completed non-empty enriched summary won over deterministic summary."
   ],
-  "deterministic_fallback_cases": [
+  "deterministicFallbackCases": [
     "Pending and blank enrichment cases both fell back to deterministic preview."
   ],
-  "filter_checks": [
+  "filterChecks": [
     "AI/OpenAI filter matched real cards.",
     "Nonmatching filter showed normal filter-empty state."
   ],
-  "empty_state_checks": [
+  "emptyStateChecks": [
     "real_empty stayed distinct from filter_empty."
   ],
   "blockersFound": [],
   "reviewerNotes": [
     "Passing example only. Uses fake data and no real environment identifiers."
   ],
-  "mobile_quality_notes": [
+  "mobileQualityNotes": [
     "Mobile viewport remained readable."
   ],
-  "bilingual_quality_notes": [
+  "bilingualQualityNotes": [
     "Chinese and English content stayed understandable together."
   ],
-  "screenshots_or_notes": [
+  "freshnessNotes": [
+    "Observed real cards were recent enough for the tested pilot date."
+  ],
+  "sourceCoverageNotes": [
+    "Observed cards came from multiple stable sources that felt broad enough for the pilot."
+  ],
+  "screenshotsOrNotes": [
     "Saved one Today screenshot and one Detail screenshot with provenance visible."
   ],
   "finalRecommendation": null

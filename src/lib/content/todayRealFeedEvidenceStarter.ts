@@ -66,6 +66,7 @@ export function buildTodayRealFeedEvidenceStarterPlan(
       `Fill or update the evidence JSON at ${outputPath} while testing.`,
       `Use npm run phase4:update-today-evidence -- ${outputPath} to capture local checks safely.`,
       `Run ${reviewCommand}.`,
+      `Run npm run phase4:today-evidence-next -- ${outputPath} to see the exact next missing evidence to collect.`,
       `Generate a local report with npm run phase4:today-pilot-report -- ${outputPath} --out ${DEFAULT_TODAY_REAL_FEED_REPORT_OUTPUT_PATH}.`,
       'Roll back with VITE_USE_REAL_CONTENT_FEED=false.',
     ],

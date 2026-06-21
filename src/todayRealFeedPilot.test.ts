@@ -114,6 +114,7 @@ test('local Today pilot helper script prints a bounded pilot-ready summary witho
   assert.match(output, /phase4:create-today-evidence/i);
   assert.match(output, /phase4:update-today-evidence/i);
   assert.match(output, /phase4:today-evidence-review -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i);
+  assert.match(output, /phase4:today-evidence-next -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i);
   assert.match(output, /phase4:today-pilot-report -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json --out docs\/evidence\/today-real-feed-pilot-report\.local\.md/i);
   assert.match(output, /npm run dev/i);
   assert.match(output, /rollback steps:/i);
@@ -151,6 +152,10 @@ test('package.json exposes the local Today pilot update, report, and help comman
     scripts?: Record<string, string>;
   };
 
+  assert.equal(
+    packageJson.scripts?.['phase4:today-evidence-next'],
+    'node --import tsx scripts/phase4-today-real-feed-evidence-next.ts',
+  );
   assert.equal(
     packageJson.scripts?.['phase4:update-today-evidence'],
     'node --import tsx scripts/phase4-update-today-real-feed-evidence.ts',
@@ -203,6 +208,7 @@ test('local Today help command prints the full bounded operator flow', () => {
   assert.match(output, /phase4:today-pilot-check/i);
   assert.match(output, /phase4:update-today-evidence/i);
   assert.match(output, /phase4:today-evidence-review/i);
+  assert.match(output, /phase4:today-evidence-next/i);
   assert.match(output, /phase4:today-pilot-report/i);
   assert.match(output, /rollback/i);
   assert.match(output, /do not commit local evidence or local pilot reports/i);

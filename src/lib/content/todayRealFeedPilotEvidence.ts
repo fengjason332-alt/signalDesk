@@ -55,6 +55,8 @@ export interface TodayRealFeedPilotEvidence {
   reviewerNotes: string[];
   mobileQualityNotes: string[];
   bilingualQualityNotes: string[];
+  freshnessNotes: string[];
+  sourceCoverageNotes: string[];
   screenshotsOrNotes: string[];
   finalRecommendation: TodayPilotEvidenceRecommendation | null;
 }
@@ -249,6 +251,8 @@ export function createEmptyTodayPilotEvidence(
     reviewerNotes: [],
     mobileQualityNotes: [],
     bilingualQualityNotes: [],
+    freshnessNotes: [],
+    sourceCoverageNotes: [],
     screenshotsOrNotes: [],
     finalRecommendation: null,
   };
@@ -397,6 +401,16 @@ export function parseTodayPilotEvidence(
     'bilingualQualityNotes',
     { allowMissing: true },
   );
+  parsed.freshnessNotes = readStringArray(
+    pickField(value, ['freshnessNotes', 'freshness_notes']),
+    'freshnessNotes',
+    { allowMissing: true },
+  );
+  parsed.sourceCoverageNotes = readStringArray(
+    pickField(value, ['sourceCoverageNotes', 'source_coverage_notes']),
+    'sourceCoverageNotes',
+    { allowMissing: true },
+  );
   parsed.screenshotsOrNotes = readStringArray(
     pickField(value, ['screenshotsOrNotes', 'screenshots_or_notes']),
     'screenshotsOrNotes',
@@ -407,6 +421,64 @@ export function parseTodayPilotEvidence(
   );
 
   return parsed;
+}
+
+export function toTodayPilotEvidenceCanonicalRecord(
+  evidence: TodayRealFeedPilotEvidence,
+): Record<string, unknown> {
+  return {
+    pilotTimestamp: evidence.pilotTimestamp,
+    environmentLabel: evidence.environmentLabel,
+    pilotEnvironment: evidence.pilotEnvironment ?? evidence.environmentLabel,
+    tester: evidence.tester,
+    appUrlOrLocalhost: evidence.appUrlOrLocalhost,
+    envFlagsChecked: [...evidence.envFlagsChecked],
+    observedFeedMode: evidence.observedFeedMode,
+    sourceCount: evidence.sourceCount,
+    realCardsRendered: evidence.realCardsRendered,
+    realCardsObservedCount: evidence.realCardsObservedCount,
+    sampleCardIdsOrTitles: [...evidence.sampleCardIdsOrTitles],
+    detailCheckedCount: evidence.detailCheckedCount,
+    detailOpenedSafely: evidence.detailOpenedSafely,
+    provenanceOrSourceLinksVisible: evidence.provenanceOrSourceLinksVisible,
+    fakeFullArticleBodyAbsent: evidence.fakeFullArticleBodyAbsent,
+    completedNonEmptyEnrichedContentObserved:
+      evidence.completedNonEmptyEnrichedContentObserved,
+    completedNonEmptyEnrichedContentWon: evidence.completedNonEmptyEnrichedContentWon,
+    completedBlankEnrichedContentFallbackWorked:
+      evidence.completedBlankEnrichedContentFallbackWorked,
+    incompleteEnrichmentDeterministicFallbackWorked:
+      evidence.incompleteEnrichmentDeterministicFallbackWorked,
+    aiOrOpenAiFilterMatchedWhenApplicable:
+      evidence.aiOrOpenAiFilterMatchedWhenApplicable,
+    nonMatchingFiltersShowedNormalFilterEmptyState:
+      evidence.nonMatchingFiltersShowedNormalFilterEmptyState,
+    realEmptyDistinctFromFilterEmpty: evidence.realEmptyDistinctFromFilterEmpty,
+    brokenPreviewReadsFellBackSafelyToMock:
+      evidence.brokenPreviewReadsFellBackSafelyToMock,
+    noSecretsOrRawInternalsInUi: evidence.noSecretsOrRawInternalsInUi,
+    bilingualQualityAcceptable: evidence.bilingualQualityAcceptable,
+    mobileQualityAcceptable: evidence.mobileQualityAcceptable,
+    dataFreshnessAcceptable: evidence.dataFreshnessAcceptable,
+    sourceCoverageAcceptable: evidence.sourceCoverageAcceptable,
+    rlsReadPolicyConfirmed: evidence.rlsReadPolicyConfirmed,
+    noFrontendWritesIntroduced: evidence.noFrontendWritesIntroduced,
+    noFrontendAiCallsIntroduced: evidence.noFrontendAiCallsIntroduced,
+    radarWatchlistLibraryUnchanged: evidence.radarWatchlistLibraryUnchanged,
+    rollbackToMockVerified: evidence.rollbackToMockVerified,
+    enrichedSummaryCases: [...evidence.enrichedSummaryCases],
+    deterministicFallbackCases: [...evidence.deterministicFallbackCases],
+    filterChecks: [...evidence.filterChecks],
+    emptyStateChecks: [...evidence.emptyStateChecks],
+    blockersFound: [...evidence.blockersFound],
+    reviewerNotes: [...evidence.reviewerNotes],
+    mobileQualityNotes: [...evidence.mobileQualityNotes],
+    bilingualQualityNotes: [...evidence.bilingualQualityNotes],
+    freshnessNotes: [...evidence.freshnessNotes],
+    sourceCoverageNotes: [...evidence.sourceCoverageNotes],
+    screenshotsOrNotes: [...evidence.screenshotsOrNotes],
+    finalRecommendation: evidence.finalRecommendation,
+  };
 }
 
 function isTrue(value: NullableBoolean): value is true {
@@ -550,6 +622,14 @@ export function evaluateTodayPilotEvidence(
     }
   } else {
     addMissingCheck(missingRequiredChecks, evidence, 'rollbackToMockVerified');
+    for (const fieldName of [
+      'mobileQualityAcceptable',
+      'bilingualQualityAcceptable',
+      'dataFreshnessAcceptable',
+      'sourceCoverageAcceptable',
+    ] as const) {
+      addMissingCheck(missingRequiredChecks, evidence, fieldName);
+    }
 
     if (isRealEmptyEvidence) {
       if (evidence.realEmptyDistinctFromFilterEmpty === false) {
@@ -620,6 +700,7 @@ export function evaluateTodayPilotEvidence(
     (isMockEvidence || isRealEmptyEvidence) &&
     hasSafeBaseline &&
     evidence.rlsReadPolicyConfirmed === true &&
+    missingRequiredChecks.length === 0 &&
     missingRequiredChecks.every(
       (checkName) =>
         checkName === 'mobileQualityAcceptable' ||

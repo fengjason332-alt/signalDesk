@@ -248,12 +248,12 @@ Proposed future AI enrichment flow:
 
 ## Remaining Tasks
 
-### Task 37: Capture The Missing Today Pilot Evidence Before Any Default Switch
+### Task 40: Run The Next Missing Today Pilot Evidence Pass
 
 - keep Today mock-by-default
-- capture a genuine `real_empty` observation in a suitable target environment if available
-- capture at least one completed and non-empty enriched-content win in the target environment
-- review the refreshed local evidence before any explicit default-switch task is considered
+- run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
+- capture the next still-missing evidence item, especially a genuine `real_empty` observation, one completed and non-empty enriched-content win, or one completed-but-blank fallback case
+- rerun the local evidence review and local pilot report after the new observation is recorded
 - preserve fallback paths and rollback paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout
 

@@ -98,12 +98,12 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 37: Capture The Missing Today Pilot Evidence Before Any Default Switch
+### Task 40: Run The Next Missing Today Pilot Evidence Pass
 
 - keep Today mock-by-default
-- capture a genuine `real_empty` observation in a suitable target environment if one is available
-- capture at least one completed, non-empty enriched-content win in the target environment
-- review the refreshed local evidence before any explicit default-switch task
+- run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
+- capture the next still-missing evidence item, especially a genuine `real_empty` observation, a completed non-empty enriched-content win, or a completed-but-blank fallback case
+- refresh the local evidence, rerun the local review/report flow, and keep the result honest if it still remains `continue_pilot`
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task
 

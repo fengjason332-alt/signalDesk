@@ -1,48 +1,48 @@
 {
   "pilotTimestamp": "2026-06-01T11:00:00.000Z",
   "environmentLabel": "target-preview-blocked",
-  "pilot_environment": "target-preview-blocked",
+  "pilotEnvironment": "target-preview-blocked",
   "tester": "example-operator",
-  "app_url_or_localhost": "http://localhost:3000",
-  "env_flags_checked": [
+  "appUrlOrLocalhost": "http://localhost:3000",
+  "envFlagsChecked": [
     "VITE_USE_REAL_CONTENT_FEED=true"
   ],
   "observedFeedMode": "fallback_to_mock",
-  "source_count": 1,
+  "sourceCount": 1,
   "realCardsRendered": false,
-  "real_card_count": 0,
-  "detail_checked_count": 0,
+  "realCardsObservedCount": 0,
+  "detailCheckedCount": 0,
   "detailOpenedSafely": false,
-  "source_links_visible": false,
-  "no_fake_article_body": false,
+  "provenanceOrSourceLinksVisible": false,
+  "fakeFullArticleBodyAbsent": false,
   "completedNonEmptyEnrichedContentObserved": false,
   "completedNonEmptyEnrichedContentWon": false,
-  "completed_blank_enriched_content_fallback_worked": false,
+  "completedBlankEnrichedContentFallbackWorked": false,
   "incompleteEnrichmentDeterministicFallbackWorked": false,
   "aiOrOpenAiFilterMatchedWhenApplicable": null,
   "nonMatchingFiltersShowedNormalFilterEmptyState": false,
   "realEmptyDistinctFromFilterEmpty": false,
   "brokenPreviewReadsFellBackSafelyToMock": false,
-  "no_secrets_or_raw_internals_in_ui": false,
+  "noSecretsOrRawInternalsInUi": false,
   "bilingualQualityAcceptable": false,
   "mobileQualityAcceptable": false,
   "dataFreshnessAcceptable": false,
   "sourceCoverageAcceptable": false,
-  "rls_read_policy_confirmed": false,
-  "no_frontend_writes_introduced": true,
-  "no_frontend_ai_calls_introduced": true,
+  "rlsReadPolicyConfirmed": false,
+  "noFrontendWritesIntroduced": true,
+  "noFrontendAiCallsIntroduced": true,
   "radarWatchlistLibraryUnchanged": false,
-  "rollback_checked": false,
-  "enriched_summary_cases": [
+  "rollbackToMockVerified": false,
+  "enrichedSummaryCases": [
     "Completed enrichment quality was not trustworthy."
   ],
-  "deterministic_fallback_cases": [
+  "deterministicFallbackCases": [
     "Fallback behavior was inconsistent."
   ],
-  "filter_checks": [
+  "filterChecks": [
     "Filter behavior was unreliable."
   ],
-  "empty_state_checks": [
+  "emptyStateChecks": [
     "real_empty and filter_empty were confusing."
   ],
   "blockersFound": [
@@ -51,13 +51,19 @@
   "reviewerNotes": [
     "Blocked example only. Uses fake content and no real environment identifiers."
   ],
-  "mobile_quality_notes": [
+  "mobileQualityNotes": [
     "Mobile layout felt too fragile."
   ],
-  "bilingual_quality_notes": [
+  "bilingualQualityNotes": [
     "Bilingual presentation looked confusing."
   ],
-  "screenshots_or_notes": [
+  "freshnessNotes": [
+    "Observed cards were too stale for confidence."
+  ],
+  "sourceCoverageNotes": [
+    "Observed source mix was too narrow to justify rollout."
+  ],
+  "screenshotsOrNotes": [
     "Saved one screenshot showing the blocked fallback state."
   ],
   "finalRecommendation": null

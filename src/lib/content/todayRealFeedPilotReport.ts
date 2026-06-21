@@ -2,6 +2,11 @@ import {
   evaluateTodayPilotEvidence,
   type TodayPilotEvidenceEvaluation,
 } from './todayRealFeedPilotEvidence';
+import { labelTodayPilotCheck } from './todayRealFeedEvidenceGuidance';
+import {
+  sanitizeTodayPilotDisplayLines,
+  sanitizeTodayPilotDisplayText,
+} from './todayRealFeedEvidenceSanitizer';
 
 export const DEFAULT_TODAY_REAL_FEED_REPORT_OUTPUT_PATH =
   'docs/evidence/today-real-feed-pilot-report.local.md';
@@ -11,53 +16,17 @@ export const TODAY_REAL_FEED_REPORT_IGNORE_PATTERNS = [
   'docs/evidence/*.private.md',
 ] as const;
 
-const CHECK_LABELS: Record<string, string> = {
-  realCardsRendered: 'Real cards rendered',
-  detailOpenedSafely: 'Detail opened safely',
-  provenanceOrSourceLinksVisible: 'Provenance or source links were visible',
-  fakeFullArticleBodyAbsent: 'No fake full article body was shown',
-  completedNonEmptyEnrichedContentObserved:
-    'Completed non-empty enriched content was observed',
-  completedNonEmptyEnrichedContentWon:
-    'Completed non-empty enriched content won over deterministic preview text',
-  completedBlankEnrichedContentFallbackWorked:
-    'Completed-but-blank enrichment fell back safely',
-  incompleteEnrichmentDeterministicFallbackWorked:
-    'Incomplete enrichment fell back safely',
-  aiOrOpenAiFilterMatchedWhenApplicable:
-    'AI/OpenAI filter matched when applicable',
-  nonMatchingFiltersShowedNormalFilterEmptyState:
-    'Nonmatching filters showed the normal filter-empty state',
-  realEmptyDistinctFromFilterEmpty: 'real_empty stayed distinct from filter_empty',
-  brokenPreviewReadsFellBackSafelyToMock:
-    'Broken preview reads fell back safely to mock',
-  noSecretsOrRawInternalsInUi: 'No secrets or raw internals appeared in UI',
-  bilingualQualityAcceptable: 'Bilingual quality was acceptable',
-  mobileQualityAcceptable: 'Mobile quality was acceptable',
-  dataFreshnessAcceptable: 'Freshness was acceptable',
-  sourceCoverageAcceptable: 'Source coverage was acceptable',
-  rlsReadPolicyConfirmed: 'Preview read policies were confirmed',
-  noFrontendWritesIntroduced: 'No frontend content writes were introduced',
-  noFrontendAiCallsIntroduced: 'No frontend AI calls were introduced',
-  radarWatchlistLibraryUnchanged:
-    'Radar, Watchlist, and Library remained unchanged',
-  rollbackToMockVerified: 'Rollback to mock was tested',
-  blockersFound: 'Blockers were recorded',
-  realFeedObservationConsistency: 'Real-feed observations were consistent',
-  realCardsObservedCount: 'A positive real-card count was captured',
-  detailCheckedCount: 'At least one real Detail view was checked',
-};
-
 function formatList(title: string, values: string[]): string[] {
   if (values.length === 0) {
     return [`## ${title}`, '', '- (none)', ''];
   }
 
-  return [`## ${title}`, '', ...values.map((value) => `- ${value}`), ''];
-}
-
-function labelForCheck(checkName: string): string {
-  return CHECK_LABELS[checkName] ?? checkName;
+  return [
+    `## ${title}`,
+    '',
+    ...sanitizeTodayPilotDisplayLines(values).map((value) => `- ${value}`),
+    '',
+  ];
 }
 
 function buildPassedChecks(review: TodayPilotEvidenceEvaluation): string[] {
@@ -109,7 +78,7 @@ function buildPassedChecks(review: TodayPilotEvidenceEvaluation): string[] {
 
   for (const [key, value] of truthyChecks) {
     if (value === true || value === 'not_applicable') {
-      passedChecks.push(labelForCheck(key));
+      passedChecks.push(labelTodayPilotCheck(key));
     }
   }
 
@@ -117,11 +86,11 @@ function buildPassedChecks(review: TodayPilotEvidenceEvaluation): string[] {
     evidence.realCardsObservedCount !== null &&
     evidence.realCardsObservedCount > 0
   ) {
-    passedChecks.push(labelForCheck('realCardsObservedCount'));
+    passedChecks.push(labelTodayPilotCheck('realCardsObservedCount'));
   }
 
   if (evidence.detailCheckedCount !== null && evidence.detailCheckedCount > 0) {
-    passedChecks.push(labelForCheck('detailCheckedCount'));
+    passedChecks.push(labelTodayPilotCheck('detailCheckedCount'));
   }
 
   return [...new Set(passedChecks)];
@@ -130,14 +99,14 @@ function buildPassedChecks(review: TodayPilotEvidenceEvaluation): string[] {
 function buildEvidenceSummary(review: TodayPilotEvidenceEvaluation): string[] {
   const evidence = review.normalizedEvidence;
 
-  return [
+  return sanitizeTodayPilotDisplayLines([
     `- Environment label: ${evidence.environmentLabel}`,
     `- Pilot timestamp: ${evidence.pilotTimestamp}`,
     `- Observed feed mode: ${evidence.observedFeedMode}`,
     `- Real card count: ${evidence.realCardsObservedCount ?? '(not captured)'}`,
     `- Detail checks: ${evidence.detailCheckedCount ?? '(not captured)'}`,
     `- Source count: ${evidence.sourceCount ?? '(not captured)'}`,
-  ];
+  ]);
 }
 
 function buildRollbackStatus(review: TodayPilotEvidenceEvaluation): string {
@@ -158,14 +127,14 @@ function buildNextActionLines(review: TodayPilotEvidenceEvaluation): string[] {
 
   if (review.failedCriticalChecks.length > 0) {
     for (const failed of review.failedCriticalChecks) {
-      lines.push(`Resolve critical issue: ${labelForCheck(failed)}.`);
+      lines.push(`Resolve critical issue: ${labelTodayPilotCheck(failed)}.`);
     }
     return lines;
   }
 
   if (review.missingRequiredChecks.length > 0) {
     for (const missing of review.missingRequiredChecks) {
-      lines.push(`Capture missing evidence: ${labelForCheck(missing)}.`);
+      lines.push(`Capture missing evidence: ${labelTodayPilotCheck(missing)}.`);
     }
   }
 
@@ -182,8 +151,8 @@ export function buildTodayRealFeedPilotMarkdownReport(
     '',
     '## Summary',
     '',
-    `- Pilot environment label: ${evidence.environmentLabel}`,
-    `- Tested timestamp: ${evidence.pilotTimestamp}`,
+    `- Pilot environment label: ${sanitizeTodayPilotDisplayText(evidence.environmentLabel)}`,
+    `- Tested timestamp: ${sanitizeTodayPilotDisplayText(evidence.pilotTimestamp)}`,
     `- Recommendation: ${normalizedReview.recommendation}`,
     `- Today is still mock-by-default unless intentionally enabled.`,
     `- This report does not switch defaults. No default switch is made by this report.`,
@@ -199,11 +168,11 @@ export function buildTodayRealFeedPilotMarkdownReport(
     ...formatList('Passed Checks', buildPassedChecks(normalizedReview)),
     ...formatList(
       'Missing Required Checks',
-      normalizedReview.missingRequiredChecks.map(labelForCheck),
+      normalizedReview.missingRequiredChecks.map(labelTodayPilotCheck),
     ),
     ...formatList(
       'Failed Critical Checks',
-      normalizedReview.failedCriticalChecks.map(labelForCheck),
+      normalizedReview.failedCriticalChecks.map(labelTodayPilotCheck),
     ),
     ...formatList('Warnings', normalizedReview.warnings),
     '## Evidence Summary',
@@ -214,6 +183,14 @@ export function buildTodayRealFeedPilotMarkdownReport(
     '',
     ...buildNextActionLines(normalizedReview).map((line) => `- ${line}`),
     '',
+    ...formatList('Enriched Summary Cases', evidence.enrichedSummaryCases),
+    ...formatList('Deterministic Fallback Cases', evidence.deterministicFallbackCases),
+    ...formatList('Filter Checks', evidence.filterChecks),
+    ...formatList('Empty State Checks', evidence.emptyStateChecks),
+    ...formatList('Mobile Quality Notes', evidence.mobileQualityNotes),
+    ...formatList('Bilingual Quality Notes', evidence.bilingualQualityNotes),
+    ...formatList('Freshness Notes', evidence.freshnessNotes),
+    ...formatList('Source Coverage Notes', evidence.sourceCoverageNotes),
     ...formatList('Reviewer Notes', evidence.reviewerNotes),
     ...formatList('Screenshot Notes', evidence.screenshotsOrNotes),
   ];

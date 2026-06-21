@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Operator Checklist
 
-This document is maintained through Phase 4 Task 36.
+This document is maintained through Phase 4 Task 39.
 
 It is a beginner-friendly manual checklist for running the Today real-feed pilot without changing the default product behavior.
 
@@ -23,14 +23,18 @@ You will use:
 - `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true`
 - `npm run dev`
 - `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json`
+- `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
 - `npm run phase4:today-help`
-- these helpers only accept gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default unless `--allow-any-path` is passed intentionally
+- create/update only accept gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default
+- review/next/report also accept the shipped `docs/examples/today-real-feed-pilot-evidence*.json` files for local practice
+- use `--allow-any-path` only when you intentionally need to bypass those local-only guards
 
 Your local evidence file should live at:
 - `docs/evidence/today-real-feed-pilot-evidence.local.json`
 
 That file is meant to stay local and should not be committed.
+Keep updating that same local/private evidence file across multiple pilot sessions instead of creating a tracked history of partial evidence files.
 
 ## Step-By-Step Checklist
 
@@ -70,7 +74,7 @@ That file is meant to stay local and should not be committed.
    - confirm Today is back on mock
 21. Fill the evidence JSON while testing.
 22. If you do not want to hand-edit JSON, use `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json ...`.
-   - it now covers the common pilot fields such as observed feed mode, detail count, env flags, sample cards, fallback checks, rollback checks, and final recommendation
+   - it now covers the common pilot fields such as observed feed mode, detail count, env flags, sample cards, fallback checks, rollback checks, freshness notes, source-coverage notes, and final recommendation
    - hand-edit JSON only if you need a rarer field that is still not exposed as a flag
 23. Run:
 
@@ -78,17 +82,54 @@ That file is meant to stay local and should not be committed.
 npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json
 ```
 
-24. Generate a local Markdown report:
+24. If the result is still `continue_pilot`, run:
+
+```bash
+npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json
+```
+
+25. Follow the printed next target:
+   - genuine `real_empty`
+   - completed non-empty enriched-content win
+   - completed-but-blank enrichment fallback
+   - mobile quality
+   - freshness
+   - source coverage
+26. Generate a local Markdown report:
 
 ```bash
 npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md
 ```
 
-25. Record the recommendation:
+27. Record the recommendation:
    - `continue_pilot`
    - `keep_mock_default`
    - `ready_for_controlled_default_rollout`
    - `blocked`
+
+## Exact Field Mapping For The Current Missing Evidence
+
+- genuine `real_empty`
+  - `observedFeedMode=real_empty`
+  - `realEmptyDistinctFromFilterEmpty=true`
+  - add one `emptyStateChecks` note
+- completed non-empty enriched-content win
+  - `completedNonEmptyEnrichedContentObserved=true`
+  - `completedNonEmptyEnrichedContentWon=true`
+  - add one `enrichedSummaryCases` note
+- completed-but-blank enrichment fallback
+  - `completedBlankEnrichedContentFallbackWorked=true`
+  - add one `deterministicFallbackCases` note
+- mobile quality
+  - `mobileQualityAcceptable=true`
+  - add one `mobileQualityNotes` note
+- freshness
+  - `dataFreshnessAcceptable=true`
+  - add one `freshnessNotes` note
+- source coverage
+  - `sourceCoverageAcceptable=true`
+  - update `sourceCount`
+  - add one `sourceCoverageNotes` note
 
 ## What To Check In The App
 

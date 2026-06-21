@@ -1,17 +1,56 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { assertTodayPilotEvidenceReadPathSafe } from '../src/lib/content/todayRealFeedEvidenceUpdater';
+import { sanitizeTodayPilotDisplayText } from '../src/lib/content/todayRealFeedEvidenceSanitizer';
 import {
   evaluateTodayPilotEvidence,
   parseTodayPilotEvidence,
   type TodayPilotEvidenceEvaluation,
 } from '../src/lib/content/todayRealFeedPilotEvidence';
 
-const evidencePathArg = process.argv[2];
+function parseArgs(argv: string[]) {
+  let evidencePath = '';
+  let allowAnyPath = false;
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const current = argv[index];
+
+    if (!current.startsWith('--') && evidencePath.length === 0) {
+      evidencePath = current;
+      continue;
+    }
+
+    if (current === '--allow-any-path') {
+      allowAnyPath = true;
+      continue;
+    }
+  }
+
+  return {
+    evidencePath,
+    allowAnyPath,
+  };
+}
+
+const args = parseArgs(process.argv.slice(2));
+const evidencePathArg = args.evidencePath;
 
 if (!evidencePathArg) {
   process.stderr.write(
     'Error: could not read evidence file because no path argument was provided.\n',
+  );
+  process.exit(1);
+}
+
+try {
+  assertTodayPilotEvidenceReadPathSafe(
+    resolve(process.cwd(), evidencePathArg),
+    args.allowAnyPath,
+  );
+} catch (error) {
+  process.stderr.write(
+    `Error: ${error instanceof Error ? error.message : 'Unsafe evidence path.'}\n`,
   );
   process.exit(1);
 }
@@ -74,13 +113,14 @@ const lines = [
   'SignalDesk Today real-feed evidence review',
   '',
   `Overall recommendation: ${review.recommendation}`,
-  `Environment label: ${review.normalizedEvidence.environmentLabel}`,
-  `Observed feed mode: ${review.normalizedEvidence.observedFeedMode}`,
+  `Environment label: ${sanitizeTodayPilotDisplayText(review.normalizedEvidence.environmentLabel)}`,
+  `Observed feed mode: ${sanitizeTodayPilotDisplayText(review.normalizedEvidence.observedFeedMode)}`,
   formatList('Missing required checks', review.missingRequiredChecks),
   formatList('Failed critical checks', review.failedCriticalChecks),
   formatList('Warnings', review.warnings),
   `Next action: ${review.nextAction}`,
   formatList('What to fix next', whatToFixNext),
+  `Next-step helper: npm run phase4:today-evidence-next -- ${evidencePathArg}`,
   'Rollback instruction:',
   '- Set VITE_USE_REAL_CONTENT_FEED=false',
   '- Restart locally with npm run dev, or rebuild/redeploy the target environment',

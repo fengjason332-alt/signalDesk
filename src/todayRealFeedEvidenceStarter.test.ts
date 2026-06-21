@@ -34,6 +34,10 @@ test('buildTodayRealFeedEvidenceStarterPlan uses the expected default local evid
     plan.nextSteps.join('\n'),
     /npm run phase4:today-evidence-review -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i,
   );
+  assert.match(
+    plan.nextSteps.join('\n'),
+    /npm run phase4:today-evidence-next -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i,
+  );
 });
 
 test('create evidence script generates a valid local evidence file that starts as continue_pilot', () => {
@@ -61,6 +65,7 @@ test('create evidence script generates a valid local evidence file that starts a
   assert.match(output, /created local evidence file/i);
   assert.match(output, /npm run phase4:today-pilot-check/i);
   assert.match(output, /npm run phase4:today-evidence-review/i);
+  assert.match(output, /npm run phase4:today-evidence-next/i);
 });
 
 test('create evidence script supports --out as a custom output path alias', () => {

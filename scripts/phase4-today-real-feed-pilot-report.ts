@@ -9,7 +9,10 @@ import {
   evaluateTodayPilotEvidence,
   parseTodayPilotEvidence,
 } from '../src/lib/content/todayRealFeedPilotEvidence';
-import { assertTodayPilotEvidencePathSafe } from '../src/lib/content/todayRealFeedEvidenceUpdater';
+import {
+  assertTodayPilotEvidencePathSafe as assertTodayPilotReportPathSafe,
+  assertTodayPilotEvidenceReadPathSafe,
+} from '../src/lib/content/todayRealFeedEvidenceUpdater';
 
 function parseArgs(argv: string[]) {
   let evidencePath = '';
@@ -74,6 +77,15 @@ const resolvedEvidencePath = resolve(process.cwd(), args.evidencePath);
 let rawJson = '';
 
 try {
+  assertTodayPilotEvidenceReadPathSafe(resolvedEvidencePath, args.allowAnyPath);
+} catch (error) {
+  process.stderr.write(
+    `Error: ${error instanceof Error ? error.message : 'Unsafe evidence path.'}\n`,
+  );
+  process.exit(1);
+}
+
+try {
   rawJson = readFileSync(resolvedEvidencePath, 'utf8');
 } catch {
   process.stderr.write('Error: could not read evidence file.\n');
@@ -103,7 +115,7 @@ if (args.outputPath) {
   const resolvedOutputPath = resolve(process.cwd(), chosenOutputPath);
 
   try {
-    assertTodayPilotEvidencePathSafe(resolvedOutputPath, args.allowAnyPath, 'report');
+    assertTodayPilotReportPathSafe(resolvedOutputPath, args.allowAnyPath, 'report');
   } catch (error) {
     process.stderr.write(
       `Error: ${error instanceof Error ? error.message : 'Unsafe report path.'}\n`,

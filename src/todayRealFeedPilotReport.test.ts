@@ -51,6 +51,10 @@ test('pilot report generator produces a markdown report for passing evidence', (
   assert.match(output, /ready_for_controlled_default_rollout/i);
   assert.match(output, /no default switch is made/i);
   assert.match(output, /Rollback Status/i);
+  assert.match(output, /Enriched Summary Cases/i);
+  assert.match(output, /Deterministic Fallback Cases/i);
+  assert.match(output, /Freshness Notes/i);
+  assert.match(output, /Source Coverage Notes/i);
 });
 
 test('pilot report generator produces a markdown report for blocked evidence', () => {
@@ -172,6 +176,53 @@ test('pilot report generator does not print secret-looking env values', () => {
 
   assert.doesNotMatch(output, /DEEPSEEK_API_KEY|SUPABASE_SERVICE_ROLE_KEY|PHASE4_WRITE_AUTH_TOKEN/i);
   assert.doesNotMatch(output, /VITE_SUPABASE_ANON_KEY=/i);
+});
+
+test('pilot report generator redacts secret-looking operator notes from local evidence', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-pilot-report-redaction-'));
+  const evidencePath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-evidence.local.json');
+  const evidence = JSON.parse(readFileSync(passingExamplePath, 'utf8')) as Record<string, unknown>;
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  evidence.reviewerNotes = ['PHASE4_WRITE_AUTH_TOKEN=super-secret'];
+  evidence.screenshotsOrNotes = ['VITE_SUPABASE_URL=https://example.supabase.co'];
+  writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
+
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', reportScriptPath, evidencePath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.doesNotMatch(output, /PHASE4_WRITE_AUTH_TOKEN=super-secret/i);
+  assert.doesNotMatch(output, /https:\/\/example\.supabase\.co/i);
+  assert.match(output, /PHASE4_WRITE_AUTH_TOKEN=\[redacted\]/i);
+  assert.match(output, /VITE_SUPABASE_URL=\[redacted\]/i);
+});
+
+test('pilot report generator redacts secret-looking environment labels from local evidence', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-pilot-report-redaction-env-'));
+  const evidencePath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-evidence.local.json');
+  const evidence = JSON.parse(readFileSync(passingExamplePath, 'utf8')) as Record<string, unknown>;
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  evidence.environmentLabel = 'PHASE4_WRITE_AUTH_TOKEN=super-secret';
+  writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
+
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', reportScriptPath, evidencePath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.doesNotMatch(output, /PHASE4_WRITE_AUTH_TOKEN=super-secret/i);
+  assert.match(output, /PHASE4_WRITE_AUTH_TOKEN=\[redacted\]/i);
 });
 
 test('pilot report generator includes rollback status and next action', () => {

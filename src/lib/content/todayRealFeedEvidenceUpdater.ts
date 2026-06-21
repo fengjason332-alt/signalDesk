@@ -1,6 +1,9 @@
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
-import { parseTodayPilotEvidence } from './todayRealFeedPilotEvidence';
+import {
+  parseTodayPilotEvidence,
+  toTodayPilotEvidenceCanonicalRecord,
+} from './todayRealFeedPilotEvidence';
 import {
   TODAY_REAL_FEED_EVIDENCE_IGNORE_PATTERNS,
   TODAY_REAL_FEED_REPORT_IGNORE_PATTERNS,
@@ -63,6 +66,8 @@ export interface UpdateTodayPilotEvidenceOptions {
   blockerNotes?: string[];
   mobileQualityNotes?: string[];
   bilingualQualityNotes?: string[];
+  freshnessNotes?: string[];
+  sourceCoverageNotes?: string[];
   operatorNotes?: string[];
   screenshotNotes?: string[];
 }
@@ -70,28 +75,76 @@ export interface UpdateTodayPilotEvidenceOptions {
 type JsonRecord = Record<string, unknown>;
 
 const DOCS_EVIDENCE_SEGMENTS = ['docs', 'evidence'] as const;
+const DOCS_EXAMPLES_SEGMENTS = ['docs', 'examples'] as const;
 const SAFE_EVIDENCE_SUFFIXES = TODAY_REAL_FEED_EVIDENCE_IGNORE_PATTERNS.map((pattern) =>
   pattern.replace('docs/evidence/*', ''),
 );
 const SAFE_REPORT_SUFFIXES = TODAY_REAL_FEED_REPORT_IGNORE_PATTERNS.map((pattern) =>
   pattern.replace('docs/evidence/*', ''),
 );
+const TODAY_PILOT_EVIDENCE_LEGACY_ALIAS_KEYS = [
+  'environment_label',
+  'pilot_environment',
+  'tested_at',
+  'pilot_timestamp',
+  'app_url_or_localhost',
+  'env_flags_checked',
+  'observed_feed_mode',
+  'source_count',
+  'real_card_count',
+  'sample_card_ids_or_titles',
+  'detail_checked_count',
+  'sourceLinksVisible',
+  'source_links_visible',
+  'noFakeArticleBody',
+  'no_fake_article_body',
+  'rollbackChecked',
+  'rollback_checked',
+  'rls_read_policy_confirmed',
+  'no_secrets_or_raw_internals_in_ui',
+  'no_frontend_writes_introduced',
+  'no_frontend_ai_calls_introduced',
+  'completed_blank_enriched_content_fallback_worked',
+  'ai_or_openai_filter_matched_when_applicable',
+  'enriched_summary_cases',
+  'deterministic_fallback_cases',
+  'filter_checks',
+  'empty_state_checks',
+  'blockerNotes',
+  'blocker_notes',
+  'reviewer_notes',
+  'mobile_quality_notes',
+  'bilingual_quality_notes',
+  'freshness_notes',
+  'source_coverage_notes',
+  'screenshots_or_notes',
+  'final_operator_recommendation',
+] as const;
 
-function hasDocsEvidenceSegment(pathValue: string): boolean {
+function hasSegmentPair(
+  pathValue: string,
+  firstSegment: string,
+  secondSegment: string,
+): boolean {
   const segments = resolve(pathValue)
     .split(/[\\/]+/)
     .filter((segment) => segment.length > 0);
 
   for (let index = 0; index < segments.length - 1; index += 1) {
-    if (
-      segments[index] === DOCS_EVIDENCE_SEGMENTS[0] &&
-      segments[index + 1] === DOCS_EVIDENCE_SEGMENTS[1]
-    ) {
+    if (segments[index] === firstSegment && segments[index + 1] === secondSegment) {
       return true;
     }
   }
 
   return false;
+}
+
+function hasDocsEvidenceSegment(pathValue: string): boolean {
+  return hasSegmentPair(pathValue, DOCS_EVIDENCE_SEGMENTS[0], DOCS_EVIDENCE_SEGMENTS[1]);
+}
+
+function hasDocsExamplesSegment(pathValue: string): boolean {
+  return hasSegmentPair(pathValue, DOCS_EXAMPLES_SEGMENTS[0], DOCS_EXAMPLES_SEGMENTS[1]);
 }
 
 function matchesSafeSuffix(pathValue: string, suffixes: readonly string[]): boolean {
@@ -243,11 +296,50 @@ export function assertTodayPilotEvidencePathSafe(
   }
 }
 
+export function assertTodayPilotEvidenceReadPathSafe(
+  evidencePath: string,
+  allowAnyPath = false,
+) {
+  if (allowAnyPath) {
+    return;
+  }
+
+  const filename = basename(resolve(evidencePath));
+  if (
+    hasDocsExamplesSegment(evidencePath) &&
+    filename.startsWith('today-real-feed-pilot-evidence') &&
+    filename.endsWith('.json')
+  ) {
+    return;
+  }
+
+  if (!hasDocsEvidenceSegment(evidencePath)) {
+    throw new Error(
+      'Refusing to read an evidence file outside docs/evidence or docs/examples without --allow-any-path.',
+    );
+  }
+
+  if (!matchesSafeSuffix(evidencePath, SAFE_EVIDENCE_SUFFIXES)) {
+    throw new Error(
+      `Refusing to read a non-gitignored evidence path. Use a docs/evidence/*${SAFE_EVIDENCE_SUFFIXES
+        .join(' or docs/evidence/*')
+        .trim()} path, a shipped docs/examples/today-real-feed-pilot-evidence*.json file, or pass --allow-any-path intentionally.`,
+    );
+  }
+}
+
 export function applyTodayPilotEvidenceUpdates(
   raw: JsonRecord,
   options: UpdateTodayPilotEvidenceOptions,
 ): JsonRecord {
-  const updated = { ...raw };
+  const updated = {
+    ...raw,
+    ...toTodayPilotEvidenceCanonicalRecord(parseTodayPilotEvidence(raw)),
+  };
+
+  for (const aliasKey of TODAY_PILOT_EVIDENCE_LEGACY_ALIAS_KEYS) {
+    delete updated[aliasKey];
+  }
 
   setIfDefined(
     updated,
@@ -265,7 +357,7 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'pilot_environment',
+    'pilotEnvironment',
     options.pilotEnvironment?.trim()
       ? readStringNote('--pilot-environment', options.pilotEnvironment)
       : undefined,
@@ -277,7 +369,7 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'source_count',
+    'sourceCount',
     readIntegerFlag('--source-count', options.sourceCount),
   );
   setIfDefined(
@@ -289,7 +381,7 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'observed_feed_mode',
+    'observedFeedMode',
     readObservedFeedModeFlag('--observed-feed-mode', options.observedFeedMode),
   );
   setIfDefined(
@@ -299,12 +391,12 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'real_card_count',
+    'realCardsObservedCount',
     readIntegerFlag('--real-card-count', options.realCardCount),
   );
   setIfDefined(
     updated,
-    'detail_checked_count',
+    'detailCheckedCount',
     readIntegerFlag('--detail-checked-count', options.detailCheckedCount),
   );
   setIfDefined(
@@ -323,13 +415,13 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'source_links_visible',
+    'provenanceOrSourceLinksVisible',
     sourceLinksVisible ?? provenanceVisible,
   );
 
   setIfDefined(
     updated,
-    'no_fake_article_body',
+    'fakeFullArticleBodyAbsent',
     readBooleanFlag('--no-fake-article-body', options.noFakeArticleBody),
   );
   setIfDefined(
@@ -350,7 +442,7 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'completed_blank_enriched_content_fallback_worked',
+    'completedBlankEnrichedContentFallbackWorked',
     readBooleanFlag(
       '--blank-enrichment-fallback',
       options.blankEnrichmentFallback,
@@ -366,7 +458,7 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'ai_or_openai_filter_matched_when_applicable',
+    'aiOrOpenAiFilterMatchedWhenApplicable',
     readBooleanFlag('--ai-openai-filter-works', options.aiOpenAiFilterWorks),
   );
   setIfDefined(
@@ -394,12 +486,12 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'rollback_checked',
+    'rollbackToMockVerified',
     readBooleanFlag('--rollback-tested', options.rollbackTested),
   );
   setIfDefined(
     updated,
-    'rls_read_policy_confirmed',
+    'rlsReadPolicyConfirmed',
     readBooleanFlag(
       '--preview-read-policies-confirmed',
       options.previewReadPoliciesConfirmed,
@@ -407,7 +499,7 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'no_frontend_writes_introduced',
+    'noFrontendWritesIntroduced',
     readBooleanFlag(
       '--no-frontend-writes-introduced',
       options.noFrontendWritesIntroduced,
@@ -415,7 +507,7 @@ export function applyTodayPilotEvidenceUpdates(
   );
   setIfDefined(
     updated,
-    'no_frontend_ai_calls_introduced',
+    'noFrontendAiCallsIntroduced',
     readBooleanFlag(
       '--no-frontend-ai-calls-introduced',
       options.noFrontendAiCallsIntroduced,
@@ -457,57 +549,71 @@ export function applyTodayPilotEvidenceUpdates(
 
   appendNoteArray(
     updated,
-    'env_flags_checked',
+    'envFlagsChecked',
     (options.envFlags ?? []).map((flag) => readStringNote('--env-flag', flag)),
   );
   appendNoteArray(
     updated,
-    'sample_card_ids_or_titles',
+    'sampleCardIdsOrTitles',
     (options.sampleCards ?? []).map((sample) => readStringNote('--sample-card', sample)),
   );
   appendNoteArray(
     updated,
-    'enriched_summary_cases',
+    'enrichedSummaryCases',
     (options.enrichedSummaryCases ?? []).map((value) =>
       readStringNote('--enriched-case', value),
     ),
   );
   appendNoteArray(
     updated,
-    'deterministic_fallback_cases',
+    'deterministicFallbackCases',
     (options.deterministicFallbackCases ?? []).map((value) =>
       readStringNote('--deterministic-fallback-case', value),
     ),
   );
   appendNoteArray(
     updated,
-    'filter_checks',
+    'filterChecks',
     (options.filterChecks ?? []).map((value) => readStringNote('--filter-check', value)),
   );
   appendNoteArray(
     updated,
-    'empty_state_checks',
+    'emptyStateChecks',
     (options.emptyStateChecks ?? []).map((value) =>
       readStringNote('--empty-state-check', value),
     ),
   );
   appendNoteArray(
     updated,
-    'blocker_notes',
+    'blockersFound',
     (options.blockerNotes ?? []).map((value) => readStringNote('--blocker', value)),
   );
   appendNoteArray(
     updated,
-    'mobile_quality_notes',
+    'mobileQualityNotes',
     (options.mobileQualityNotes ?? []).map((value) =>
       readStringNote('--mobile-note', value),
     ),
   );
   appendNoteArray(
     updated,
-    'bilingual_quality_notes',
+    'bilingualQualityNotes',
     (options.bilingualQualityNotes ?? []).map((value) =>
       readStringNote('--bilingual-note', value),
+    ),
+  );
+  appendNoteArray(
+    updated,
+    'freshnessNotes',
+    (options.freshnessNotes ?? []).map((value) =>
+      readStringNote('--freshness-note', value),
+    ),
+  );
+  appendNoteArray(
+    updated,
+    'sourceCoverageNotes',
+    (options.sourceCoverageNotes ?? []).map((value) =>
+      readStringNote('--source-coverage-note', value),
     ),
   );
 
@@ -520,7 +626,7 @@ export function applyTodayPilotEvidenceUpdates(
   );
   appendNoteArray(
     updated,
-    'screenshots_or_notes',
+    'screenshotsOrNotes',
     (options.screenshotNotes ?? []).map((note) =>
       readStringNote('--screenshot-note', note),
     ),

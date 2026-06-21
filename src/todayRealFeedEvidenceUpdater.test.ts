@@ -84,6 +84,10 @@ test('update evidence command can update a generated local evidence file', () =>
       'continue_pilot',
       '--rollback-tested',
       'true',
+      '--freshness-note',
+      'Newest observed cards were published within an acceptable window.',
+      '--source-coverage-note',
+      'Observed cards came from OpenAI News and another stable source.',
       '--operator-note',
       'Observed three real cards.',
       '--screenshot-note',
@@ -119,7 +123,12 @@ test('update evidence command can update a generated local evidence file', () =>
   assert.equal(parsed.radarWatchlistLibraryUnchanged, true);
   assert.equal(parsed.finalRecommendation, 'continue_pilot');
   assert.equal(parsed.rollbackToMockVerified, true);
+  assert.ok(parsed.freshnessNotes.includes('Newest observed cards were published within an acceptable window.'));
+  assert.ok(parsed.sourceCoverageNotes.includes('Observed cards came from OpenAI News and another stable source.'));
   assert.match(JSON.stringify(raw), /updated_at/i);
+  assert.equal('source_count' in raw, false);
+  assert.equal('real_card_count' in raw, false);
+  assert.equal('rollback_checked' in raw, false);
   assert.ok(parsed.reviewerNotes.includes('Observed three real cards.'));
   assert.ok(parsed.screenshotsOrNotes.includes('Saved one safe Today screenshot.'));
 });
@@ -149,6 +158,59 @@ test('update evidence command preserves unrelated fields', () => {
 
   const raw = JSON.parse(readFileSync(outputPath, 'utf8')) as Record<string, unknown>;
   assert.equal(raw.custom_field, 'keep-me');
+});
+
+test('update evidence command upgrades legacy snake_case evidence without dropping prior notes', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-legacy-'));
+  const outputPath = createLocalEvidenceFile(tempDir);
+  const original = JSON.parse(readFileSync(outputPath, 'utf8')) as Record<string, unknown>;
+
+  original.pilot_environment = 'legacy-preview';
+  original.tested_at = '2026-06-05T00:00:00.000Z';
+  original.observed_feed_mode = 'real';
+  original.freshness_notes = ['Legacy freshness evidence was already captured.'];
+  original.source_coverage_notes = ['Legacy source-coverage evidence was already captured.'];
+  delete original.pilotEnvironment;
+  delete original.pilotTimestamp;
+  delete original.observedFeedMode;
+  delete original.freshnessNotes;
+  delete original.sourceCoverageNotes;
+
+  writeFileSync(outputPath, JSON.stringify(original, null, 2), 'utf8');
+
+  execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--detail-opened-safely',
+      'true',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const raw = JSON.parse(readFileSync(outputPath, 'utf8')) as Record<string, unknown>;
+  const parsed = parseTodayPilotEvidence(raw);
+
+  assert.equal(raw.pilot_environment, undefined);
+  assert.equal(raw.tested_at, undefined);
+  assert.equal(raw.observed_feed_mode, undefined);
+  assert.equal(raw.freshness_notes, undefined);
+  assert.equal(raw.source_coverage_notes, undefined);
+  assert.equal(parsed.pilotEnvironment, 'legacy-preview');
+  assert.equal(parsed.pilotTimestamp, '2026-06-05T00:00:00.000Z');
+  assert.equal(parsed.observedFeedMode, 'real');
+  assert.ok(parsed.freshnessNotes.includes('Legacy freshness evidence was already captured.'));
+  assert.ok(
+    parsed.sourceCoverageNotes.includes(
+      'Legacy source-coverage evidence was already captured.',
+    ),
+  );
 });
 
 test('update evidence command rejects invalid boolean values', () => {
@@ -270,9 +332,9 @@ test('update evidence command allows an explicit tracked-looking docs/evidence j
   writeFileSync(
     outputPath,
     JSON.stringify({
-      pilot_environment: 'manual-pilot',
-      tested_at: '2026-06-08T00:00:00.000Z',
-      observed_feed_mode: 'unknown',
+      environmentLabel: 'manual-pilot',
+      pilotTimestamp: '2026-06-08T00:00:00.000Z',
+      observedFeedMode: 'unknown',
     }),
     'utf8',
   );
@@ -370,6 +432,10 @@ test('updated evidence can still be reviewed locally after operator notes are ad
       'acceptable',
       '--source-coverage',
       'acceptable',
+      '--freshness-note',
+      'Publish dates looked recent enough for the local pilot.',
+      '--source-coverage-note',
+      'Observed real cards came from multiple stable sources.',
       '--operator-note',
       'Real cards looked stable.',
     ],

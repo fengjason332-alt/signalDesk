@@ -29,6 +29,8 @@ function parseArgs(argv: string[]) {
   const blockerNotes: string[] = [];
   const mobileQualityNotes: string[] = [];
   const bilingualQualityNotes: string[] = [];
+  const freshnessNotes: string[] = [];
+  const sourceCoverageNotes: string[] = [];
   const options: Record<string, string | string[] | boolean> = {};
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -110,6 +112,18 @@ function parseArgs(argv: string[]) {
       continue;
     }
 
+    if (current === '--freshness-note') {
+      freshnessNotes.push(readFlagValue(argv, index, current));
+      index += 1;
+      continue;
+    }
+
+    if (current === '--source-coverage-note') {
+      sourceCoverageNotes.push(readFlagValue(argv, index, current));
+      index += 1;
+      continue;
+    }
+
     const value = readFlagValue(argv, index, current);
     options[current] = value;
     index += 1;
@@ -129,6 +143,8 @@ function parseArgs(argv: string[]) {
     blockerNotes,
     mobileQualityNotes,
     bilingualQualityNotes,
+    freshnessNotes,
+    sourceCoverageNotes,
     options,
   };
 }
@@ -240,6 +256,8 @@ try {
     blockerNotes: args.blockerNotes,
     mobileQualityNotes: args.mobileQualityNotes,
     bilingualQualityNotes: args.bilingualQualityNotes,
+    freshnessNotes: args.freshnessNotes,
+    sourceCoverageNotes: args.sourceCoverageNotes,
     operatorNotes: args.operatorNotes,
     screenshotNotes: args.screenshotNotes,
   });

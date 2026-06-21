@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -76,6 +76,8 @@ function buildPassingEvidence() {
     reviewerNotes: ['Pilot looked stable.'],
     mobileQualityNotes: ['Mobile layout stayed readable on a narrow viewport.'],
     bilingualQualityNotes: ['Chinese and English copy remained understandable together.'],
+    freshnessNotes: ['Newest real cards were still recent enough for the pilot.'],
+    sourceCoverageNotes: ['Observed cards came from more than one stable source.'],
     screenshotsOrNotes: ['No secrets or raw internal errors appeared in UI.'],
   };
 }
@@ -190,12 +192,42 @@ test('real-empty pilot evidence can conservatively keep Today mock-by-default', 
     realEmptyDistinctFromFilterEmpty: true,
     aiOrOpenAiFilterMatchedWhenApplicable: 'not_applicable',
     rlsReadPolicyConfirmed: true,
+    mobileQualityAcceptable: true,
+    bilingualQualityAcceptable: true,
+    dataFreshnessAcceptable: true,
+    sourceCoverageAcceptable: true,
     blockersFound: [],
     reviewerNotes: ['Preview-safe rows were absent in this environment.'],
   });
 
   assert.equal(review.recommendation, 'keep_mock_default');
   assert.deepEqual(review.failedCriticalChecks, []);
+});
+
+test('real-empty pilot evidence stays continue_pilot while mobile freshness or source coverage are still missing', () => {
+  const review = evaluateTodayPilotEvidence({
+    ...createEmptyTodayPilotEvidence({
+      environmentLabel: 'preview-real-empty-missing-quality',
+      observedFeedMode: 'real_empty',
+    }),
+    realCardsRendered: false,
+    realCardsObservedCount: 0,
+    brokenPreviewReadsFellBackSafelyToMock: true,
+    noSecretsOrRawInternalsInUi: true,
+    noFrontendWritesIntroduced: true,
+    noFrontendAiCallsIntroduced: true,
+    radarWatchlistLibraryUnchanged: true,
+    rollbackToMockVerified: true,
+    realEmptyDistinctFromFilterEmpty: true,
+    aiOrOpenAiFilterMatchedWhenApplicable: 'not_applicable',
+    rlsReadPolicyConfirmed: true,
+    blockersFound: [],
+  });
+
+  assert.equal(review.recommendation, 'continue_pilot');
+  assert.ok(review.missingRequiredChecks.includes('mobileQualityAcceptable'));
+  assert.ok(review.missingRequiredChecks.includes('dataFreshnessAcceptable'));
+  assert.ok(review.missingRequiredChecks.includes('sourceCoverageAcceptable'));
 });
 
 test('missing RLS read policy confirmation blocks readiness', () => {
@@ -241,7 +273,9 @@ test('example evidence json files exist and parse locally', () => {
 test('template evidence json is valid JSON and starts as continue_pilot guidance', () => {
   const parsed = JSON.parse(readFileSync(templateExamplePath, 'utf8'));
 
-  assert.equal(parsed.pilot_environment, 'fill-me-target-environment');
+  assert.equal(parsed.environmentLabel, 'fill-me-target-environment');
+  assert.ok(Array.isArray(parsed.freshnessNotes));
+  assert.ok(Array.isArray(parsed.sourceCoverageNotes));
 
   const review = evaluateTodayPilotEvidence(parseTodayPilotEvidence(parsed));
   assert.equal(review.recommendation, 'continue_pilot');
@@ -260,6 +294,7 @@ test('evidence review script prints a recommendation for a valid example JSON fi
   assert.match(output, /overall recommendation:\s+ready_for_controlled_default_rollout/i);
   assert.match(output, /next action:/i);
   assert.match(output, /what to fix next:/i);
+  assert.match(output, /next-step helper:/i);
   assert.match(output, /failed critical checks:/i);
   assert.match(output, /rollback instruction:/i);
   assert.doesNotMatch(output, /DEEPSEEK_API_KEY/i);
@@ -270,7 +305,7 @@ test('evidence review script prints a recommendation for a valid example JSON fi
 test('evidence review script returns a clear error for a missing file', () => {
   const result = spawnSync(
     process.execPath,
-    ['--import', 'tsx', reviewScriptPath, 'docs/examples/does-not-exist.json'],
+    ['--import', 'tsx', reviewScriptPath, 'docs/evidence/does-not-exist.local.json'],
     {
       cwd: process.cwd(),
       encoding: 'utf8',
@@ -299,11 +334,35 @@ test('evidence review script does not print env values or secrets when reviewing
   assert.doesNotMatch(result.stdout, /VITE_SUPABASE_ANON_KEY=/i);
 });
 
+test('evidence review script redacts secret-looking environment labels', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-review-redaction-'));
+  const evidencePath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-evidence.local.json');
+  const evidence = JSON.parse(readFileSync(passingExamplePath, 'utf8')) as Record<string, unknown>;
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  evidence.environmentLabel = 'PHASE4_WRITE_AUTH_TOKEN=super-secret';
+  writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
+
+  const result = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', reviewScriptPath, evidencePath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.equal(result.status, 0);
+  assert.doesNotMatch(result.stdout, /PHASE4_WRITE_AUTH_TOKEN=super-secret/i);
+  assert.match(result.stdout, /PHASE4_WRITE_AUTH_TOKEN=\[redacted\]/i);
+});
+
 test('evidence review script returns a clear error for invalid evidence JSON', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-invalid-evidence-'));
-  const invalidPath = resolve(tempDir, 'invalid-evidence.json');
+  const invalidPath = resolve(tempDir, 'docs/evidence/invalid-evidence.local.json');
 
-  writeFileSync(invalidPath, '{"pilot_environment":123', 'utf8');
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  writeFileSync(invalidPath, '{"environmentLabel":123', 'utf8');
 
   const result = spawnSync(
     process.execPath,

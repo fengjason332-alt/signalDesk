@@ -24,13 +24,18 @@ Local helper command:
 - `npm run phase4:create-today-evidence`
 - `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
 - `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true`
+- `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
 - `npm run phase4:today-help`
 - This helper is local-only. It does not call Supabase, does not call AI providers, and does not write content.
-- The create, update, and report helpers only accept gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default unless `--allow-any-path` is passed intentionally.
+- The create/update helpers only accept gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default.
+- The review/next/report readers also accept the shipped `docs/examples/today-real-feed-pilot-evidence*.json` practice files.
+- Use `--allow-any-path` only when you intentionally need to bypass those local-only guards.
 - Record pilot outcomes in `docs/evidence/today-real-feed-pilot-evidence.local.json`.
+- Keep updating that same local/private evidence file across multiple sessions. Merge a `real_empty` observation and a successful real-card observation into one final local/private evidence file before review/report.
 - Keep local/private evidence files uncommitted.
 - Review local evidence with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>` after the checklist is complete.
+- If the review still returns `continue_pilot`, run `npm run phase4:today-evidence-next -- <path-to-local-evidence-json>` before the next manual browser pass.
 - A beginner-friendly starter file now exists at `docs/examples/today-real-feed-pilot-evidence.template.json`.
 - Use [docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md) if you want a click-by-click walkthrough.
 
@@ -89,7 +94,8 @@ To confirm the normal default remains intact:
      - final recommendation
    - Hand-edit JSON only if you want to fill a rarer field the updater still does not expose.
 9. When the checklist is complete, review the recorded JSON evidence locally with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>`.
-10. Generate a local Markdown report with `npm run phase4:today-pilot-report -- <path-to-local-evidence-json> --out docs/evidence/today-real-feed-pilot-report.local.md`.
+10. If the result is still `continue_pilot`, run `npm run phase4:today-evidence-next -- <path-to-local-evidence-json>` and follow the printed next target before starting another browser pass.
+11. Generate a local Markdown report with `npm run phase4:today-pilot-report -- <path-to-local-evidence-json> --out docs/evidence/today-real-feed-pilot-report.local.md`.
 
 Expected:
 - real cards render with the existing style
@@ -109,9 +115,16 @@ Expected:
 1. Find a signal where enrichment is completed and non-empty.
 2. Confirm completed and non-empty enriched summary text is shown first.
 3. Confirm completed and non-empty enriched why-it-matters text is shown first.
+   - when captured in the evidence file, this maps to:
+     - `completedNonEmptyEnrichedContentObserved=true`
+     - `completedNonEmptyEnrichedContentWon=true`
+     - one `enrichedSummaryCases` note
 4. Find a signal where enrichment is pending, failed, skipped, not requested, or blank.
 5. Confirm deterministic preview summary remains visible.
 6. Confirm deterministic why-it-matters remains visible.
+   - a completed-but-blank fallback case should also map to:
+     - `completedBlankEnrichedContentFallbackWorked=true`
+     - one `deterministicFallbackCases` note
 
 ### 5. Verify Filter Behavior
 
@@ -122,6 +135,10 @@ Expected:
 5. Confirm real_empty is distinct from filter_empty:
    - `real_empty` means the real preview query returned zero preview-safe rows
    - `filter_empty` means real rows exist, but the current filter excludes them
+   - when captured in the evidence file, this maps to:
+     - `observedFeedMode=real_empty`
+     - `realEmptyDistinctFromFilterEmpty=true`
+     - one `emptyStateChecks` note
 
 ### 6. Verify Fallback To Mock
 

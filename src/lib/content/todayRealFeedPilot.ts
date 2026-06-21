@@ -63,6 +63,7 @@ export const TODAY_REAL_FEED_PILOT_NEXT_COMMANDS = [
   `npm run phase4:update-today-evidence -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}`,
   'npm run dev',
   `npm run phase4:today-evidence-review -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}`,
+  `npm run phase4:today-evidence-next -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}`,
   `npm run phase4:today-pilot-report -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH} --out ${DEFAULT_TODAY_REAL_FEED_REPORT_OUTPUT_PATH}`,
 ] as const;
 

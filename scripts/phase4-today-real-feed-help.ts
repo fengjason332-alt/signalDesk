@@ -13,6 +13,7 @@ const lines = [
   '- npm run phase4:today-pilot-check',
   `- npm run phase4:update-today-evidence -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH} --real-cards-rendered true`,
   `- npm run phase4:today-evidence-review -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}`,
+  `- npm run phase4:today-evidence-next -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}`,
   `- npm run phase4:today-pilot-report -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH} --out ${DEFAULT_TODAY_REAL_FEED_REPORT_OUTPUT_PATH}`,
   '',
   'Rollback reminder:',
