@@ -6,6 +6,7 @@ import {
   applyTodayPilotEvidenceUpdates,
   assertTodayPilotEvidencePathSafe,
 } from '../src/lib/content/todayRealFeedEvidenceUpdater';
+import { DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH } from '../src/lib/content/todayRealFeedEvidenceStarter';
 
 function readFlagValue(argv: string[], index: number, flagName: string): string {
   const value = argv[index + 1];
@@ -18,6 +19,7 @@ function readFlagValue(argv: string[], index: number, flagName: string): string 
 function parseArgs(argv: string[]) {
   let evidencePath = '';
   let allowAnyPath = false;
+  let helpRequested = false;
   const operatorNotes: string[] = [];
   const screenshotNotes: string[] = [];
   const envFlags: string[] = [];
@@ -43,6 +45,11 @@ function parseArgs(argv: string[]) {
 
     if (current === '--allow-any-path') {
       allowAnyPath = true;
+      continue;
+    }
+
+    if (current === '--help' || current === '-h') {
+      helpRequested = true;
       continue;
     }
 
@@ -132,6 +139,7 @@ function parseArgs(argv: string[]) {
   return {
     evidencePath,
     allowAnyPath,
+    helpRequested,
     operatorNotes,
     screenshotNotes,
     envFlags,
@@ -150,6 +158,47 @@ function parseArgs(argv: string[]) {
 }
 
 const args = parseArgs(process.argv.slice(2));
+
+if (args.helpRequested) {
+  const helpLines = [
+    'SignalDesk Today real-feed evidence updater',
+    '',
+    'Usage:',
+    `  npm run phase4:update-today-evidence -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH} [flags]`,
+    '',
+    'Common flags:',
+    '  --observed-feed-mode real|real_empty|fallback_to_mock|mock|unknown',
+    '  --real-cards-rendered true|false',
+    '  --real-card-count <number>',
+    '  --detail-opened-safely true|false',
+    '  --completed-enriched-text-observed true|false',
+    '  --completed-enriched-text-wins true|false',
+    '  --blank-enrichment-fallback true|false',
+    '  --mobile-quality acceptable|needs_work|not_tested',
+    '  --freshness acceptable|needs_work|not_tested',
+    '  --source-coverage acceptable|needs_work|not_tested',
+    '  --rollback-tested true|false',
+    '  --preview-read-policies-confirmed true|false',
+    '  --env-flag "VITE_USE_REAL_CONTENT_FEED=true"',
+    '  --enriched-case "Describe the enriched-content win"',
+    '  --deterministic-fallback-case "Describe the fallback case"',
+    '  --mobile-note "Describe the tested viewport/device"',
+    '  --freshness-note "Describe the recency evidence"',
+    '  --source-coverage-note "Describe the source mix"',
+    '  --operator-note "Add a local reviewer note"',
+    '  --screenshot-note "Add a local screenshot placeholder"',
+    '',
+    'Safety:',
+    '  - Local-only helper.',
+    '  - No Supabase call.',
+    '  - No AI call.',
+    '  - No content write.',
+    '  - Use gitignored docs/evidence/*.local.* or *.private.* paths by default.',
+  ];
+
+  process.stdout.write(`${helpLines.join('\n')}\n`);
+  process.exit(0);
+}
 
 if (!args.evidencePath) {
   process.stderr.write(

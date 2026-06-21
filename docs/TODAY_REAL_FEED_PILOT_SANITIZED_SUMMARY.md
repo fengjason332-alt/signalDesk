@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Sanitized Summary
 
-This document is a committed, sanitized summary of the bounded local Today real-feed pilot work completed through Phase 4 Task 39.
+This document is a committed, sanitized summary of the bounded local Today real-feed pilot work completed through Phase 4 Task 42.
 
 It does not include local evidence JSON, local Markdown reports, secret values, or private operator notes.
 
@@ -33,7 +33,8 @@ Today remains mock-by-default after this pilot summary.
 - Keep Today mock-by-default.
 - Treat the current pilot as `continue_pilot`, not as rollout approval.
 - Capture the still-missing evidence before any explicit default-switch task is considered.
-- Use `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json` to decide the next missing evidence target locally.
+- Use `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json` to decide the next missing evidence bucket locally.
+- Task 40-42 only improve the local-only evidence collection, completeness scoring, and sanitized reporting flow. They do not change the Today runtime default.
 
 ## Boundaries Preserved
 

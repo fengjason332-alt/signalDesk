@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, relative, resolve } from 'node:path';
 
 import {
   createEmptyTodayPilotEvidence,
@@ -88,6 +88,9 @@ test('complete passing evidence returns ready_for_controlled_default_rollout', (
   assert.equal(review.recommendation, 'ready_for_controlled_default_rollout');
   assert.deepEqual(review.failedCriticalChecks, []);
   assert.deepEqual(review.missingRequiredChecks, []);
+  assert.equal(review.completeness.requiredChecksMissingCount, 0);
+  assert.equal(review.completeness.criticalBlockersCount, 0);
+  assert.equal(review.completeness.progressPercent, 100);
 });
 
 test('missing evidence returns continue_pilot', () => {
@@ -110,6 +113,8 @@ test('failed critical checks return blocked', () => {
 
   assert.equal(review.recommendation, 'blocked');
   assert.ok(review.failedCriticalChecks.includes('brokenPreviewReadsFellBackSafelyToMock'));
+  assert.equal(review.completeness.criticalBlockersCount, 1);
+  assert.equal(review.completeness.progressPercent < 100, true);
 });
 
 test('fake full article body present should block', () => {
@@ -202,6 +207,11 @@ test('real-empty pilot evidence can conservatively keep Today mock-by-default', 
 
   assert.equal(review.recommendation, 'keep_mock_default');
   assert.deepEqual(review.failedCriticalChecks, []);
+  assert.deepEqual(review.missingRequiredChecks, []);
+  assert.equal(review.completeness.requiredChecksCompletedCount, 12);
+  assert.equal(review.completeness.requiredChecksMissingCount, 0);
+  assert.equal(review.completeness.requiredChecksTotalCount, 12);
+  assert.equal(review.completeness.progressPercent, 100);
 });
 
 test('real-empty pilot evidence stays continue_pilot while mobile freshness or source coverage are still missing', () => {
@@ -279,6 +289,7 @@ test('template evidence json is valid JSON and starts as continue_pilot guidance
 
   const review = evaluateTodayPilotEvidence(parseTodayPilotEvidence(parsed));
   assert.equal(review.recommendation, 'continue_pilot');
+  assert.equal(review.completeness.requiredChecksCompletedCount < review.completeness.requiredChecksTotalCount, true);
 });
 
 test('evidence review script prints a recommendation for a valid example JSON file', () => {
@@ -292,10 +303,18 @@ test('evidence review script prints a recommendation for a valid example JSON fi
   );
 
   assert.match(output, /overall recommendation:\s+ready_for_controlled_default_rollout/i);
+  assert.match(output, /evidence completeness:/i);
+  assert.match(output, /guidance-only progress score:/i);
   assert.match(output, /next action:/i);
-  assert.match(output, /what to fix next:/i);
+  assert.match(output, /primary next manual action:/i);
+  assert.match(output, /exact commands to update evidence:/i);
   assert.match(output, /next-step helper:/i);
+  assert.match(
+    output,
+    /Next-step helper:\s+npm run phase4:today-evidence-next -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i,
+  );
   assert.match(output, /failed critical checks:/i);
+  assert.match(output, /already satisfied:/i);
   assert.match(output, /rollback instruction:/i);
   assert.doesNotMatch(output, /DEEPSEEK_API_KEY/i);
   assert.doesNotMatch(output, /SUPABASE_SERVICE_ROLE_KEY/i);
@@ -355,6 +374,33 @@ test('evidence review script redacts secret-looking environment labels', () => {
   assert.equal(result.status, 0);
   assert.doesNotMatch(result.stdout, /PHASE4_WRITE_AUTH_TOKEN=super-secret/i);
   assert.match(result.stdout, /PHASE4_WRITE_AUTH_TOKEN=\[redacted\]/i);
+});
+
+test('evidence review script does not echo traversal-style helper paths', () => {
+  const evidencePath = resolve(
+    '/private/tmp',
+    `signaldesk-review-traversal-${Date.now()}.json`,
+  );
+  const traversalPath = `docs/evidence/${relative(
+    resolve(process.cwd(), 'docs/evidence'),
+    evidencePath,
+  ).replace(/\\/g, '/')}`;
+  const evidence = JSON.parse(readFileSync(passingExamplePath, 'utf8')) as Record<string, unknown>;
+
+  writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
+
+  const result = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', reviewScriptPath, traversalPath, '--allow-any-path'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.equal(result.status, 0);
+  assert.doesNotMatch(result.stdout, new RegExp(traversalPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(result.stdout, /<path-to-local-evidence-json>/i);
 });
 
 test('evidence review script returns a clear error for invalid evidence JSON', () => {

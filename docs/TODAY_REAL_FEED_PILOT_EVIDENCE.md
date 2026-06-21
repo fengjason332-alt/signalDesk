@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is maintained through Phase 4 Task 39. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is maintained through Phase 4 Task 42. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -31,6 +31,8 @@ Local helper command:
 - The evidence-review command is local-only. It does not call Supabase, does not call AI providers, and does not write content.
 - The evidence-update and pilot-report commands are also local-only. They do not call Supabase, do not call AI providers, and do not write app content.
 - The evidence-next command is also local-only. It does not call Supabase, does not call AI providers, and does not write content.
+- The evidence-next command now groups missing evidence into must-collect, optional, blocked, and already-satisfied buckets and prints exact updater commands.
+- The review / next / report flow now also prints a guidance-only completeness score. It never changes the runtime default by itself.
 - Local operator evidence should live in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another gitignored local/private JSON path.
 - Local operator reports should live in `docs/evidence/today-real-feed-pilot-report.local.md` or another gitignored local/private Markdown path.
 - The create/update helpers only accept gitignored `docs/evidence/*.local.*` or `docs/evidence/*.private.*` paths by default.
@@ -120,7 +122,7 @@ Important boundaries:
 
 ## Task 37 Missing Evidence Map
 
-The current evidence review still remains `continue_pilot` until the following gaps are filled:
+The current evidence review still remains `continue_pilot` until the following priority gaps are filled:
 
 - genuine `real_empty`
   - record `observedFeedMode=real_empty` during the session where you saw it
@@ -143,6 +145,12 @@ The current evidence review still remains `continue_pilot` until the following g
   - set `sourceCoverageAcceptable=true` only after checking the breadth of stable observed sources
   - update `sourceCount`
   - add one `sourceCoverageNotes` note summarizing the observed source mix
+
+Other still-required readiness checks can also remain missing in ordinary real-feed passes:
+- `rlsReadPolicyConfirmed`
+- `rollbackToMockVerified`
+- `aiOrOpenAiFilterMatchedWhenApplicable`
+- `bilingualQualityAcceptable`
 
 ## Recommendation Categories
 
@@ -197,6 +205,8 @@ If the review still returns `continue_pilot`, ask the local next-step helper wha
 ```bash
 npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json
 ```
+
+That helper now prints grouped missing-evidence buckets and copy-paste updater commands so the next human step is explicit.
 
 If you prefer not to hand-edit JSON, update the file incrementally:
 

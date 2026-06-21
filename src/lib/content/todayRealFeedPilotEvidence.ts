@@ -67,7 +67,21 @@ export interface TodayPilotEvidenceEvaluation {
   failedCriticalChecks: string[];
   warnings: string[];
   nextAction: string;
+  completeness: TodayPilotEvidenceCompleteness;
   normalizedEvidence: TodayRealFeedPilotEvidence;
+}
+
+export interface TodayPilotEvidenceCompleteness {
+  applicableRequiredChecks: string[];
+  completedRequiredChecks: string[];
+  optionalRecommendedChecks: string[];
+  requiredChecksCompletedCount: number;
+  requiredChecksMissingCount: number;
+  requiredChecksTotalCount: number;
+  criticalBlockersCount: number;
+  warningsCount: number;
+  progressPercent: number;
+  guidanceOnly: true;
 }
 
 export interface CreateEmptyTodayPilotEvidenceOptions {
@@ -485,6 +499,153 @@ function isTrue(value: NullableBoolean): value is true {
   return value === true;
 }
 
+const BASELINE_REQUIRED_CHECKS = [
+  'brokenPreviewReadsFellBackSafelyToMock',
+  'radarWatchlistLibraryUnchanged',
+  'noSecretsOrRawInternalsInUi',
+  'noFrontendWritesIntroduced',
+  'noFrontendAiCallsIntroduced',
+  'rlsReadPolicyConfirmed',
+  'rollbackToMockVerified',
+  'mobileQualityAcceptable',
+  'bilingualQualityAcceptable',
+  'dataFreshnessAcceptable',
+  'sourceCoverageAcceptable',
+] as const;
+
+const REAL_CARD_REQUIRED_CHECKS = [
+  'realCardsRendered',
+  'realCardsObservedCount',
+  'detailCheckedCount',
+  'detailOpenedSafely',
+  'provenanceOrSourceLinksVisible',
+  'fakeFullArticleBodyAbsent',
+  'completedNonEmptyEnrichedContentObserved',
+  'completedNonEmptyEnrichedContentWon',
+  'completedBlankEnrichedContentFallbackWorked',
+  'incompleteEnrichmentDeterministicFallbackWorked',
+  'aiOrOpenAiFilterMatchedWhenApplicable',
+  'nonMatchingFiltersShowedNormalFilterEmptyState',
+  'realEmptyDistinctFromFilterEmpty',
+] as const;
+
+type TodayPilotRequiredCheckName =
+  | (typeof BASELINE_REQUIRED_CHECKS)[number]
+  | (typeof REAL_CARD_REQUIRED_CHECKS)[number]
+  | 'realEmptyDistinctFromFilterEmpty';
+
+function hasPositiveCount(value: number | null): boolean {
+  return value !== null && value > 0;
+}
+
+function hasRealCardEvidenceSignal(evidence: TodayRealFeedPilotEvidence): boolean {
+  return (
+    evidence.observedFeedMode === 'real' ||
+    evidence.realCardsRendered === true ||
+    hasPositiveCount(evidence.realCardsObservedCount) ||
+    hasPositiveCount(evidence.detailCheckedCount) ||
+    evidence.detailOpenedSafely !== null ||
+    evidence.provenanceOrSourceLinksVisible !== null ||
+    evidence.fakeFullArticleBodyAbsent !== null ||
+    evidence.completedNonEmptyEnrichedContentObserved !== null ||
+    evidence.completedNonEmptyEnrichedContentWon !== null ||
+    evidence.completedBlankEnrichedContentFallbackWorked !== null ||
+    evidence.incompleteEnrichmentDeterministicFallbackWorked !== null ||
+    (evidence.aiOrOpenAiFilterMatchedWhenApplicable !== null &&
+      evidence.aiOrOpenAiFilterMatchedWhenApplicable !== 'not_applicable') ||
+    evidence.nonMatchingFiltersShowedNormalFilterEmptyState !== null
+  );
+}
+
+function listApplicableRequiredChecks(
+  evidence: TodayRealFeedPilotEvidence,
+): TodayPilotRequiredCheckName[] {
+  const checks = [...BASELINE_REQUIRED_CHECKS] as TodayPilotRequiredCheckName[];
+
+  if (hasRealCardEvidenceSignal(evidence)) {
+    checks.push(...REAL_CARD_REQUIRED_CHECKS);
+  } else if (evidence.observedFeedMode === 'real_empty') {
+    checks.push('realEmptyDistinctFromFilterEmpty');
+  }
+
+  return [...new Set(checks)];
+}
+
+function isRequiredCheckSatisfied(
+  evidence: TodayRealFeedPilotEvidence,
+  checkName: TodayPilotRequiredCheckName,
+): boolean {
+  switch (checkName) {
+    case 'realCardsRendered':
+      return evidence.realCardsRendered === true;
+    case 'realCardsObservedCount':
+      return hasPositiveCount(evidence.realCardsObservedCount);
+    case 'detailCheckedCount':
+      return hasPositiveCount(evidence.detailCheckedCount);
+    case 'aiOrOpenAiFilterMatchedWhenApplicable':
+      return (
+        evidence.aiOrOpenAiFilterMatchedWhenApplicable === true ||
+        evidence.aiOrOpenAiFilterMatchedWhenApplicable === 'not_applicable'
+      );
+    default:
+      return evidence[checkName] === true;
+  }
+}
+
+function buildTodayPilotEvidenceCompleteness(
+  evidence: TodayRealFeedPilotEvidence,
+  missingRequiredChecks: string[],
+  failedCriticalChecks: string[],
+  warnings: string[],
+): TodayPilotEvidenceCompleteness {
+  const applicableRequiredChecks = listApplicableRequiredChecks(evidence);
+  const failedRequiredChecks = new Set(
+    failedCriticalChecks.filter((checkName) =>
+      applicableRequiredChecks.includes(checkName as TodayPilotRequiredCheckName),
+    ),
+  );
+  const missingRequiredCheckSet = new Set(
+    missingRequiredChecks.filter((checkName) =>
+      applicableRequiredChecks.includes(checkName as TodayPilotRequiredCheckName),
+    ),
+  );
+  const completedRequiredChecks = applicableRequiredChecks.filter(
+    (checkName) =>
+      !failedRequiredChecks.has(checkName) &&
+      !missingRequiredCheckSet.has(checkName) &&
+      isRequiredCheckSatisfied(evidence, checkName),
+  );
+  const optionalRecommendedChecks: string[] = [];
+
+  if (evidence.envFlagsChecked.length === 0) {
+    optionalRecommendedChecks.push('envFlagsChecked');
+  }
+
+  if (evidence.screenshotsOrNotes.length === 0) {
+    optionalRecommendedChecks.push('screenshotsOrNotes');
+  }
+
+  const requiredChecksTotalCount = applicableRequiredChecks.length;
+  const requiredChecksCompletedCount = completedRequiredChecks.length;
+  const progressPercent =
+    requiredChecksTotalCount === 0
+      ? 0
+      : Math.round((requiredChecksCompletedCount / requiredChecksTotalCount) * 100);
+
+  return {
+    applicableRequiredChecks,
+    completedRequiredChecks,
+    optionalRecommendedChecks,
+    requiredChecksCompletedCount,
+    requiredChecksMissingCount: missingRequiredCheckSet.size,
+    requiredChecksTotalCount,
+    criticalBlockersCount: failedCriticalChecks.length,
+    warningsCount: warnings.length,
+    progressPercent,
+    guidanceOnly: true,
+  };
+}
+
 function addMissingCheck(
   missingRequiredChecks: string[],
   evidence: TodayRealFeedPilotEvidence,
@@ -519,8 +680,7 @@ export function evaluateTodayPilotEvidence(
   const failedCriticalChecks: string[] = [];
   const missingRequiredChecks: string[] = [];
   const warnings: string[] = [];
-  const hasPositiveRealCardCount =
-    evidence.realCardsObservedCount !== null && evidence.realCardsObservedCount > 0;
+  const hasPositiveRealCardCount = hasPositiveCount(evidence.realCardsObservedCount);
   const hasObservedRealCards =
     evidence.observedFeedMode === 'real' &&
     isTrue(evidence.realCardsRendered) &&
@@ -688,6 +848,17 @@ export function evaluateTodayPilotEvidence(
     );
   }
 
+  if (
+    (evidence.observedFeedMode === 'mock' ||
+      evidence.observedFeedMode === 'unknown') &&
+    !hasObservedRealCards &&
+    !isRealEmptyEvidence
+  ) {
+    warnings.push(
+      'No real-feed observation has been recorded yet, so the pilot still needs a first real or real_empty browser pass.',
+    );
+  }
+
   let recommendation: TodayPilotEvidenceRecommendation = 'continue_pilot';
   let nextAction =
     'Collect the missing pilot evidence and rerun the local evidence review before considering any default-switch decision.';
@@ -733,12 +904,22 @@ export function evaluateTodayPilotEvidence(
     }
   }
 
+  const normalizedMissingRequiredChecks = [...new Set(missingRequiredChecks)];
+  const normalizedFailedCriticalChecks = [...new Set(failedCriticalChecks)];
+  const completeness = buildTodayPilotEvidenceCompleteness(
+    evidence,
+    normalizedMissingRequiredChecks,
+    normalizedFailedCriticalChecks,
+    warnings,
+  );
+
   return {
     recommendation,
-    missingRequiredChecks: [...new Set(missingRequiredChecks)],
-    failedCriticalChecks: [...new Set(failedCriticalChecks)],
+    missingRequiredChecks: normalizedMissingRequiredChecks,
+    failedCriticalChecks: normalizedFailedCriticalChecks,
     warnings,
     nextAction,
+    completeness,
     normalizedEvidence: {
       ...evidence,
       finalRecommendation: recommendation,

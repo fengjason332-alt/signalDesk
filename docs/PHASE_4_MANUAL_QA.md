@@ -34,7 +34,7 @@ Important boundaries:
 - Task 33 adds `npm run phase4:today-help`
 - Task 35 hardens the local evidence/report path guards and clarifies that `pilot_ready` is only an env-presence preflight
 - Task 36 adds a sanitized committed pilot summary doc while keeping local/private evidence uncommitted
-- Task 37-39 add clearer missing-evidence field mapping, a local `npm run phase4:today-evidence-next` command, and updated operator handoff/docs
+- Task 37-42 add clearer missing-evidence field mapping, a local `npm run phase4:today-evidence-next` command, grouped next-step buckets, guidance-only completeness scoring, and improved sanitized local reporting
 - do not commit `.env` or secrets
 
 ## Current Known Good State
@@ -470,7 +470,8 @@ The create/update helpers only accept gitignored `docs/evidence/*.local.*` or `d
 The review/next/report readers also accept the shipped `docs/examples/today-real-feed-pilot-evidence*.json` files for local practice.
 Use `--allow-any-path` only when you intentionally need to bypass those local-only guards.
 Run `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json` after the manual checks are captured.
-If that review still returns `continue_pilot`, run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json` and follow the printed next target before the next browser pass.
+If that review still returns `continue_pilot`, run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json` and follow the printed must-collect bucket plus exact updater command before the next browser pass.
+The helper now also prints a guidance-only completeness score, optional-but-recommended notes, blocked-or-contradictory evidence, and already-satisfied buckets.
 Run `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md` to generate a local-only Markdown report.
 Run `npm run phase4:today-help` to reprint the bounded local-only operator flow.
 Record outcomes in [docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_EVIDENCE.md) and [docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md).

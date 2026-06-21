@@ -1,6 +1,6 @@
 # Today Real-Feed Rollout Decision
 
-This document is maintained through Task 39. It does not switch Today to real content by default.
+This document is maintained through Task 42. It does not switch Today to real content by default.
 
 Today must remain mock by default until the criteria below are met and the team explicitly approves a later rollout task.
 
@@ -32,7 +32,10 @@ This means:
 - Task 33 adds `npm run phase4:today-help` so the bounded command flow is easy to rediscover
 - Task 37 clarifies how the still-missing evidence maps to local evidence fields and updater commands
 - Task 38 adds `npm run phase4:today-evidence-next` so a `continue_pilot` result can be turned into one concrete next evidence target
-- Task 39 updates the docs and handoff so the next operator step is still evidence collection, not a default switch
+- Tasks 39-42 keep the next operator step focused on evidence collection and local-only rollout review, not a default switch
+- Task 40 makes the missing-evidence output actionable with grouped buckets and exact updater commands
+- Task 41 adds a guidance-only completeness score across review / next / report without changing rollout rules
+- Task 42 improves the local sanitized report so future sharing/review is easier without exposing private evidence
 
 ## Current Boundary
 
@@ -119,7 +122,7 @@ Prerequisites:
 - This is a QA and rollout-decision document only.
 - It does not approve switching Today to real feed by default.
 - It still requires a separate controlled rollout task even if the local evidence review says `ready_for_controlled_default_rollout`.
-- As long as the local evidence review still returns `continue_pilot`, the next operator step is to run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json` and fill the printed gap.
+- As long as the local evidence review still returns `continue_pilot`, the next operator step is to run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json` and fill the first printed must-collect bucket.
 - Task 20 decision: keep Today mock by default until target-environment rollout validation is complete.
 - It does not approve Radar, Watchlist, or Library real-data rollout.
 - It does not change any server-side AI scheduling boundary.

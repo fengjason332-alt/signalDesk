@@ -3,6 +3,11 @@ import type {
   TodayRealFeedPilotEvidence,
 } from './todayRealFeedPilotEvidence';
 import { TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS } from './todayRealFeedPilot';
+import {
+  isTodayPilotRepoExamplePath,
+  sanitizeTodayPilotDisplayPath,
+} from './todayRealFeedEvidenceSanitizer';
+import { DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH } from './todayRealFeedEvidenceStarter';
 
 export const TODAY_REAL_FEED_CHECK_LABELS: Record<string, string> = {
   realCardsRendered: 'Real cards rendered',
@@ -39,6 +44,8 @@ export const TODAY_REAL_FEED_CHECK_LABELS: Record<string, string> = {
   realFeedObservationConsistency: 'Real-feed observations were consistent',
   realCardsObservedCount: 'A positive real-card count was captured',
   detailCheckedCount: 'At least one real Detail view was checked',
+  envFlagsChecked: 'Local env flags were recorded',
+  screenshotsOrNotes: 'Screenshot or operator notes were recorded',
 };
 
 export function labelTodayPilotCheck(checkName: string): string {
@@ -46,6 +53,11 @@ export function labelTodayPilotCheck(checkName: string): string {
 }
 
 type GuidanceAreaId =
+  | 'first_real_feed_observation'
+  | 'safety_baseline'
+  | 'real_card_rendering'
+  | 'detail_safety'
+  | 'incomplete_enrichment_fallback'
   | 'real_empty'
   | 'completed_enriched_win'
   | 'blank_enrichment_fallback'
@@ -68,25 +80,118 @@ interface GuidanceAreaDefinition {
 
 export interface TodayPilotEvidenceNextPlan {
   recommendation: string;
+  completeness: TodayPilotEvidenceEvaluation['completeness'];
   missingRequiredChecks: string[];
   failedCriticalChecks: string[];
   warnings: string[];
   nextAction: string;
+  mustCollectBeforeRollout: string[];
+  optionalButRecommended: string[];
+  blockedOrContradictory: string[];
+  alreadySatisfied: string[];
+  exactNextManualAction: string;
   exactNextManualChecks: string[];
-  suggestedUpdateCommands: string[];
+  exactUpdateCommands: string[];
   evidenceStatusLines: string[];
   rollbackReminder: readonly string[];
 }
 
 const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   {
+    id: 'first_real_feed_observation',
+    title: 'first real-feed observation evidence',
+    checks: [],
+    describeExistingEvidence: (evidence) =>
+      `observed feed mode: ${evidence.observedFeedMode}`,
+    suggestedCommands: (evidencePath) => [
+      `npm run phase4:update-today-evidence -- ${evidencePath} --observed-feed-mode real --real-cards-rendered true --real-card-count 1 --sample-card "Add one sampled real card title here."`,
+    ],
+    manualChecks: [
+      'Enable real-feed and run one real browser pass instead of staying in mock or unknown mode.',
+      'Capture either one real card, a genuine real_empty state, or a safe fallback_to_mock observation.',
+      'Record the first observed feed mode and at least one supporting note in the evidence file.',
+    ],
+  },
+  {
+    id: 'safety_baseline',
+    title: 'baseline safety evidence',
+    checks: [
+      'brokenPreviewReadsFellBackSafelyToMock',
+      'noSecretsOrRawInternalsInUi',
+      'noFrontendWritesIntroduced',
+      'noFrontendAiCallsIntroduced',
+      'radarWatchlistLibraryUnchanged',
+    ],
+    describeExistingEvidence: (evidence) =>
+      `reviewer notes captured: ${evidence.reviewerNotes.length}`,
+    suggestedCommands: (evidencePath) => [
+      `npm run phase4:update-today-evidence -- ${evidencePath} --broken-preview-fallback true --no-secrets-in-ui true --no-frontend-writes-introduced true --no-frontend-ai-calls-introduced true --radar-watchlist-library-unchanged true --operator-note "Confirmed fallback safety, no secret leakage, no frontend writes/AI calls, and no Radar/Watchlist/Library changes."`,
+    ],
+    manualChecks: [
+      'Confirm broken preview reads still fall back safely to mock.',
+      'Confirm no secrets or raw internal errors appear in UI.',
+      'Confirm no frontend writes or frontend AI calls were introduced.',
+      'Confirm Radar, Watchlist, and Library remained unchanged during the pilot.',
+    ],
+  },
+  {
+    id: 'real_card_rendering',
+    title: 'real card rendering evidence',
+    checks: ['realCardsRendered', 'realCardsObservedCount'],
+    describeExistingEvidence: (evidence) =>
+      `sample cards captured: ${evidence.sampleCardIdsOrTitles.length}`,
+    suggestedCommands: (evidencePath) => [
+      `npm run phase4:update-today-evidence -- ${evidencePath} --observed-feed-mode real --real-cards-rendered true --real-card-count 1 --sample-card "Add one sampled real card title here."`,
+    ],
+    manualChecks: [
+      'Enable real-feed and confirm real cards actually render in Today.',
+      'Capture at least one sampled real card title or id.',
+      'Record the observed real-card count from that pass.',
+    ],
+  },
+  {
+    id: 'detail_safety',
+    title: 'detail safety and provenance evidence',
+    checks: [
+      'detailCheckedCount',
+      'detailOpenedSafely',
+      'provenanceOrSourceLinksVisible',
+      'fakeFullArticleBodyAbsent',
+    ],
+    describeExistingEvidence: (evidence) =>
+      `detail checks captured: ${evidence.detailCheckedCount ?? 0}`,
+    suggestedCommands: (evidencePath) => [
+      `npm run phase4:update-today-evidence -- ${evidencePath} --detail-checked-count 1 --detail-opened-safely true --provenance-visible true --no-fake-article-body true --operator-note "Checked one real Detail view with visible provenance and no fake full article body."`,
+    ],
+    manualChecks: [
+      'Open at least one real card in Detail.',
+      'Confirm Detail opened safely and source provenance stayed visible.',
+      'Confirm Detail did not fabricate a full article body.',
+    ],
+  },
+  {
+    id: 'incomplete_enrichment_fallback',
+    title: 'incomplete enrichment fallback evidence',
+    checks: ['incompleteEnrichmentDeterministicFallbackWorked'],
+    describeExistingEvidence: (evidence) =>
+      `deterministic fallback cases captured: ${evidence.deterministicFallbackCases.length}`,
+    suggestedCommands: (evidencePath) => [
+      `npm run phase4:update-today-evidence -- ${evidencePath} --incomplete-enrichment-fallback true --deterministic-fallback-case "Observed pending/failed/skipped/not-requested enrichment fallback to deterministic preview text."`,
+    ],
+    manualChecks: [
+      'Find one card where enrichment is pending, failed, skipped, or not requested.',
+      'Confirm deterministic preview text remained visible and useful.',
+      'Record the fallback case in the evidence file.',
+    ],
+  },
+  {
     id: 'real_empty',
-    title: 'Capture a genuine real_empty observation',
+    title: 'real_empty distinction evidence',
     checks: ['realEmptyDistinctFromFilterEmpty'],
     describeExistingEvidence: (evidence) =>
       `real_empty notes captured: ${evidence.emptyStateChecks.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --observed-feed-mode real_empty --real-empty-distinct true --empty-state-check "Captured a genuine real_empty state that stayed distinct from filter_empty."`,
+      `npm run phase4:update-today-evidence -- ${evidencePath} --observed-feed-mode real_empty --real-cards-rendered false --real-card-count 0 --real-empty-distinct true --empty-state-check "Captured a genuine real_empty state that stayed distinct from filter_empty."`,
     ],
     manualChecks: [
       'Enable real-feed and capture a true real_empty state, not an invalid-env fallback or a normal filter-empty result.',
@@ -96,7 +201,7 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'completed_enriched_win',
-    title: 'Capture a completed non-empty enriched-content win',
+    title: 'completed non-empty enriched-content win evidence',
     checks: [
       'completedNonEmptyEnrichedContentObserved',
       'completedNonEmptyEnrichedContentWon',
@@ -114,7 +219,7 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'blank_enrichment_fallback',
-    title: 'Capture a completed-but-blank enrichment fallback case',
+    title: 'completed-but-blank enrichment fallback evidence',
     checks: ['completedBlankEnrichedContentFallbackWorked'],
     describeExistingEvidence: (evidence) =>
       `deterministic fallback cases captured: ${evidence.deterministicFallbackCases.length}`,
@@ -129,7 +234,7 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'filter_behavior',
-    title: 'Capture filter-behavior evidence',
+    title: 'filter behavior evidence',
     checks: [
       'aiOrOpenAiFilterMatchedWhenApplicable',
       'nonMatchingFiltersShowedNormalFilterEmptyState',
@@ -147,7 +252,7 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'rollback',
-    title: 'Capture rollback verification',
+    title: 'rollback verification',
     checks: ['rollbackToMockVerified'],
     describeExistingEvidence: (evidence) =>
       `rollback captured: ${evidence.rollbackToMockVerified === true ? 'yes' : 'no'}`,
@@ -162,7 +267,7 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'rls',
-    title: 'Capture preview-read policy confirmation',
+    title: 'preview-read policy confirmation',
     checks: ['rlsReadPolicyConfirmed'],
     describeExistingEvidence: () =>
       'preview-read policy confirmation captured: check evidence flags',
@@ -177,7 +282,7 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'bilingual_quality',
-    title: 'Capture bilingual quality evidence',
+    title: 'bilingual quality evidence',
     checks: ['bilingualQualityAcceptable'],
     describeExistingEvidence: (evidence) =>
       `bilingual notes captured: ${evidence.bilingualQualityNotes.length}`,
@@ -192,7 +297,7 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'mobile_quality',
-    title: 'Capture mobile quality evidence',
+    title: 'mobile quality evidence',
     checks: ['mobileQualityAcceptable'],
     describeExistingEvidence: (evidence) =>
       `mobile notes captured: ${evidence.mobileQualityNotes.length}`,
@@ -207,7 +312,7 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'freshness',
-    title: 'Capture freshness evidence',
+    title: 'freshness evidence',
     checks: ['dataFreshnessAcceptable'],
     describeExistingEvidence: (evidence) =>
       `freshness notes captured: ${evidence.freshnessNotes.length}`,
@@ -222,12 +327,12 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
   },
   {
     id: 'source_coverage',
-    title: 'Capture source coverage evidence',
+    title: 'source coverage evidence',
     checks: ['sourceCoverageAcceptable'],
     describeExistingEvidence: (evidence) =>
       `source coverage notes captured: ${evidence.sourceCoverageNotes.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --source-coverage acceptable --source-coverage-note "Observed a broad enough mix of stable sources for the pilot."`,
+      `npm run phase4:update-today-evidence -- ${evidencePath} --source-count 3 --source-coverage acceptable --source-coverage-note "Observed a broad enough mix of stable sources for the pilot."`,
     ],
     manualChecks: [
       'Review whether the observed cards came from a broad enough set of stable sources.',
@@ -238,24 +343,81 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
 ];
 
 function areaForCheck(checkName: string): GuidanceAreaDefinition | null {
+  return GUIDANCE_AREAS.find((area) => area.checks.includes(checkName)) ?? null;
+}
+
+function needsFirstRealFeedObservation(evidence: TodayRealFeedPilotEvidence): boolean {
   return (
-    GUIDANCE_AREAS.find((area) => area.checks.includes(checkName)) ?? null
+    (evidence.observedFeedMode === 'mock' ||
+      evidence.observedFeedMode === 'unknown' ||
+      evidence.observedFeedMode === 'fallback_to_mock') &&
+    evidence.realCardsRendered !== true &&
+    (evidence.realCardsObservedCount ?? 0) <= 0 &&
+    evidence.detailCheckedCount === null
   );
+}
+
+function resolveTodayPilotUpdaterPath(evidencePath: string): string {
+  if (isTodayPilotRepoExamplePath(evidencePath)) {
+    return DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH;
+  }
+
+  return sanitizeTodayPilotDisplayPath(evidencePath);
 }
 
 export function buildTodayPilotEvidenceNextPlan(
   review: TodayPilotEvidenceEvaluation,
   evidencePath: string,
 ): TodayPilotEvidenceNextPlan {
+  const safeEvidencePath = resolveTodayPilotUpdaterPath(evidencePath);
+  const mustCollectBeforeRollout: string[] = [];
+  const optionalButRecommended = review.completeness.optionalRecommendedChecks.map(
+    labelTodayPilotCheck,
+  );
+  const blockedOrContradictory = review.failedCriticalChecks.map(labelTodayPilotCheck);
+  const alreadySatisfied: string[] = [];
   const exactNextManualChecks: string[] = [];
-  const suggestedUpdateCommands: string[] = [];
+  const exactUpdateCommands: string[] = [];
   const evidenceStatusLines: string[] = [];
   const seenAreas = new Set<GuidanceAreaId>();
+  const completedRequiredChecks = new Set(review.completeness.completedRequiredChecks);
+  const applicableRequiredChecks = new Set(review.completeness.applicableRequiredChecks);
 
   const relevantChecks = [
     ...review.failedCriticalChecks,
     ...review.missingRequiredChecks,
   ];
+
+  if (isTodayPilotRepoExamplePath(evidencePath)) {
+    evidenceStatusLines.push(
+      `Practice example detected: updater commands target ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH}.`,
+    );
+    exactUpdateCommands.push('npm run phase4:create-today-evidence');
+  }
+
+  if (
+    relevantChecks.length === 0 &&
+    review.recommendation !== 'blocked' &&
+    review.recommendation !== 'ready_for_controlled_default_rollout' &&
+    needsFirstRealFeedObservation(review.normalizedEvidence)
+  ) {
+    const firstObservationArea = GUIDANCE_AREAS.find(
+      (area) => area.id === 'first_real_feed_observation',
+    );
+
+    if (firstObservationArea) {
+      mustCollectBeforeRollout.push(firstObservationArea.title);
+      evidenceStatusLines.push(
+        `${firstObservationArea.title}: ${firstObservationArea.describeExistingEvidence(
+          review.normalizedEvidence,
+        )}`,
+      );
+      exactNextManualChecks.push(...firstObservationArea.manualChecks);
+      exactUpdateCommands.push(
+        ...firstObservationArea.suggestedCommands(safeEvidencePath),
+      );
+    }
+  }
 
   for (const checkName of relevantChecks) {
     const area = areaForCheck(checkName);
@@ -264,10 +426,12 @@ export function buildTodayPilotEvidenceNextPlan(
     }
 
     seenAreas.add(area.id);
-    evidenceStatusLines.push(`Next target: ${area.title}`);
-    evidenceStatusLines.push(area.describeExistingEvidence(review.normalizedEvidence));
+    mustCollectBeforeRollout.push(area.title);
+    evidenceStatusLines.push(
+      `${area.title}: ${area.describeExistingEvidence(review.normalizedEvidence)}`,
+    );
     exactNextManualChecks.push(...area.manualChecks);
-    suggestedUpdateCommands.push(...area.suggestedCommands(evidencePath));
+    exactUpdateCommands.push(...area.suggestedCommands(safeEvidencePath));
   }
 
   for (const warning of review.warnings) {
@@ -275,7 +439,8 @@ export function buildTodayPilotEvidenceNextPlan(
       warning.includes('Completed enriched summary content') ||
       warning.includes('Source coverage is not acceptable yet') ||
       warning.includes('Data freshness is not acceptable yet') ||
-      warning.includes('Mobile quality is not acceptable yet')
+      warning.includes('Mobile quality is not acceptable yet') ||
+      warning.includes('Bilingual quality is not acceptable yet')
     ) {
       evidenceStatusLines.push(`Warning context: ${warning}`);
     }
@@ -296,20 +461,77 @@ export function buildTodayPilotEvidenceNextPlan(
       continue;
     }
 
+    mustCollectBeforeRollout.push(labelTodayPilotCheck(missingCheck));
     exactNextManualChecks.push(
       `Capture the missing check: ${labelTodayPilotCheck(missingCheck)}.`,
     );
   }
 
+  for (const area of GUIDANCE_AREAS) {
+    if (area.checks.length === 0) {
+      continue;
+    }
+
+    const areaFailed = area.checks.some((checkName) =>
+      review.failedCriticalChecks.includes(checkName),
+    );
+    const areaMissing = area.checks.some((checkName) =>
+      review.missingRequiredChecks.includes(checkName),
+    );
+    const areaApplicable = area.checks.every((checkName) =>
+      applicableRequiredChecks.has(checkName),
+    );
+    const areaCompleted = area.checks.every((checkName) =>
+      completedRequiredChecks.has(checkName),
+    );
+
+    if (areaApplicable && areaCompleted && !areaFailed && !areaMissing) {
+      alreadySatisfied.push(area.title);
+    }
+  }
+
+  const exactNextManualAction =
+    exactNextManualChecks[0] ??
+    (optionalButRecommended.length > 0
+      ? 'Record the remaining optional evidence notes and rerun the local review.'
+      : review.nextAction);
+
+  const coveredByArea = new Set<string>();
+  for (const area of GUIDANCE_AREAS) {
+    for (const checkName of area.checks) {
+      coveredByArea.add(checkName);
+    }
+  }
+
+  if (
+    mustCollectBeforeRollout.length === 0 &&
+    blockedOrContradictory.length === 0 &&
+    optionalButRecommended.length === 0
+  ) {
+    alreadySatisfied.push('All currently-applicable pilot evidence checks');
+  }
+
+  for (const completedCheck of review.completeness.completedRequiredChecks) {
+    if (!coveredByArea.has(completedCheck)) {
+      alreadySatisfied.push(labelTodayPilotCheck(completedCheck));
+    }
+  }
+
   return {
     recommendation: review.recommendation,
+    completeness: review.completeness,
     missingRequiredChecks: review.missingRequiredChecks,
     failedCriticalChecks: review.failedCriticalChecks,
     warnings: review.warnings,
     nextAction: review.nextAction,
+    mustCollectBeforeRollout: [...new Set(mustCollectBeforeRollout)],
+    optionalButRecommended: [...new Set(optionalButRecommended)],
+    blockedOrContradictory: [...new Set(blockedOrContradictory)],
+    alreadySatisfied: [...new Set(alreadySatisfied)],
+    exactNextManualAction,
     exactNextManualChecks: [...new Set(exactNextManualChecks)],
-    suggestedUpdateCommands: [...new Set(suggestedUpdateCommands)],
-    evidenceStatusLines,
+    exactUpdateCommands: [...new Set(exactUpdateCommands)],
+    evidenceStatusLines: [...new Set(evidenceStatusLines)],
     rollbackReminder: TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS,
   };
 }

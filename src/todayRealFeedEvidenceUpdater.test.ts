@@ -385,6 +385,24 @@ test('update evidence command does not overwrite malformed JSON', () => {
   assert.match(result.stderr || result.stdout, /malformed json|invalid json/i);
 });
 
+test('update evidence command exposes a bounded local help output', () => {
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', updateEvidenceScriptPath, '--help'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.match(output, /SignalDesk Today real-feed evidence updater/i);
+  assert.match(output, /--completed-enriched-text-observed/i);
+  assert.match(output, /--mobile-quality acceptable\|needs_work\|not_tested/i);
+  assert.match(output, /Local-only helper/i);
+  assert.match(output, /No Supabase call/i);
+  assert.match(output, /No AI call/i);
+});
+
 test('updated evidence can still be reviewed locally after operator notes are added', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-review-'));
   const outputPath = createLocalEvidenceFile(tempDir);

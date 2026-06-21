@@ -5,6 +5,12 @@ import { mkdtempSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
+import { buildTodayPilotEvidenceNextPlan } from './lib/content/todayRealFeedEvidenceGuidance';
+import {
+  createEmptyTodayPilotEvidence,
+  evaluateTodayPilotEvidence,
+} from './lib/content/todayRealFeedPilotEvidence';
+
 const nextScriptPath = resolve(
   process.cwd(),
   'scripts/phase4-today-real-feed-evidence-next.ts',
@@ -94,14 +100,147 @@ test('evidence next command prints guided next steps for continue_pilot evidence
   );
 
   assert.match(output, /current recommendation:\s+continue_pilot/i);
-  assert.match(output, /Capture a completed non-empty enriched-content win/i);
-  assert.match(output, /Capture mobile quality evidence/i);
-  assert.match(output, /Capture freshness evidence/i);
-  assert.match(output, /Capture source coverage evidence/i);
-  assert.match(output, /phase4:update-today-evidence -- .*--completed-enriched-text-observed true/i);
+  assert.match(output, /evidence completeness:/i);
+  assert.match(output, /must collect before rollout:/i);
+  assert.match(output, /completed non-empty enriched-content win evidence/i);
+  assert.match(output, /mobile quality evidence/i);
+  assert.match(output, /freshness evidence/i);
+  assert.match(output, /source coverage evidence/i);
+  assert.match(output, /exact next manual action:/i);
+  assert.match(output, /exact commands to update evidence:/i);
+  assert.match(
+    output,
+    /practice example detected: updater commands target docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i,
+  );
+  assert.match(output, /npm run phase4:create-today-evidence/i);
+  assert.match(
+    output,
+    /phase4:update-today-evidence -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json --completed-enriched-text-observed true/i,
+  );
   assert.match(output, /phase4:update-today-evidence -- .*--mobile-quality acceptable/i);
   assert.match(output, /phase4:update-today-evidence -- .*--freshness acceptable/i);
-  assert.match(output, /phase4:update-today-evidence -- .*--source-coverage acceptable/i);
+  assert.match(output, /phase4:update-today-evidence -- .*--source-count 3 --source-coverage acceptable/i);
+});
+
+test('evidence next plan uses an actionable fallback message when only optional notes remain', () => {
+  const review = evaluateTodayPilotEvidence({
+    ...createEmptyTodayPilotEvidence({
+      environmentLabel: 'preview-staging',
+      observedFeedMode: 'real',
+    }),
+    realCardsRendered: true,
+    realCardsObservedCount: 3,
+    detailCheckedCount: 1,
+    detailOpenedSafely: true,
+    provenanceOrSourceLinksVisible: true,
+    fakeFullArticleBodyAbsent: true,
+    completedNonEmptyEnrichedContentObserved: true,
+    completedNonEmptyEnrichedContentWon: true,
+    completedBlankEnrichedContentFallbackWorked: true,
+    incompleteEnrichmentDeterministicFallbackWorked: true,
+    aiOrOpenAiFilterMatchedWhenApplicable: true,
+    nonMatchingFiltersShowedNormalFilterEmptyState: true,
+    realEmptyDistinctFromFilterEmpty: true,
+    brokenPreviewReadsFellBackSafelyToMock: true,
+    noSecretsOrRawInternalsInUi: true,
+    bilingualQualityAcceptable: true,
+    mobileQualityAcceptable: true,
+    dataFreshnessAcceptable: true,
+    sourceCoverageAcceptable: true,
+    rlsReadPolicyConfirmed: true,
+    noFrontendWritesIntroduced: true,
+    noFrontendAiCallsIntroduced: true,
+    radarWatchlistLibraryUnchanged: true,
+    rollbackToMockVerified: true,
+  });
+
+  const nextPlan = buildTodayPilotEvidenceNextPlan(
+    review,
+    'docs/evidence/today-real-feed-pilot-evidence.local.json',
+  );
+
+  assert.equal(
+    nextPlan.exactNextManualAction,
+    'Record the remaining optional evidence notes and rerun the local review.',
+  );
+});
+
+test('baseline-only evidence still receives a first real-feed observation bucket', () => {
+  const review = evaluateTodayPilotEvidence({
+    ...createEmptyTodayPilotEvidence({
+      environmentLabel: 'baseline-only',
+      observedFeedMode: 'mock',
+    }),
+    brokenPreviewReadsFellBackSafelyToMock: true,
+    noSecretsOrRawInternalsInUi: true,
+    noFrontendWritesIntroduced: true,
+    noFrontendAiCallsIntroduced: true,
+    radarWatchlistLibraryUnchanged: true,
+    rollbackToMockVerified: true,
+    rlsReadPolicyConfirmed: true,
+    mobileQualityAcceptable: true,
+    bilingualQualityAcceptable: true,
+    dataFreshnessAcceptable: true,
+    sourceCoverageAcceptable: true,
+  });
+
+  const nextPlan = buildTodayPilotEvidenceNextPlan(
+    review,
+    'docs/evidence/today-real-feed-pilot-evidence.local.json',
+  );
+
+  assert.equal(review.recommendation, 'keep_mock_default');
+  assert.match(nextPlan.mustCollectBeforeRollout.join('\n'), /first real-feed observation evidence/i);
+  assert.match(nextPlan.exactNextManualAction, /enable real-feed/i);
+  assert.match(
+    nextPlan.exactUpdateCommands.join('\n'),
+    /--observed-feed-mode real --real-cards-rendered true --real-card-count 1/i,
+  );
+});
+
+test('evidence next command does not echo unsafe absolute evidence paths in updater commands', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-next-path-redaction-'));
+  const evidencePath = resolve(tempDir, 'outside.local.json');
+  const template = JSON.parse(readFileSync(incompleteExamplePath, 'utf8')) as Record<string, unknown>;
+
+  writeFileSync(evidencePath, JSON.stringify(template, null, 2), 'utf8');
+
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', nextScriptPath, evidencePath, '--allow-any-path'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.doesNotMatch(output, new RegExp(tempDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(output, /<path-to-local-evidence-json>/i);
+});
+
+test('evidence next command does not treat arbitrary temp docs/examples paths as shipped practice examples', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-next-fake-example-'));
+  const fakeExamplePath = resolve(
+    tempDir,
+    'docs/examples/today-real-feed-pilot-evidence.sneaky.json',
+  );
+  const template = JSON.parse(readFileSync(incompleteExamplePath, 'utf8')) as Record<string, unknown>;
+
+  mkdirSync(resolve(tempDir, 'docs/examples'), { recursive: true });
+  writeFileSync(fakeExamplePath, JSON.stringify(template, null, 2), 'utf8');
+
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', nextScriptPath, fakeExamplePath, '--allow-any-path'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.doesNotMatch(output, /Practice example detected/i);
+  assert.doesNotMatch(output, /npm run phase4:create-today-evidence/i);
+  assert.match(output, /<path-to-local-evidence-json>/i);
 });
 
 test('evidence next command preserves blocked status and surfaces critical issues', () => {
@@ -130,6 +269,7 @@ test('evidence next command preserves ready status and still prints rollback rem
   );
 
   assert.match(output, /current recommendation:\s+ready_for_controlled_default_rollout/i);
+  assert.match(output, /already satisfied:/i);
   assert.match(output, /rollback reminder:/i);
   assert.match(output, /Set VITE_USE_REAL_CONTENT_FEED=false/i);
 });
@@ -170,8 +310,8 @@ test('evidence next command does not echo secret-looking operator notes from loc
 
   assert.doesNotMatch(output, /PHASE4_WRITE_AUTH_TOKEN=super-secret/i);
   assert.doesNotMatch(output, /https:\/\/example\.supabase\.co/i);
-  assert.match(output, /source coverage notes captured:\s+1/i);
-  assert.match(output, /freshness notes captured:\s+1/i);
+  assert.match(output, /source coverage evidence:\s+source coverage notes captured:\s+1/i);
+  assert.match(output, /freshness evidence:\s+freshness notes captured:\s+1/i);
 });
 
 test('package.json exposes the today evidence next command', () => {

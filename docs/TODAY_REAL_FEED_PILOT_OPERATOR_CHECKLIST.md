@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Operator Checklist
 
-This document is maintained through Phase 4 Task 39.
+This document is maintained through Phase 4 Task 42.
 
 It is a beginner-friendly manual checklist for running the Today real-feed pilot without changing the default product behavior.
 
@@ -88,18 +88,28 @@ npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evid
 npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json
 ```
 
-25. Follow the printed next target:
-   - genuine `real_empty`
-   - completed non-empty enriched-content win
-   - completed-but-blank enrichment fallback
-   - mobile quality
-   - freshness
-   - source coverage
+   - read the `must collect before rollout` bucket first
+   - use the printed `exact commands to update evidence`
+   - treat the completeness score as guidance only, not rollout approval
+
+25. Follow the printed grouped next step:
+   - start with the `must collect before rollout` bucket
+   - copy the printed updater commands directly
+   - if you are practicing from `docs/examples/...`, run `npm run phase4:create-today-evidence` first because the updater commands intentionally target `docs/evidence/today-real-feed-pilot-evidence.local.json`
+   - common missing buckets still include:
+     - genuine `real_empty`
+     - completed non-empty enriched-content win
+     - completed-but-blank enrichment fallback
+     - mobile quality
+     - freshness
+     - source coverage
 26. Generate a local Markdown report:
 
 ```bash
 npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md
 ```
+
+   - the report now includes a guidance-only completeness summary, rollback confirmation, explicit boundaries, and a next recommended task
 
 27. Record the recommendation:
    - `continue_pilot`

@@ -22,7 +22,7 @@ Phase 3 did not move content cards or feed data into Supabase.
 
 Phase 4 is the real-content phase. Its purpose is to ingest real information, store raw source items, deduplicate them, generate structured intelligence signals, and eventually feed those results into the Today experience without breaking the mock-first default rollout.
 
-### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-29 Complete
+### Phase 4 Tasks 0-12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-42 Complete
 
 1. Task 0: content-domain foundation types, additive mappers, and Phase 4 schema draft
 2. Task 1: source registry and RSS ingestion skeleton
@@ -66,6 +66,9 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 40. Task 31: local Today pilot Markdown report generation that stays local-only and does not switch defaults
 41. Task 32: operator-flow doc alignment for create -> check -> run -> update -> review -> report -> rollback
 42. Task 33: bounded local Today pilot help output and no-commit guidance for local/private evidence artifacts
+43. Task 40: actionable missing-evidence buckets plus copy-paste updater commands for the local Today pilot helper
+44. Task 41: guidance-only completeness scoring for review, next-step, and local report flows
+45. Task 42: richer sanitized local reporting for future sharing and review without exposing private evidence
 
 ### Current Phase 4 Status
 
@@ -98,11 +101,12 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 40: Run The Next Missing Today Pilot Evidence Pass
+### Task 43: Run The Next Today Pilot Evidence Pass With The Grouped Helper
 
 - keep Today mock-by-default
+- run `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
-- capture the next still-missing evidence item, especially a genuine `real_empty` observation, a completed non-empty enriched-content win, or a completed-but-blank fallback case
+- capture the first must-collect evidence bucket, especially a genuine `real_empty` observation, a completed non-empty enriched-content win, or a completed-but-blank fallback case
 - refresh the local evidence, rerun the local review/report flow, and keep the result honest if it still remains `continue_pilot`
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized
 - do not touch Radar, Watchlist, or Library real-data rollout in this task

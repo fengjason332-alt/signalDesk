@@ -98,7 +98,9 @@ try {
   const review = evaluateTodayPilotEvidence(
     parseTodayPilotEvidence(JSON.parse(rawJson)),
   );
-  reportMarkdown = buildTodayRealFeedPilotMarkdownReport(review);
+  reportMarkdown = buildTodayRealFeedPilotMarkdownReport(review, {
+    evidencePath: args.evidencePath,
+  });
 } catch (error) {
   process.stderr.write(
     `Error: evidence file is invalid. ${

@@ -212,10 +212,10 @@ test('scheduled ingestion docs mention the explicit env gate, bounded scheduled 
   assert.match(manualQaDoc, /code:\s*"ai_scheduled_trigger_not_allowed"/i);
 });
 
-test('README records the Today pilot workflow through Task 39 without switching Today by default', () => {
+test('README records the Today pilot workflow through Task 42 without switching Today by default', () => {
   const readme = readFileSync(readmePath, 'utf8');
 
-  assert.match(readme, /Tasks 14A-39/i);
+  assert.match(readme, /Tasks 14A-42/i);
   assert.match(readme, /Today remains mock by default/i);
   assert.match(readme, /separate explicit rollout decision/i);
   assert.match(readme, /VITE_USE_REAL_CONTENT_FEED=false/i);
@@ -251,7 +251,7 @@ test('App Store readiness doc remains planning-only and does not imply Phase 4 r
 test('Today real-feed rollout decision doc captures Task 20 blockers, enablement criteria, and rollback steps without switching defaults', () => {
   const doc = readFileSync(todayRolloutDecisionDocPath, 'utf8');
 
-  assert.match(doc, /maintained through Task 39/i);
+  assert.match(doc, /maintained through Task 42/i);
   assert.match(doc, /Task 20 decision/i);
   assert.match(doc, /keep Today mock by default/i);
   assert.match(doc, /explicit rollout task/i);
@@ -345,7 +345,7 @@ test('Today pilot docs mention the local helper, evidence starter, update, repor
   assert.match(handoffDoc, /phase4:today-pilot-report/i);
   assert.match(handoffDoc, /no frontend ai calls/i);
   assert.match(handoffDoc, /Today remains mock by default/i);
-  assert.match(handoffDoc, /Phase 4 Task 40/i);
+  assert.match(handoffDoc, /Phase 4 Task 43/i);
   assert.match(handoffDoc, /no X\/Grok runtime/i);
   assert.match(handoffDoc, /no scheduled AI enrichment/i);
 });
@@ -411,6 +411,18 @@ test('pilot operator checklist doc exists and mentions rollback plus screenshot 
   assert.match(doc, /Detail/i);
 });
 
+test('pilot docs use grouped next-step wording instead of legacy target or fix wording', () => {
+  const targetPilotDoc = readFileSync(todayTargetPilotDocPath, 'utf8');
+  const operatorChecklistDoc = readFileSync(todayPilotOperatorChecklistDocPath, 'utf8');
+  const codexHandoffDoc = readFileSync(resolve(process.cwd(), 'docs/CODEX_HANDOFF.md'), 'utf8');
+
+  assert.doesNotMatch(targetPilotDoc, /follow the printed next target/i);
+  assert.doesNotMatch(operatorChecklistDoc, /follow the printed next target/i);
+  assert.doesNotMatch(codexHandoffDoc, /what-to-fix-next/i);
+  assert.match(targetPilotDoc, /grouped must-collect \/ optional \/ blocked \/ already-satisfied buckets/i);
+  assert.match(operatorChecklistDoc, /must collect before rollout/i);
+});
+
 test('.gitignore protects local and private operator evidence files', () => {
   const gitignore = readFileSync(gitignorePath, 'utf8');
 
@@ -438,7 +450,7 @@ test('controlled default rollout plan stays planning-only and preserves rollout 
   const doc = readFileSync(todayControlledDefaultRolloutPlanDocPath, 'utf8');
 
   assert.match(doc, /planning-only/i);
-  assert.match(doc, /maintained through Phase 4 Task 39/i);
+  assert.match(doc, /maintained through Phase 4 Task 42/i);
   assert.match(doc, /Today remains mock by default/i);
   assert.match(doc, /VITE_USE_REAL_CONTENT_FEED=false/i);
   assert.match(doc, /VITE_USE_REAL_CONTENT_FEED=true/i);
@@ -448,7 +460,7 @@ test('controlled default rollout plan stays planning-only and preserves rollout 
   assert.match(doc, /X\/Grok remains planning-only/i);
   assert.match(doc, /private deployed pilot/i);
   assert.match(doc, /controlled default for myself only/i);
-  assert.match(doc, /Tasks 25 through 39/i);
+  assert.match(doc, /Tasks 25 through 42/i);
 });
 
 test('X Grok user-curated source plan stays planning-only and preserves the server-side boundary', () => {

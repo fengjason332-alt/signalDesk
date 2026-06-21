@@ -36,6 +36,7 @@ Local helper command:
 - Keep local/private evidence files uncommitted.
 - Review local evidence with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>` after the checklist is complete.
 - If the review still returns `continue_pilot`, run `npm run phase4:today-evidence-next -- <path-to-local-evidence-json>` before the next manual browser pass.
+- The next-step helper now prints grouped must-collect / optional / blocked / already-satisfied buckets plus exact updater commands and a guidance-only completeness score.
 - A beginner-friendly starter file now exists at `docs/examples/today-real-feed-pilot-evidence.template.json`.
 - Use [docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md](/Users/jasonfeng/Desktop/project3_signalDESK/signaldesk/docs/TODAY_REAL_FEED_PILOT_OPERATOR_CHECKLIST.md) if you want a click-by-click walkthrough.
 
@@ -94,7 +95,7 @@ To confirm the normal default remains intact:
      - final recommendation
    - Hand-edit JSON only if you want to fill a rarer field the updater still does not expose.
 9. When the checklist is complete, review the recorded JSON evidence locally with `npm run phase4:today-evidence-review -- <path-to-local-evidence-json>`.
-10. If the result is still `continue_pilot`, run `npm run phase4:today-evidence-next -- <path-to-local-evidence-json>` and follow the printed next target before starting another browser pass.
+10. If the result is still `continue_pilot`, run `npm run phase4:today-evidence-next -- <path-to-local-evidence-json>` and follow the printed grouped must-collect bucket plus exact updater commands before starting another browser pass.
 11. Generate a local Markdown report with `npm run phase4:today-pilot-report -- <path-to-local-evidence-json> --out docs/evidence/today-real-feed-pilot-report.local.md`.
 
 Expected:

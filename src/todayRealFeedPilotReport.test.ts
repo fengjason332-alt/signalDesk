@@ -34,7 +34,10 @@ test('pilot report generator produces a markdown report for incomplete evidence'
 
   assert.match(output, /^# SignalDesk Today Real-Feed Pilot Report/m);
   assert.match(output, /continue_pilot/i);
+  assert.match(output, /Completeness Summary/i);
+  assert.match(output, /What Was Tested/i);
   assert.match(output, /Next Action/i);
+  assert.match(output, /Exact Next Manual Action/i);
   assert.match(output, /Today is still mock-by-default/i);
 });
 
@@ -51,6 +54,9 @@ test('pilot report generator produces a markdown report for passing evidence', (
   assert.match(output, /ready_for_controlled_default_rollout/i);
   assert.match(output, /no default switch is made/i);
   assert.match(output, /Rollback Status/i);
+  assert.match(output, /Risk \/ Blocker Summary/i);
+  assert.match(output, /Explicit Boundaries/i);
+  assert.match(output, /Next Recommended Task/i);
   assert.match(output, /Enriched Summary Cases/i);
   assert.match(output, /Deterministic Fallback Cases/i);
   assert.match(output, /Freshness Notes/i);
@@ -69,6 +75,8 @@ test('pilot report generator produces a markdown report for blocked evidence', (
 
   assert.match(output, /blocked/i);
   assert.match(output, /Failed Critical Checks/i);
+  assert.match(output, /Critical blocker: .* is not satisfied\./i);
+  assert.doesNotMatch(output, /Critical blocker: .*were confirmed\./i);
 });
 
 test('pilot report generator refuses overwrite by default', () => {
@@ -203,6 +211,38 @@ test('pilot report generator redacts secret-looking operator notes from local ev
   assert.match(output, /VITE_SUPABASE_URL=\[redacted\]/i);
 });
 
+test('pilot report generator redacts authorization headers, local paths, and generic urls from local evidence', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-pilot-report-redaction-auth-'));
+  const evidencePath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-evidence.local.json');
+  const evidence = JSON.parse(readFileSync(passingExamplePath, 'utf8')) as Record<string, unknown>;
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  evidence.reviewerNotes = ['Authorization: Bearer abc123'];
+  evidence.screenshotsOrNotes = [
+    '/Users/private-operator/Desktop/today-pilot.png',
+    '/private/tmp/trace.har',
+    'https://internal.example.com/path',
+  ];
+  writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
+
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', reportScriptPath, evidencePath],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.doesNotMatch(output, /Authorization:\s*Bearer\s+abc123/i);
+  assert.doesNotMatch(output, /\/Users\/private-operator\/Desktop\/today-pilot\.png/i);
+  assert.doesNotMatch(output, /\/private\/tmp\/trace\.har/i);
+  assert.doesNotMatch(output, /https:\/\/internal\.example\.com\/path/i);
+  assert.match(output, /Authorization: Bearer \[redacted\]/i);
+  assert.match(output, /\[redacted-local-path\]/i);
+  assert.match(output, /\[redacted-url\]/i);
+});
+
 test('pilot report generator redacts secret-looking environment labels from local evidence', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-pilot-report-redaction-env-'));
   const evidencePath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-evidence.local.json');
@@ -237,4 +277,25 @@ test('pilot report generator includes rollback status and next action', () => {
 
   assert.match(output, /Rollback Status/i);
   assert.match(output, /Next Action/i);
+  assert.match(output, /Exact Commands To Update Evidence/i);
+});
+
+test('pilot report generator does not echo unsafe absolute evidence paths in exact commands', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-pilot-report-path-redaction-'));
+  const evidencePath = resolve(tempDir, 'outside.local.json');
+  const evidence = JSON.parse(readFileSync(incompleteExamplePath, 'utf8')) as Record<string, unknown>;
+
+  writeFileSync(evidencePath, JSON.stringify(evidence, null, 2), 'utf8');
+
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', reportScriptPath, evidencePath, '--allow-any-path'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.doesNotMatch(output, new RegExp(tempDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(output, /<path-to-local-evidence-json>/i);
 });

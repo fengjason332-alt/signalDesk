@@ -17,7 +17,7 @@ SignalDesk Phase 4 adds a real-content pipeline around curated RSS ingestion, de
 - Macro
 - Geopolitics
 
-## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-29
+## Completed Through Task 12 Plus Task 13-preflight, Tasks 13B-13E, And Tasks 14A-42
 
 ### Tasks 0-4: Foundations
 
@@ -248,11 +248,46 @@ Proposed future AI enrichment flow:
 
 ## Remaining Tasks
 
-### Task 40: Run The Next Missing Today Pilot Evidence Pass
+### Task 40: Actionable Missing-Evidence Collection
+
+- `npm run phase4:today-evidence-next` now groups missing evidence into:
+  - must collect before rollout
+  - optional but recommended
+  - blocked or contradictory
+  - already satisfied
+- the helper now prints one exact next manual action and copy-paste updater commands
+
+### Task 41: Guidance-Only Evidence Completeness Scoring
+
+- local evidence review, next-step guidance, and local report generation now share:
+  - required checks completed count
+  - required checks missing count
+  - critical blockers count
+  - warnings count
+  - recommendation
+  - guidance-only progress score
+- the score does not switch Today by default and does not override blockers
+
+### Task 42: Improved Sanitized Reporting
+
+- the local Markdown report now includes:
+  - project state
+  - what was tested
+  - what passed
+  - what is still missing
+  - current recommendation
+  - risk / blocker summary
+  - screenshot / note placeholders
+  - rollback confirmation
+  - explicit safety boundaries
+  - next recommended task
+
+### Task 43: Run The Next Today Pilot Evidence Pass
 
 - keep Today mock-by-default
+- run `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
-- capture the next still-missing evidence item, especially a genuine `real_empty` observation, one completed and non-empty enriched-content win, or one completed-but-blank fallback case
+- capture the first must-collect evidence bucket, especially a genuine `real_empty` observation, one completed and non-empty enriched-content win, or one completed-but-blank fallback case
 - rerun the local evidence review and local pilot report after the new observation is recorded
 - preserve fallback paths and rollback paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout
