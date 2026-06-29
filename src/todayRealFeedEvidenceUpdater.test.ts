@@ -364,6 +364,46 @@ test('update evidence command allows an explicit tracked-looking docs/evidence j
   assert.match(output, /updated local today pilot evidence/i);
 });
 
+test('update evidence command sanitizes printed paths for allow-any-path dry runs', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-sanitized-path-'));
+  const outputPath = resolve(
+    tempDir,
+    'docs/evidence/today-real-feed-pilot-evidence.private.json',
+  );
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  writeFileSync(
+    outputPath,
+    JSON.stringify({
+      environmentLabel: 'manual-pilot',
+      pilotTimestamp: '2026-06-08T00:00:00.000Z',
+      observedFeedMode: 'unknown',
+    }),
+    'utf8',
+  );
+
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--allow-any-path',
+      '--preset',
+      'rollback-tested',
+      '--dry-run',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.match(output, /<path-to-local-evidence-json>/i);
+  assert.doesNotMatch(output, new RegExp(tempDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+});
+
 test('update evidence command does not overwrite malformed JSON', () => {
   const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-malformed-'));
   const outputPath = resolve(tempDir, 'docs/evidence/today-real-feed-pilot-evidence.local.json');
@@ -396,11 +436,227 @@ test('update evidence command exposes a bounded local help output', () => {
   );
 
   assert.match(output, /SignalDesk Today real-feed evidence updater/i);
+  assert.match(output, /--preset real-cards-rendered/i);
+  assert.match(output, /--preset rollback-tested/i);
+  assert.match(output, /--dry-run/i);
   assert.match(output, /--completed-enriched-text-observed/i);
   assert.match(output, /--mobile-quality acceptable\|needs_work\|not_tested/i);
   assert.match(output, /Local-only helper/i);
   assert.match(output, /No Supabase call/i);
   assert.match(output, /No AI call/i);
+});
+
+test('update evidence command rejects invalid presets without a raw stack trace', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-bad-preset-'));
+  const outputPath = createLocalEvidenceFile(tempDir);
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--preset',
+      'not-a-real-preset',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const output = `${result.stderr ?? ''}${result.stdout ?? ''}`;
+
+  assert.notEqual(result.status, 0);
+  assert.match(output, /invalid preset value/i);
+  assert.doesNotMatch(output, /at .*:\d+:\d+/i);
+  assert.doesNotMatch(output, /node:internal|tsx\/dist/i);
+});
+
+test('update evidence command redacts secret-looking invalid preset values in bounded errors', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-secret-preset-'));
+  const outputPath = createLocalEvidenceFile(tempDir);
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--preset',
+      'PHASE4_WRITE_AUTH_TOKEN=super-secret',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const output = `${result.stderr ?? ''}${result.stdout ?? ''}`;
+
+  assert.notEqual(result.status, 0);
+  assert.doesNotMatch(output, /PHASE4_WRITE_AUTH_TOKEN=super-secret/i);
+  assert.match(output, /PHASE4_WRITE_AUTH_TOKEN=\[redacted\]/i);
+});
+
+test('update evidence command applies guided presets and preserves prior notes', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-presets-'));
+  const outputPath = createLocalEvidenceFile(tempDir);
+
+  execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--operator-note',
+      'Existing note should remain.',
+      '--preset',
+      'real-cards-rendered',
+      '--preset',
+      'detail-safe',
+      '--preset',
+      'provenance-visible',
+      '--preset',
+      'rollback-tested',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const parsed = parseTodayPilotEvidence(
+    JSON.parse(readFileSync(outputPath, 'utf8')),
+  );
+
+  assert.equal(parsed.observedFeedMode, 'real');
+  assert.equal(parsed.realCardsRendered, true);
+  assert.equal(parsed.realCardsObservedCount, 1);
+  assert.equal(parsed.detailOpenedSafely, true);
+  assert.equal(parsed.detailCheckedCount, 1);
+  assert.equal(parsed.provenanceOrSourceLinksVisible, true);
+  assert.equal(parsed.rollbackToMockVerified, true);
+  assert.ok(parsed.reviewerNotes.includes('Existing note should remain.'));
+});
+
+test('update evidence real-empty preset preserves earlier real-card evidence in a shared local file', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-real-empty-'));
+  const outputPath = createLocalEvidenceFile(tempDir);
+
+  execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--preset',
+      'real-cards-rendered',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--preset',
+      'real-empty-observed',
+      '--empty-state-check',
+      'Observed a genuine real_empty state in a later pass.',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const parsed = parseTodayPilotEvidence(
+    JSON.parse(readFileSync(outputPath, 'utf8')),
+  );
+
+  assert.equal(parsed.observedFeedMode, 'real');
+  assert.equal(parsed.realCardsRendered, true);
+  assert.equal(parsed.realCardsObservedCount, 1);
+  assert.equal(parsed.realEmptyDistinctFromFilterEmpty, true);
+  assert.ok(
+    parsed.emptyStateChecks.includes(
+      'Observed a genuine real_empty state in a later pass.',
+    ),
+  );
+});
+
+test('update evidence real-empty preset records observed feed mode on a fresh local file', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-real-empty-fresh-'));
+  const outputPath = createLocalEvidenceFile(tempDir);
+
+  execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--preset',
+      'real-empty-observed',
+      '--empty-state-check',
+      'Observed a genuine first-pass real_empty state.',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const parsed = parseTodayPilotEvidence(
+    JSON.parse(readFileSync(outputPath, 'utf8')),
+  );
+
+  assert.equal(parsed.observedFeedMode, 'real_empty');
+  assert.equal(parsed.realEmptyDistinctFromFilterEmpty, true);
+  assert.ok(
+    parsed.emptyStateChecks.includes('Observed a genuine first-pass real_empty state.'),
+  );
+});
+
+test('update evidence command dry-run prints a summary and does not write the file', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-update-evidence-dry-run-'));
+  const outputPath = createLocalEvidenceFile(tempDir);
+  const before = readFileSync(outputPath, 'utf8');
+
+  const output = execFileSync(
+    process.execPath,
+    [
+      '--import',
+      'tsx',
+      updateEvidenceScriptPath,
+      outputPath,
+      '--preset',
+      'real-cards-rendered',
+      '--dry-run',
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  const after = readFileSync(outputPath, 'utf8');
+
+  assert.equal(after, before);
+  assert.match(output, /Dry run only/i);
+  assert.match(output, /real-cards-rendered/i);
+  assert.match(output, /No file was written/i);
 });
 
 test('updated evidence can still be reviewed locally after operator notes are added', () => {

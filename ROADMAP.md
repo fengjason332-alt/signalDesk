@@ -69,6 +69,9 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 43. Task 40: actionable missing-evidence buckets plus copy-paste updater commands for the local Today pilot helper
 44. Task 41: guidance-only completeness scoring for review, next-step, and local report flows
 45. Task 42: richer sanitized local reporting for future sharing and review without exposing private evidence
+46. Task 43: actual human pilot run checklist split into explicit phases with pass/fail expectations and evidence mapping
+47. Task 44: guided local evidence presets plus updater `--dry-run` for safer incremental pilot recording
+48. Task 45: local Today pilot evidence-status dashboard showing recommendation, blockers, next commands, and gitignore/report checks
 
 ### Current Phase 4 Status
 
@@ -101,11 +104,12 @@ Phase 4 is the real-content phase. Its purpose is to ingest real information, st
 
 ## Next Recommended Tasks
 
-### Task 43: Run The Next Today Pilot Evidence Pass With The Grouped Helper
+### Task 46: Run The Next Today Pilot Evidence Pass With The Phased Checklist And Local Dashboard
 
 - keep Today mock-by-default
 - run `npm run phase4:today-evidence-review -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
+- run `npm run phase4:today-evidence-status -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - capture the first must-collect evidence bucket, especially a genuine `real_empty` observation, a completed non-empty enriched-content win, or a completed-but-blank fallback case
 - refresh the local evidence, rerun the local review/report flow, and keep the result honest if it still remains `continue_pilot`
 - keep AI enrichment manual-only while recurring non-AI ingestion is stabilized

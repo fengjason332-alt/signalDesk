@@ -73,6 +73,25 @@ export interface UpdateTodayPilotEvidenceOptions {
 }
 
 type JsonRecord = Record<string, unknown>;
+export type TodayPilotEvidencePresetName =
+  | 'real-cards-rendered'
+  | 'detail-safe'
+  | 'provenance-visible'
+  | 'filter-ai-openai-works'
+  | 'filter-empty-works'
+  | 'real-empty-observed'
+  | 'enriched-non-empty-wins'
+  | 'blank-enrichment-fallback'
+  | 'mobile-acceptable'
+  | 'freshness-acceptable'
+  | 'source-coverage-acceptable'
+  | 'rollback-tested';
+
+export interface TodayPilotEvidenceUpdatePreview {
+  changedFields: string[];
+  appliedPresets: TodayPilotEvidencePresetName[];
+  wouldWrite: boolean;
+}
 
 const DOCS_EVIDENCE_SEGMENTS = ['docs', 'evidence'] as const;
 const DOCS_EXAMPLES_SEGMENTS = ['docs', 'examples'] as const;
@@ -120,6 +139,45 @@ const TODAY_PILOT_EVIDENCE_LEGACY_ALIAS_KEYS = [
   'screenshots_or_notes',
   'final_operator_recommendation',
 ] as const;
+const TODAY_PILOT_EVIDENCE_PRESET_NAMES: readonly TodayPilotEvidencePresetName[] = [
+  'real-cards-rendered',
+  'detail-safe',
+  'provenance-visible',
+  'filter-ai-openai-works',
+  'filter-empty-works',
+  'real-empty-observed',
+  'enriched-non-empty-wins',
+  'blank-enrichment-fallback',
+  'mobile-acceptable',
+  'freshness-acceptable',
+  'source-coverage-acceptable',
+  'rollback-tested',
+] as const;
+const TODAY_PILOT_EVIDENCE_PRESET_SUMMARIES: Record<
+  TodayPilotEvidencePresetName,
+  string
+> = {
+  'real-cards-rendered':
+    'Marks one real-card rendering pass as observed and records a minimum count of one real card.',
+  'detail-safe':
+    'Marks one real Detail check as safe and records a minimum checked-detail count of one.',
+  'provenance-visible':
+    'Marks source provenance or source-link visibility as confirmed.',
+  'filter-ai-openai-works':
+    'Marks the AI/OpenAI filter as matching the expected real cards.',
+  'filter-empty-works':
+    'Marks the nonmatching filter empty state as working normally.',
+  'real-empty-observed':
+    'Marks a genuine real_empty observation and keeps it distinct from filter_empty without clearing earlier real-card evidence.',
+  'enriched-non-empty-wins':
+    'Marks a completed non-empty enriched-content win over deterministic preview text.',
+  'blank-enrichment-fallback':
+    'Marks a completed-but-blank enrichment fallback to deterministic preview text.',
+  'mobile-acceptable': 'Marks mobile quality as acceptable.',
+  'freshness-acceptable': 'Marks freshness as acceptable.',
+  'source-coverage-acceptable': 'Marks source coverage as acceptable.',
+  'rollback-tested': 'Marks rollback-to-mock as verified.',
+};
 
 function hasSegmentPair(
   pathValue: string,
@@ -269,6 +327,190 @@ function setIfDefined(raw: JsonRecord, key: string, value: unknown) {
   if (value !== undefined) {
     raw[key] = value;
   }
+}
+
+function setMinimumIntegerString(
+  target: UpdateTodayPilotEvidenceOptions,
+  key: 'realCardCount' | 'detailCheckedCount',
+  minimumValue: number,
+) {
+  const currentValue = target[key];
+  if (currentValue === undefined) {
+    target[key] = String(minimumValue);
+    return;
+  }
+
+  const parsed = Number.parseInt(currentValue, 10);
+  if (!Number.isFinite(parsed) || parsed < minimumValue) {
+    target[key] = String(minimumValue);
+  }
+}
+
+function buildPresetOptionUpdates(
+  presetName: TodayPilotEvidencePresetName,
+): UpdateTodayPilotEvidenceOptions {
+  const preset: UpdateTodayPilotEvidenceOptions = {};
+
+  switch (presetName) {
+    case 'real-cards-rendered':
+      preset.observedFeedMode = 'real';
+      preset.realCardsRendered = 'true';
+      preset.realCardCount = '1';
+      break;
+    case 'detail-safe':
+      preset.detailOpenedSafely = 'true';
+      preset.noFakeArticleBody = 'true';
+      preset.detailCheckedCount = '1';
+      break;
+    case 'provenance-visible':
+      preset.provenanceVisible = 'true';
+      break;
+    case 'filter-ai-openai-works':
+      preset.aiOpenAiFilterWorks = 'true';
+      break;
+    case 'filter-empty-works':
+      preset.nonmatchingFilterEmpty = 'true';
+      break;
+    case 'real-empty-observed':
+      preset.realEmptyDistinct = 'true';
+      break;
+    case 'enriched-non-empty-wins':
+      preset.completedEnrichedTextObserved = 'true';
+      preset.completedEnrichedTextWins = 'true';
+      break;
+    case 'blank-enrichment-fallback':
+      preset.blankEnrichmentFallback = 'true';
+      break;
+    case 'mobile-acceptable':
+      preset.mobileQuality = 'acceptable';
+      break;
+    case 'freshness-acceptable':
+      preset.freshness = 'acceptable';
+      break;
+    case 'source-coverage-acceptable':
+      preset.sourceCoverage = 'acceptable';
+      break;
+    case 'rollback-tested':
+      preset.rollbackTested = 'true';
+      break;
+  }
+
+  return preset;
+}
+
+function mergePresetOptions(
+  presetNames: readonly TodayPilotEvidencePresetName[],
+): UpdateTodayPilotEvidenceOptions {
+  const merged: UpdateTodayPilotEvidenceOptions = {};
+
+  for (const presetName of presetNames) {
+    const next = buildPresetOptionUpdates(presetName);
+    Object.assign(merged, next);
+  }
+
+  if (presetNames.includes('real-cards-rendered')) {
+    setMinimumIntegerString(merged, 'realCardCount', 1);
+  }
+
+  if (presetNames.includes('detail-safe')) {
+    setMinimumIntegerString(merged, 'detailCheckedCount', 1);
+  }
+
+  return merged;
+}
+
+function mergeDefinedUpdateOptions(
+  base: UpdateTodayPilotEvidenceOptions,
+  overrides: UpdateTodayPilotEvidenceOptions,
+): UpdateTodayPilotEvidenceOptions {
+  const merged: UpdateTodayPilotEvidenceOptions = { ...base };
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value !== undefined) {
+      (merged as Record<string, unknown>)[key] = value;
+    }
+  }
+
+  return merged;
+}
+
+export function readTodayPilotEvidencePresetName(
+  value: string,
+): TodayPilotEvidencePresetName {
+  if (
+    (TODAY_PILOT_EVIDENCE_PRESET_NAMES as readonly string[]).includes(value)
+  ) {
+    return value as TodayPilotEvidencePresetName;
+  }
+
+  throw new Error(
+    `Invalid preset value for --preset: ${value}. Supported presets: ${TODAY_PILOT_EVIDENCE_PRESET_NAMES.join(', ')}.`,
+  );
+}
+
+export function listTodayPilotEvidencePresetHelpLines(): string[] {
+  return TODAY_PILOT_EVIDENCE_PRESET_NAMES.map(
+    (presetName) =>
+      `  --preset ${presetName}  ${TODAY_PILOT_EVIDENCE_PRESET_SUMMARIES[presetName]}`,
+  );
+}
+
+export function buildTodayPilotEvidencePresetCommand(
+  evidencePath: string,
+  presetNames: readonly TodayPilotEvidencePresetName[],
+  extraFlags: readonly string[] = [],
+): string {
+  const presetArgs = presetNames.flatMap((presetName) => ['--preset', presetName]);
+  return [
+    'npm run phase4:update-today-evidence',
+    '--',
+    evidencePath,
+    ...presetArgs,
+    ...extraFlags,
+  ].join(' ');
+}
+
+export function buildTodayPilotEvidenceUpdatePreview(
+  before: JsonRecord,
+  after: JsonRecord,
+  options?: {
+    appliedPresets?: readonly TodayPilotEvidencePresetName[];
+    wouldWrite?: boolean;
+  },
+): TodayPilotEvidenceUpdatePreview {
+  const changedFields = Object.keys(after)
+    .filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]))
+    .sort((left, right) => left.localeCompare(right));
+
+  return {
+    changedFields,
+    appliedPresets: [...(options?.appliedPresets ?? [])],
+    wouldWrite: options?.wouldWrite !== false,
+  };
+}
+
+export function applyTodayPilotEvidencePresetUpdates(
+  raw: JsonRecord,
+  presetNames: readonly TodayPilotEvidencePresetName[],
+  options: UpdateTodayPilotEvidenceOptions,
+): JsonRecord {
+  const parsed = parseTodayPilotEvidence(raw);
+  const presetOptions = mergePresetOptions(presetNames);
+
+  if (
+    presetNames.includes('real-empty-observed') &&
+    options.observedFeedMode === undefined &&
+    parsed.observedFeedMode !== 'real' &&
+    parsed.realCardsRendered !== true &&
+    (parsed.realCardsObservedCount ?? 0) < 1
+  ) {
+    presetOptions.observedFeedMode = 'real_empty';
+  }
+
+  return applyTodayPilotEvidenceUpdates(
+    raw,
+    mergeDefinedUpdateOptions(presetOptions, options),
+  );
 }
 
 export function assertTodayPilotEvidencePathSafe(

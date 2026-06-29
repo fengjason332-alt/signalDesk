@@ -292,6 +292,20 @@ Proposed future AI enrichment flow:
 - preserve fallback paths and rollback paths either way
 - do not use this task to touch Radar, Watchlist, or Library real-data rollout
 
+### Task 44: Guided Local Evidence Presets
+
+- add local-only `--preset` support to `npm run phase4:update-today-evidence`
+- keep updater writes bounded to the local evidence JSON only
+- add `--dry-run` so operators can preview changed fields without writing
+- keep presets compatible with the grouped missing-evidence helper output
+
+### Task 45: Local Evidence Status Dashboard
+
+- add `npm run phase4:today-evidence-status -- docs/evidence/today-real-feed-pilot-evidence.local.json`
+- show recommendation, required evidence progress, missing buckets, critical blockers, warnings, and the next three exact commands
+- show whether the local report exists and whether the evidence path is gitignored
+- keep the command local-only and explicitly non-authoritative for any default switch
+
 ## Risks To Keep In Mind
 
 - RLS and preview-read policies can drift from what the frontend read adapter expects

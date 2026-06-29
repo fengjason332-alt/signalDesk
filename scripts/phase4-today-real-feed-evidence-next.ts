@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 import {
   buildTodayPilotEvidenceNextPlan,
@@ -10,7 +10,11 @@ import {
   evaluateTodayPilotEvidence,
   parseTodayPilotEvidence,
 } from '../src/lib/content/todayRealFeedPilotEvidence';
-import { sanitizeTodayPilotDisplayLines } from '../src/lib/content/todayRealFeedEvidenceSanitizer';
+import {
+  isTodayPilotRepoExamplePath,
+  sanitizeTodayPilotDisplayLines,
+  sanitizeTodayPilotDisplayPath,
+} from '../src/lib/content/todayRealFeedEvidenceSanitizer';
 
 function parseArgs(argv: string[]) {
   let evidencePath = '';
@@ -87,6 +91,29 @@ try {
 }
 
 const nextPlan = buildTodayPilotEvidenceNextPlan(review, evidencePathArg);
+const safeEvidencePathArg = isTodayPilotRepoExamplePath(evidencePathArg)
+  ? 'docs/evidence/today-real-feed-pilot-evidence.local.json'
+  : sanitizeTodayPilotDisplayPath(evidencePathArg);
+
+function deriveSuggestedReportPath(evidencePath: string): string {
+  const resolvedEvidencePath = resolve(process.cwd(), evidencePath);
+  const filename = basename(resolvedEvidencePath);
+
+  if (
+    filename.startsWith('today-real-feed-pilot-evidence') &&
+    filename.endsWith('.json')
+  ) {
+    return `docs/evidence/${filename.replace('evidence', 'report').replace(/\.json$/i, '.md')}`;
+  }
+
+  return 'docs/evidence/today-real-feed-pilot-report.local.md';
+}
+
+const suggestedReportPath = deriveSuggestedReportPath(
+  isTodayPilotRepoExamplePath(evidencePathArg)
+    ? 'docs/evidence/today-real-feed-pilot-evidence.local.json'
+    : evidencePathArg,
+);
 
 function formatList(label: string, values: string[]) {
   const safeValues = sanitizeTodayPilotDisplayLines(values);
@@ -127,6 +154,11 @@ const lines = [
   formatList('Exact next manual checks to run', nextPlan.exactNextManualChecks),
   formatList('Exact commands to update evidence', nextPlan.exactUpdateCommands),
   formatList('Existing evidence notes that already help', nextPlan.evidenceStatusLines),
+  'After this pass:',
+  `- Rerun review: npm run phase4:today-evidence-review -- ${safeEvidencePathArg}`,
+  `- Rerun status: npm run phase4:today-evidence-status -- ${safeEvidencePathArg}`,
+  `- Rerun sanitized report: npm run phase4:today-pilot-report -- ${safeEvidencePathArg} --out ${suggestedReportPath}`,
+  '- Keep Today mock-by-default unless a separate explicit rollout task approves otherwise.',
   'Rollback reminder:',
   ...nextPlan.rollbackReminder.map((line) => `- ${line}`),
   'Boundaries:',

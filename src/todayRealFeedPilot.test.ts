@@ -168,6 +168,10 @@ test('package.json exposes the local Today pilot update, report, and help comman
     packageJson.scripts?.['phase4:today-help'],
     'node --import tsx scripts/phase4-today-real-feed-help.ts',
   );
+  assert.equal(
+    packageJson.scripts?.['phase4:today-evidence-status'],
+    'node --import tsx scripts/phase4-today-real-feed-evidence-status.ts',
+  );
 });
 
 test('today real-feed pilot contract exposes bounded evidence, rollback, pass criteria, and blockers', () => {
@@ -209,7 +213,10 @@ test('local Today help command prints the full bounded operator flow', () => {
   assert.match(output, /phase4:update-today-evidence/i);
   assert.match(output, /phase4:today-evidence-review/i);
   assert.match(output, /phase4:today-evidence-next/i);
+  assert.match(output, /phase4:today-evidence-status/i);
   assert.match(output, /phase4:today-pilot-report/i);
+  assert.match(output, /1\. Baseline mock confirmation/i);
+  assert.match(output, /15\. Sanitized report command/i);
   assert.match(output, /rollback/i);
   assert.match(output, /do not commit local evidence or local pilot reports/i);
   assert.match(output, /no ai call/i);

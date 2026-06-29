@@ -1,6 +1,6 @@
 # Today Real-Feed Pilot Evidence
 
-This document is maintained through Phase 4 Task 42. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
+This document is maintained through Phase 4 Task 45. It prepares the target-environment Today real-feed pilot to be executed consistently and reviewed as evidence, without switching Today to real by default.
 
 Today remains mock by default. No production default switch is made in this task.
 
@@ -25,12 +25,15 @@ Local helper command:
 - `npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true`
 - `npm run phase4:today-evidence-review -- docs/examples/today-real-feed-pilot-evidence.example.json`
 - `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`
+- `npm run phase4:today-evidence-status -- docs/evidence/today-real-feed-pilot-evidence.local.json`
 - `npm run phase4:today-pilot-report -- docs/evidence/today-real-feed-pilot-evidence.local.json --out docs/evidence/today-real-feed-pilot-report.local.md`
 - `npm run phase4:today-help`
 - `npm run phase4:create-today-evidence -- --out docs/evidence/today-real-feed-pilot-evidence.private.json`
 - The evidence-review command is local-only. It does not call Supabase, does not call AI providers, and does not write content.
 - The evidence-update and pilot-report commands are also local-only. They do not call Supabase, do not call AI providers, and do not write app content.
+- The evidence-update command now supports guided presets and `--dry-run` for safer incremental evidence capture.
 - The evidence-next command is also local-only. It does not call Supabase, does not call AI providers, and does not write content.
+- The evidence-status command is also local-only. It summarizes recommendation, blockers, next commands, report existence, and gitignore status without switching Today by default.
 - The evidence-next command now groups missing evidence into must-collect, optional, blocked, and already-satisfied buckets and prints exact updater commands.
 - The review / next / report flow now also prints a guidance-only completeness score. It never changes the runtime default by itself.
 - Local operator evidence should live in `docs/evidence/today-real-feed-pilot-evidence.local.json` or another gitignored local/private JSON path.
@@ -39,6 +42,7 @@ Local helper command:
 - The review/next/report readers also accept the shipped `docs/examples/today-real-feed-pilot-evidence*.json` files for local practice.
 - Pass `--allow-any-path` only when you intentionally need to bypass those local-only path guards.
 - Keep updating one local/private evidence file across multiple pilot passes. Do not split a `real_empty` pass and a successful real-card pass into separate committed files.
+- When you record a `real_empty` pass in that shared file, do not clear earlier successful real-card evidence just to capture the empty state.
 
 Important boundaries:
 - no `SUPABASE_SERVICE_ROLE_KEY` in the frontend
@@ -125,9 +129,9 @@ Important boundaries:
 The current evidence review still remains `continue_pilot` until the following priority gaps are filled:
 
 - genuine `real_empty`
-  - record `observedFeedMode=real_empty` during the session where you saw it
   - set `realEmptyDistinctFromFilterEmpty=true`
   - add one `emptyStateChecks` note describing why the result was a true `real_empty` state and not an invalid env or generic fallback case
+  - keep any earlier successful real-card evidence intact if this is a later pass in the same local evidence file
 - completed and non-empty enriched content wins
   - set `completedNonEmptyEnrichedContentObserved=true`
   - set `completedNonEmptyEnrichedContentWon=true`
@@ -208,13 +212,21 @@ npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-eviden
 
 That helper now prints grouped missing-evidence buckets and copy-paste updater commands so the next human step is explicit.
 
+Then check the local dashboard:
+
+```bash
+npm run phase4:today-evidence-status -- docs/evidence/today-real-feed-pilot-evidence.local.json
+```
+
+That dashboard shows the current recommendation, required evidence progress, missing buckets, warnings, critical blockers, next exact commands, whether the local report exists, and whether the evidence path is gitignored.
+
 If you prefer not to hand-edit JSON, update the file incrementally:
 
 ```bash
-npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --real-cards-rendered true --detail-opened-safely true
+npm run phase4:update-today-evidence -- docs/evidence/today-real-feed-pilot-evidence.local.json --preset real-cards-rendered --preset detail-safe
 ```
 
-The updater covers the common pilot fields such as observed feed mode, detail count, env flags checked, sample cards, fallback checks, rollback checks, freshness notes, source-coverage notes, and final recommendation. Hand-edit the JSON only if you need a rarer field that is still not exposed as a flag.
+The updater covers the common pilot fields such as observed feed mode, detail count, env flags checked, sample cards, fallback checks, rollback checks, freshness notes, source-coverage notes, and final recommendation. Use guided presets for the common cases and add `--dry-run` when you want a safe preview of changed fields before writing. Hand-edit the JSON only if you need a rarer field that is still not exposed as a flag.
 
 Generate a local Markdown report after review:
 

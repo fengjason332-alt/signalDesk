@@ -115,11 +115,13 @@ test('evidence next command prints guided next steps for continue_pilot evidence
   assert.match(output, /npm run phase4:create-today-evidence/i);
   assert.match(
     output,
-    /phase4:update-today-evidence -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json --completed-enriched-text-observed true/i,
+    /phase4:update-today-evidence -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json --preset enriched-non-empty-wins/i,
   );
-  assert.match(output, /phase4:update-today-evidence -- .*--mobile-quality acceptable/i);
-  assert.match(output, /phase4:update-today-evidence -- .*--freshness acceptable/i);
-  assert.match(output, /phase4:update-today-evidence -- .*--source-count 3 --source-coverage acceptable/i);
+  assert.match(output, /phase4:update-today-evidence -- .*--preset mobile-acceptable/i);
+  assert.match(output, /phase4:update-today-evidence -- .*--preset freshness-acceptable/i);
+  assert.match(output, /phase4:update-today-evidence -- .*--preset source-coverage-acceptable --source-count 3/i);
+  assert.match(output, /After this pass:/i);
+  assert.match(output, /phase4:today-evidence-status -- docs\/evidence\/today-real-feed-pilot-evidence\.local\.json/i);
 });
 
 test('evidence next plan uses an actionable fallback message when only optional notes remain', () => {
@@ -194,7 +196,7 @@ test('baseline-only evidence still receives a first real-feed observation bucket
   assert.match(nextPlan.exactNextManualAction, /enable real-feed/i);
   assert.match(
     nextPlan.exactUpdateCommands.join('\n'),
-    /--observed-feed-mode real --real-cards-rendered true --real-card-count 1/i,
+    /--preset real-cards-rendered/i,
   );
 });
 
@@ -216,6 +218,29 @@ test('evidence next command does not echo unsafe absolute evidence paths in upda
 
   assert.doesNotMatch(output, new RegExp(tempDir.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(output, /<path-to-local-evidence-json>/i);
+});
+
+test('evidence next command keeps private evidence follow-up reports on the matching private markdown path', () => {
+  const tempDir = mkdtempSync(join(tmpdir(), 'signaldesk-next-private-report-'));
+  const evidencePath = resolve(
+    tempDir,
+    'docs/evidence/today-real-feed-pilot-evidence.private.json',
+  );
+  const template = JSON.parse(readFileSync(incompleteExamplePath, 'utf8')) as Record<string, unknown>;
+
+  mkdirSync(resolve(tempDir, 'docs/evidence'), { recursive: true });
+  writeFileSync(evidencePath, JSON.stringify(template, null, 2), 'utf8');
+
+  const output = execFileSync(
+    process.execPath,
+    ['--import', 'tsx', nextScriptPath, evidencePath, '--allow-any-path'],
+    {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    },
+  );
+
+  assert.match(output, /today-real-feed-pilot-report\.private\.md/i);
 });
 
 test('evidence next command does not treat arbitrary temp docs/examples paths as shipped practice examples', () => {

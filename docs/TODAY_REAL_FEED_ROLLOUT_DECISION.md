@@ -1,6 +1,6 @@
 # Today Real-Feed Rollout Decision
 
-This document is maintained through Task 42. It does not switch Today to real content by default.
+This document is maintained through Task 45. It does not switch Today to real content by default.
 
 Today must remain mock by default until the criteria below are met and the team explicitly approves a later rollout task.
 
@@ -36,6 +36,9 @@ This means:
 - Task 40 makes the missing-evidence output actionable with grouped buckets and exact updater commands
 - Task 41 adds a guidance-only completeness score across review / next / report without changing rollout rules
 - Task 42 improves the local sanitized report so future sharing/review is easier without exposing private evidence
+- Task 43 adds a phased human pilot checklist for the actual operator run
+- Task 44 adds guided local evidence presets plus updater `--dry-run`
+- Task 45 adds a local evidence-status dashboard for recommendation, blockers, and next commands
 
 ## Current Boundary
 
@@ -122,7 +125,7 @@ Prerequisites:
 - This is a QA and rollout-decision document only.
 - It does not approve switching Today to real feed by default.
 - It still requires a separate controlled rollout task even if the local evidence review says `ready_for_controlled_default_rollout`.
-- As long as the local evidence review still returns `continue_pilot`, the next operator step is to run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json` and fill the first printed must-collect bucket.
+- As long as the local evidence review still returns `continue_pilot`, the next operator step is to run `npm run phase4:today-evidence-next -- docs/evidence/today-real-feed-pilot-evidence.local.json`, confirm the current blocker bucket with `npm run phase4:today-evidence-status -- docs/evidence/today-real-feed-pilot-evidence.local.json`, and fill the first printed must-collect bucket.
 - Task 20 decision: keep Today mock by default until target-environment rollout validation is complete.
 - It does not approve Radar, Watchlist, or Library real-data rollout.
 - It does not change any server-side AI scheduling boundary.

@@ -3,9 +3,17 @@ import { dirname, resolve } from 'node:path';
 import { mkdirSync } from 'node:fs';
 
 import {
+  applyTodayPilotEvidencePresetUpdates,
   applyTodayPilotEvidenceUpdates,
   assertTodayPilotEvidencePathSafe,
+  buildTodayPilotEvidenceUpdatePreview,
+  listTodayPilotEvidencePresetHelpLines,
+  readTodayPilotEvidencePresetName,
 } from '../src/lib/content/todayRealFeedEvidenceUpdater';
+import {
+  sanitizeTodayPilotDisplayPath,
+  sanitizeTodayPilotDisplayText,
+} from '../src/lib/content/todayRealFeedEvidenceSanitizer';
 import { DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH } from '../src/lib/content/todayRealFeedEvidenceStarter';
 
 function readFlagValue(argv: string[], index: number, flagName: string): string {
@@ -20,6 +28,7 @@ function parseArgs(argv: string[]) {
   let evidencePath = '';
   let allowAnyPath = false;
   let helpRequested = false;
+  let dryRun = false;
   const operatorNotes: string[] = [];
   const screenshotNotes: string[] = [];
   const envFlags: string[] = [];
@@ -33,6 +42,7 @@ function parseArgs(argv: string[]) {
   const bilingualQualityNotes: string[] = [];
   const freshnessNotes: string[] = [];
   const sourceCoverageNotes: string[] = [];
+  const presets: string[] = [];
   const options: Record<string, string | string[] | boolean> = {};
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -50,6 +60,17 @@ function parseArgs(argv: string[]) {
 
     if (current === '--help' || current === '-h') {
       helpRequested = true;
+      continue;
+    }
+
+    if (current === '--dry-run') {
+      dryRun = true;
+      continue;
+    }
+
+    if (current === '--preset') {
+      presets.push(readFlagValue(argv, index, current));
+      index += 1;
       continue;
     }
 
@@ -140,6 +161,7 @@ function parseArgs(argv: string[]) {
     evidencePath,
     allowAnyPath,
     helpRequested,
+    dryRun,
     operatorNotes,
     screenshotNotes,
     envFlags,
@@ -153,6 +175,7 @@ function parseArgs(argv: string[]) {
     bilingualQualityNotes,
     freshnessNotes,
     sourceCoverageNotes,
+    presets,
     options,
   };
 }
@@ -167,6 +190,8 @@ if (args.helpRequested) {
     `  npm run phase4:update-today-evidence -- ${DEFAULT_TODAY_REAL_FEED_EVIDENCE_OUTPUT_PATH} [flags]`,
     '',
     'Common flags:',
+    '  --preset <name>',
+    '  --dry-run',
     '  --observed-feed-mode real|real_empty|fallback_to_mock|mock|unknown',
     '  --real-cards-rendered true|false',
     '  --real-card-count <number>',
@@ -187,6 +212,9 @@ if (args.helpRequested) {
     '  --source-coverage-note "Describe the source mix"',
     '  --operator-note "Add a local reviewer note"',
     '  --screenshot-note "Add a local screenshot placeholder"',
+    '',
+    'Guided local-only presets:',
+    ...listTodayPilotEvidencePresetHelpLines(),
     '',
     'Safety:',
     '  - Local-only helper.',
@@ -213,7 +241,9 @@ try {
   assertTodayPilotEvidencePathSafe(resolvedEvidencePath, args.allowAnyPath);
 } catch (error) {
   process.stderr.write(
-    `Error: ${error instanceof Error ? error.message : 'Unsafe evidence path.'}\n`,
+    `Error: ${sanitizeTodayPilotDisplayText(
+      error instanceof Error ? error.message : 'Unsafe evidence path.',
+    )}\n`,
   );
   process.exit(1);
 }
@@ -237,9 +267,14 @@ try {
 }
 
 let updated: Record<string, unknown>;
+let presetNames: ReturnType<typeof readTodayPilotEvidencePresetName>[] = [];
 
 try {
-  updated = applyTodayPilotEvidenceUpdates(parsedRaw, {
+  presetNames = args.presets.map((presetName) =>
+    readTodayPilotEvidencePresetName(presetName),
+  );
+
+  const updateOptions = {
     allowAnyPath: args.allowAnyPath,
     pilotTimestamp: args.options['--pilot-timestamp'] as string | undefined,
     environmentLabel: args.options['--environment-label'] as string | undefined,
@@ -309,17 +344,43 @@ try {
     sourceCoverageNotes: args.sourceCoverageNotes,
     operatorNotes: args.operatorNotes,
     screenshotNotes: args.screenshotNotes,
-  });
+  };
+
+  updated =
+    presetNames.length > 0
+      ? applyTodayPilotEvidencePresetUpdates(parsedRaw, presetNames, updateOptions)
+      : applyTodayPilotEvidenceUpdates(parsedRaw, updateOptions);
 } catch (error) {
   process.stderr.write(
-    `Error: ${error instanceof Error ? error.message : 'Could not update evidence.'}\n`,
+    `Error: ${sanitizeTodayPilotDisplayText(
+      error instanceof Error ? error.message : 'Could not update evidence.',
+    )}\n`,
   );
   process.exit(1);
 }
 
-mkdirSync(dirname(resolvedEvidencePath), { recursive: true });
-writeFileSync(resolvedEvidencePath, `${JSON.stringify(updated, null, 2)}\n`, 'utf8');
+const preview = buildTodayPilotEvidenceUpdatePreview(parsedRaw, updated, {
+  appliedPresets: presetNames,
+  wouldWrite: !args.dryRun,
+});
 
-process.stdout.write(
-  `Updated local Today pilot evidence: ${args.evidencePath}\nNo Supabase call. No AI call. No content write.\n`,
-);
+if (!args.dryRun) {
+  mkdirSync(dirname(resolvedEvidencePath), { recursive: true });
+  writeFileSync(resolvedEvidencePath, `${JSON.stringify(updated, null, 2)}\n`, 'utf8');
+}
+
+const lines = [
+  args.dryRun
+    ? `Dry run only for local Today pilot evidence: ${sanitizeTodayPilotDisplayPath(args.evidencePath)}`
+    : `Updated local Today pilot evidence: ${sanitizeTodayPilotDisplayPath(args.evidencePath)}`,
+  preview.appliedPresets.length > 0
+    ? `Applied presets: ${preview.appliedPresets.join(', ')}`
+    : 'Applied presets: (none)',
+  preview.changedFields.length > 0
+    ? `Changed fields: ${preview.changedFields.join(', ')}`
+    : 'Changed fields: (none)',
+  args.dryRun ? 'No file was written.' : 'File write completed.',
+  'No Supabase call. No AI call. No content write.',
+];
+
+process.stdout.write(`${lines.join('\n')}\n`);

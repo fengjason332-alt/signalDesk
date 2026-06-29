@@ -3,6 +3,7 @@ import type {
   TodayRealFeedPilotEvidence,
 } from './todayRealFeedPilotEvidence';
 import { TODAY_REAL_FEED_PILOT_ROLLBACK_STEPS } from './todayRealFeedPilot';
+import { buildTodayPilotEvidencePresetCommand } from './todayRealFeedEvidenceUpdater';
 import {
   isTodayPilotRepoExamplePath,
   sanitizeTodayPilotDisplayPath,
@@ -104,7 +105,10 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `observed feed mode: ${evidence.observedFeedMode}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --observed-feed-mode real --real-cards-rendered true --real-card-count 1 --sample-card "Add one sampled real card title here."`,
+      buildTodayPilotEvidencePresetCommand(evidencePath, ['real-cards-rendered'], [
+        '--sample-card',
+        '"Add one sampled real card title here."',
+      ]),
     ],
     manualChecks: [
       'Enable real-feed and run one real browser pass instead of staying in mock or unknown mode.',
@@ -141,7 +145,10 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `sample cards captured: ${evidence.sampleCardIdsOrTitles.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --observed-feed-mode real --real-cards-rendered true --real-card-count 1 --sample-card "Add one sampled real card title here."`,
+      buildTodayPilotEvidencePresetCommand(evidencePath, ['real-cards-rendered'], [
+        '--sample-card',
+        '"Add one sampled real card title here."',
+      ]),
     ],
     manualChecks: [
       'Enable real-feed and confirm real cards actually render in Today.',
@@ -161,7 +168,14 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `detail checks captured: ${evidence.detailCheckedCount ?? 0}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --detail-checked-count 1 --detail-opened-safely true --provenance-visible true --no-fake-article-body true --operator-note "Checked one real Detail view with visible provenance and no fake full article body."`,
+      buildTodayPilotEvidencePresetCommand(
+        evidencePath,
+        ['detail-safe', 'provenance-visible'],
+        [
+          '--operator-note',
+          '"Checked one real Detail view with visible provenance and no fake full article body."',
+        ],
+      ),
     ],
     manualChecks: [
       'Open at least one real card in Detail.',
@@ -191,7 +205,10 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `real_empty notes captured: ${evidence.emptyStateChecks.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --observed-feed-mode real_empty --real-cards-rendered false --real-card-count 0 --real-empty-distinct true --empty-state-check "Captured a genuine real_empty state that stayed distinct from filter_empty."`,
+      buildTodayPilotEvidencePresetCommand(evidencePath, ['real-empty-observed'], [
+        '--empty-state-check',
+        '"Captured a genuine real_empty state that stayed distinct from filter_empty."',
+      ]),
     ],
     manualChecks: [
       'Enable real-feed and capture a true real_empty state, not an invalid-env fallback or a normal filter-empty result.',
@@ -209,7 +226,14 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `enriched-content cases captured: ${evidence.enrichedSummaryCases.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --completed-enriched-text-observed true --completed-enriched-text-wins true --enriched-case "Observed one completed non-empty enriched summary that clearly beat the deterministic preview text."`,
+      buildTodayPilotEvidencePresetCommand(
+        evidencePath,
+        ['enriched-non-empty-wins'],
+        [
+          '--enriched-case',
+          '"Observed one completed non-empty enriched summary that clearly beat the deterministic preview text."',
+        ],
+      ),
     ],
     manualChecks: [
       'Find one real card where enrichment is completed and the enriched text is visibly non-empty.',
@@ -224,7 +248,14 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `deterministic fallback cases captured: ${evidence.deterministicFallbackCases.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --blank-enrichment-fallback true --deterministic-fallback-case "Observed a completed-but-blank enrichment case that fell back to deterministic preview text safely."`,
+      buildTodayPilotEvidencePresetCommand(
+        evidencePath,
+        ['blank-enrichment-fallback'],
+        [
+          '--deterministic-fallback-case',
+          '"Observed a completed-but-blank enrichment case that fell back to deterministic preview text safely."',
+        ],
+      ),
     ],
     manualChecks: [
       'Find one case where enrichment is marked completed but the enriched text is blank.',
@@ -242,7 +273,14 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `filter-behavior notes captured: ${evidence.filterChecks.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --ai-openai-filter-works true --nonmatching-filter-empty true --filter-check "AI/OpenAI filter matched a real card and a nonmatching filter still showed the normal filter-empty state."`,
+      buildTodayPilotEvidencePresetCommand(
+        evidencePath,
+        ['filter-ai-openai-works', 'filter-empty-works'],
+        [
+          '--filter-check',
+          '"AI/OpenAI filter matched a real card and a nonmatching filter still showed the normal filter-empty state."',
+        ],
+      ),
     ],
     manualChecks: [
       'Run the AI/OpenAI filter against a matching real card when that content is available.',
@@ -257,7 +295,10 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `rollback captured: ${evidence.rollbackToMockVerified === true ? 'yes' : 'no'}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --rollback-tested true --operator-note "Set VITE_USE_REAL_CONTENT_FEED=false and confirmed Today returned to the mock feed."`,
+      buildTodayPilotEvidencePresetCommand(evidencePath, ['rollback-tested'], [
+        '--operator-note',
+        '"Set VITE_USE_REAL_CONTENT_FEED=false and confirmed Today returned to the mock feed."',
+      ]),
     ],
     manualChecks: [
       'Set VITE_USE_REAL_CONTENT_FEED=false and restart locally or rebuild/redeploy the tested environment.',
@@ -302,7 +343,10 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `mobile notes captured: ${evidence.mobileQualityNotes.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --mobile-quality acceptable --mobile-note "Checked Today and Detail on a narrow/mobile viewport; cards, chips, and provenance stayed readable."`,
+      buildTodayPilotEvidencePresetCommand(evidencePath, ['mobile-acceptable'], [
+        '--mobile-note',
+        '"Checked Today and Detail on a narrow/mobile viewport; cards, chips, and provenance stayed readable."',
+      ]),
     ],
     manualChecks: [
       'Check Today and Detail on at least one narrow/mobile viewport.',
@@ -317,7 +361,10 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `freshness notes captured: ${evidence.freshnessNotes.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --freshness acceptable --freshness-note "Observed publish dates or recency that felt acceptable for the tested pilot environment."`,
+      buildTodayPilotEvidencePresetCommand(evidencePath, ['freshness-acceptable'], [
+        '--freshness-note',
+        '"Observed publish dates or recency that felt acceptable for the tested pilot environment."',
+      ]),
     ],
     manualChecks: [
       'Review the publish dates or recency of the real cards you observed.',
@@ -332,7 +379,16 @@ const GUIDANCE_AREAS: readonly GuidanceAreaDefinition[] = [
     describeExistingEvidence: (evidence) =>
       `source coverage notes captured: ${evidence.sourceCoverageNotes.length}`,
     suggestedCommands: (evidencePath) => [
-      `npm run phase4:update-today-evidence -- ${evidencePath} --source-count 3 --source-coverage acceptable --source-coverage-note "Observed a broad enough mix of stable sources for the pilot."`,
+      buildTodayPilotEvidencePresetCommand(
+        evidencePath,
+        ['source-coverage-acceptable'],
+        [
+          '--source-count',
+          '3',
+          '--source-coverage-note',
+          '"Observed a broad enough mix of stable sources for the pilot."',
+        ],
+      ),
     ],
     manualChecks: [
       'Review whether the observed cards came from a broad enough set of stable sources.',

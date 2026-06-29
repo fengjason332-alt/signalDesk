@@ -13,6 +13,7 @@
     "phase4:today-pilot-check": "node --import tsx scripts/phase4-today-real-feed-pilot.ts",
     "phase4:today-evidence-review": "node --import tsx scripts/phase4-today-real-feed-evidence-review.ts",
     "phase4:today-evidence-next": "node --import tsx scripts/phase4-today-real-feed-evidence-next.ts",
+    "phase4:today-evidence-status": "node --import tsx scripts/phase4-today-real-feed-evidence-status.ts",
     "phase4:update-today-evidence": "node --import tsx scripts/phase4-update-today-real-feed-evidence.ts",
     "phase4:today-pilot-report": "node --import tsx scripts/phase4-today-real-feed-pilot-report.ts",
     "phase4:today-help": "node --import tsx scripts/phase4-today-real-feed-help.ts"
